@@ -149,10 +149,11 @@ export const NewsRadar: React.FC = () => {
   const translateConnectionType = (type: string) => {
     switch (type) {
       case 'rss2json_proxy': return 'Proxy Público (rss2json)';
-      case 'edge_function': return 'Edge Function (Supabase)';
+      case 'edge_function': return 'Supabase Edge Function';
       case 'google_news': return 'Google News Engine';
       case 'social_api': return 'Social Media API';
       case 'rss_direct': return 'RSS Directo';
+      case 'pending': return 'Pendiente / No URL';
       default: return type;
     }
   };
@@ -470,6 +471,7 @@ export const NewsRadar: React.FC = () => {
                   <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Tipo de Conexión</th>
                   <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Estado</th>
                   <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Noticias Extraídas</th>
+                  <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Tiempo (ms)</th>
                   <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Última Revisión</th>
                 </tr>
               </thead>
@@ -496,17 +498,26 @@ export const NewsRadar: React.FC = () => {
                         </span>
                       </td>
                       <td style={{ padding: '0.75rem' }}>
-                        {diag.status === 'OK' ? (
+                        {diag.status === 'OK' && (
                           <span style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, fontSize: '0.75rem' }}>OK</span>
-                        ) : (
+                        )}
+                        {diag.status === 'ERROR' && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                             <span style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, fontSize: '0.75rem', alignSelf: 'flex-start' }}>Error</span>
                             <span style={{ fontSize: '0.7rem', color: '#ef4444' }}>{diag.message}</span>
                           </div>
                         )}
+                        {diag.status === 'PENDING' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <span style={{ backgroundColor: 'var(--bg-tertiary)', color: 'var(--text-secondary)', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, fontSize: '0.75rem', alignSelf: 'flex-start' }}>Pendiente</span>
+                          </div>
+                        )}
                       </td>
                       <td style={{ padding: '0.75rem', fontWeight: 700, color: diag.status === 'OK' ? 'var(--text-primary)' : 'var(--text-muted)' }}>
                         {diag.itemCount}
+                      </td>
+                      <td style={{ padding: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.75rem', fontFamily: 'monospace' }}>
+                        {diag.responseTimeMs ? `${diag.responseTimeMs}ms` : '-'}
                       </td>
                       <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>
                         {new Date(diag.lastChecked).toLocaleTimeString('es-AR')}

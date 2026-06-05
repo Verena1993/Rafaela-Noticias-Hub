@@ -93,17 +93,18 @@ export interface NewsRadarItem {
   socialPlatform?: 'tiktok' | 'instagram' | 'x' | 'youtube' | 'local';
 }
 
-export type ConnectionType = 'rss_direct' | 'rss2json_proxy' | 'edge_function' | 'google_news' | 'social_api';
+export type ConnectionType = 'rss_direct' | 'rss2json_proxy' | 'edge_function' | 'google_news' | 'social_api' | 'pending';
 
 export interface RssDiagnostic {
   id: string;
   name: string;
   url: string;
-  status: 'OK' | 'ERROR';
+  status: 'OK' | 'ERROR' | 'PENDING';
   itemCount: number;
   message?: string;
   lastChecked: string;
   connectionType: ConnectionType;
+  responseTimeMs?: number;
 }
 
 export interface Task {

@@ -1,6 +1,6 @@
 import { RSS_FEEDS } from '../config/rssFeeds';
-import type { NewsRadarItem, RssDiagnostic, RadarCategory } from '../data/mockData';
-import { newsGatewayService } from './newsGatewayService';
+import type { NewsRadarItem, RssDiagnostic, RadarCategory, ConnectionType } from '../data/mockData';
+import { supabaseRadarGateway } from './supabaseRadarGateway';
 
 const ALERT_KEYWORDS = ['accidente', 'choque', 'incendio', 'robo', 'allanamiento', 'homicidio', 'tormenta', 'evacuacion', 'evacuación', 'corte'];
 
@@ -9,7 +9,10 @@ const LOCAL_KEYWORDS = [
   'felicia', 'sunchales', 'humberto', 'tacural', 'presidente roca', 'san vicente', 
   'angélica', 'vila', 'maría juana', 'ramona', 'frontera', 'josefina', 'virginia', 
   'castellanos', 'departamento castellanos', 'concejo municipal de rafaela', 
-  'municipalidad de rafaela', 'gobierno de rafaela', 'región rafaela'
+  'municipalidad de rafaela', 'gobierno de rafaela', 'región rafaela', 'humberto primo',
+  'aldao', 'eusebia', 'colonia raquel', 'colonia bicha', 'zenón pereyra',
+  'santa clara de saguier', 'coronel fraga', 'garibaldi', 'plaza clucellas',
+  'esmeralda', 'san antonio', 'bauer y sigel', 'egusquiza', 'colonia aldao', 'moisés ville', 'aurelia'
 ];
 
 const PROVINCIAL_KEYWORDS = [
@@ -74,16 +77,25 @@ export const rssService = {
       const diag: RssDiagnostic = {
         id: feed.id,
         name: feed.name,
-        url: feed.url,
-        status: 'OK',
+        url: feed.url || 'URL NO CONFIGURADA',
+        status: feed.connectionType === 'pending' ? 'PENDING' : 'OK',
         itemCount: 0,
         lastChecked: new Date().toISOString(),
-        connectionType: feed.connectionType
+        connectionType: feed.connectionType,
+        responseTimeMs: 0
       };
 
+      if (feed.connectionType === 'pending') {
+        diag.message = 'Pendiente de configuración';
+        diagnostics.push(diag);
+        continue;
+      }
+
       try {
-        const data = await newsGatewayService.fetchFeed(feed.url, feed.connectionType);
+        const { data, methodUsed, responseTimeMs } = await supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
         
+        diag.connectionType = methodUsed as ConnectionType;
+        diag.responseTimeMs = responseTimeMs;
         let addedItems = 0;
         
         // Assuming JSON format from Gateway (rss2json or Edge Function matching same output)
