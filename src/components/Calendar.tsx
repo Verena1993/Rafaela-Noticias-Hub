@@ -12,6 +12,7 @@ import {
   Save
 } from 'lucide-react';
 import type { CalendarEvent, StaffSchedule, ProgramType, FormatType } from '../data/mockData';
+import { formatFriendlyDate } from '../utils/dateUtils';
 
 interface CalendarProps {
   setSelectedCoverageId?: (id: string | null) => void;
@@ -22,6 +23,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 }) => {
   const { 
     events, 
+    coverages,
     users, 
     staffSchedules, 
     addEvent, 
@@ -39,7 +41,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   // Date state
   const [viewDate, setViewDate] = useState<Date>(() => new Date());
   const [selectedProgramFilter, setSelectedProgramFilter] = useState<ProgramType | 'Todos'>('Todos');
-  const [expandedDay, setExpandedDay] = useState<string | null>(null);
+
 
   // Filter events by program
   const filteredEvents = events.filter(evt => {
@@ -161,15 +163,7 @@ export const Calendar: React.FC<CalendarProps> = ({
     return map[type] || 'Evento';
   };
 
-  const handleDayCellClick = (day: number) => {
-    const formattedDay = day < 10 ? `0${day}` : day;
-    const formattedMonth = (currentMonth + 1) < 10 ? `0${currentMonth + 1}` : (currentMonth + 1);
-    setNewStart(`${currentYear}-${formattedMonth}-${formattedDay}T10:00`);
-    setNewEnd(`${currentYear}-${formattedMonth}-${formattedDay}T11:30`);
-    setNewPrograms(selectedProgramFilter !== 'Todos' ? [selectedProgramFilter] : []);
-    setNewFormats([]);
-    setShowAddModal(true);
-  };
+
 
   // Staff Schedule Getter
   const getDaySchedule = (dateStr: string): StaffSchedule => {
@@ -430,8 +424,11 @@ export const Calendar: React.FC<CalendarProps> = ({
                       <span 
                         className="calendar-day-num"
                         style={{ cursor: 'pointer', fontWeight: 700 }}
-                        onClick={() => handleDayCellClick(day)}
-                        title="Programar evento aquí"
+                        onClick={() => {
+                          setViewDate(new Date(currentYear, currentMonth, day));
+                          setViewMode('day');
+                        }}
+                        title="Ver detalles del día"
                       >
                         {day}
                       </span>
@@ -481,7 +478,11 @@ export const Calendar: React.FC<CalendarProps> = ({
                       ))}
                       {hiddenCount > 0 && (
                         <button
-                          onClick={(e) => { e.stopPropagation(); setExpandedDay(expandedDay === dayStr ? null : dayStr); }}
+                          onClick={(e) => { 
+                            e.stopPropagation(); 
+                            setViewDate(new Date(currentYear, currentMonth, day));
+                            setViewMode('day');
+                          }}
                           style={{
                             fontSize: '0.6rem',
                             color: 'var(--primary)',
@@ -497,42 +498,6 @@ export const Calendar: React.FC<CalendarProps> = ({
                         >
                           +{hiddenCount} más
                         </button>
-                      )}
-                      {/* Expanded day modal */}
-                      {expandedDay === dayStr && (
-                        <div style={{
-                          position: 'absolute',
-                          zIndex: 100,
-                          background: 'var(--bg-primary)',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: 'var(--radius-md)',
-                          padding: '0.75rem',
-                          minWidth: '200px',
-                          boxShadow: 'var(--shadow-lg)',
-                          marginTop: '4px',
-                          top: 0,
-                          left: 0
-                        }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                            <strong style={{ fontSize: '0.8rem' }}>Eventos del día {day}</strong>
-                            <button onClick={() => setExpandedDay(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>✕</button>
-                          </div>
-                          {dayEvents.map(evt => (
-                            <div 
-                              key={evt.id}
-                              className={getEventClass(evt.type)}
-                              style={{ marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.4rem' }}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setExpandedDay(null);
-                                if (evt.coverageId) navigateToCoverage(evt.coverageId);
-                                else handleSelectEventForView(evt);
-                              }}
-                            >
-                              {evt.start.split('T')[1]?.substring(0,5)} {evt.title.replace(/^\[Cobertura\] /, '')}
-                            </div>
-                          ))}
-                        </div>
                       )}
                     </div>
                   </div>
@@ -671,7 +636,7 @@ export const Calendar: React.FC<CalendarProps> = ({
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
                   <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>
-                    Compromisos del {viewDate.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                    Compromisos del {formatFriendlyDate(viewDate)}
                   </h4>
                   <div style={{ display: 'flex', gap: '0.35rem' }}>
                     <button 
@@ -701,6 +666,28 @@ export const Calendar: React.FC<CalendarProps> = ({
                       const timeStart = evt.start.split('T')[1]?.substring(0, 5) || '00:00';
                       const timeEnd = evt.end.split('T')[1]?.substring(0, 5) || '00:00';
                       
+                      const eventStatusLabels: Record<string, string> = {
+                        pending: 'Pendiente',
+                        confirmed: 'Confirmada',
+                        in_coverage: 'En Cobertura',
+                        finished: 'Finalizada',
+                        suspended: 'Suspendida',
+                        pending_confirmation: 'Pendiente de confirmación',
+                        in_redaction: 'En Redacción',
+                        ready_to_publish: 'En Redacción',
+                        published: 'Publicada'
+                      };
+
+
+                      let assigneesList: string[] = [];
+                      if (evt.coverageId) {
+                         const cov = coverages.find(c => c.id === evt.coverageId);
+                         if (cov) assigneesList = cov.assignees;
+                      } else if (evt.assigneeId) {
+                         assigneesList = [evt.assigneeId];
+                      }
+                      const assigneeNames = assigneesList.map(uid => users.find(u => u.id === uid)?.name).filter(Boolean).join(', ') || 'Sin asignar';
+
                       return (
                         <div 
                           key={evt.id} 
@@ -711,7 +698,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                             display: 'flex',
                             flexDirection: 'column',
                             gap: '0.35rem',
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            position: 'relative'
                           }}
                           onClick={() => {
                             if (evt.coverageId) {
@@ -721,12 +709,36 @@ export const Calendar: React.FC<CalendarProps> = ({
                             }
                           }}
                         >
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h5 style={{ fontSize: '0.9rem', fontWeight: 700 }}>{evt.title.replace(/^\[Cobertura\] /, '')}</h5>
-                            <span className={`badge event-${evt.type}`}>{getEventTypeName(evt.type)}</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                              <h5 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.2rem' }}>{evt.title.replace(/^\[Cobertura\] /, '')}</h5>
+                              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                                <span className={`badge event-${evt.type}`}>{getEventTypeName(evt.type)}</span>
+                                <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{eventStatusLabels[evt.status || 'pending'] || 'Pendiente'}</span>
+                              </div>
+                            </div>
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: '0.2rem 0.5rem', fontSize: '0.7rem' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (evt.coverageId) {
+                                  navigateToCoverage(evt.coverageId);
+                                } else {
+                                  handleSelectEventForView(evt);
+                                }
+                              }}
+                            >
+                              <Edit3 size={12} style={{ marginRight: '0.2rem', verticalAlign: 'middle' }} /> Editar
+                            </button>
                           </div>
-                          {evt.description && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>{evt.description}</p>}
                           
+                          {evt.description && <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>{evt.description}</p>}
+                          
+                          <div style={{ fontSize: '0.75rem', marginTop: '0.2rem', color: 'var(--text-secondary)' }}>
+                            <span style={{ fontWeight: 600 }}>Responsables:</span> {assigneeNames}
+                          </div>
+
                           {/* Programs & Formats */}
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', margin: '0.15rem 0' }}>
                             {(evt.programs || []).map((prog, idx) => (

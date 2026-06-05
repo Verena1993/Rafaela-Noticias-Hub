@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
 import { 
-  ArrowLeft, Calendar, MapPin, Send, Plus, ExternalLink, 
+  ArrowLeft, Calendar, MapPin, Send, ExternalLink, 
   Image, FileText, Check, Bot, History, Sparkles, MessageSquare, Clipboard,
   MessageCircle
 } from 'lucide-react';
 import type { Coverage, PublicationChecklist, ProgramType, FormatType } from '../data/mockData';
+import { formatFriendlyDate } from '../utils/dateUtils';
+import { MultimediaManager } from './MultimediaManager';
 
 interface CoverageDetailProps {
   coverageId: string;
@@ -15,7 +17,7 @@ interface CoverageDetailProps {
 export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBack }) => {
   const { 
     coverages, users, updateCoverageStatus, 
-    addCommentToCoverage, addMultimediaToCoverage, addSharedLinkToCoverage, 
+    addCommentToCoverage, addMultimediaToCoverage, 
     updatePublicationStatus, currentUser, updateCoverageDetails,
     events, updateEvent, recreateCoverageForEvent
   } = useHub();
@@ -24,10 +26,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [chatMessage, setChatMessage] = useState('');
   
   // Modals state
-  const [showLinkModal, setShowLinkModal] = useState(false);
-  const [linkLabel, setLinkLabel] = useState('');
-  const [linkUrl, setLinkUrl] = useState('');
-  const [linkComment, setLinkComment] = useState('');
+
 
   const [showFileModal, setShowFileModal] = useState(false);
   const [fileName, setFileName] = useState('');
@@ -275,22 +274,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     window.open(url, '_blank');
   };
 
-  const handleRealFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const fileUrl = event.target?.result as string || URL.createObjectURL(file);
-      let type: 'photo' | 'video' | 'audio' | 'document' = 'document';
-      if (file.type.startsWith('image/')) type = 'photo';
-      else if (file.type.startsWith('video/')) type = 'video';
-      else if (file.type.startsWith('audio/')) type = 'audio';
-      const sizeInMb = (file.size / (1024 * 1024)).toFixed(1) + ' MB';
-      addMultimediaToCoverage(coverage.id, file.name, type, fileUrl, sizeInMb);
-    };
-    reader.readAsDataURL(file);
-  };
+
 
   const handleTogglePlatform = (plat: keyof PublicationChecklist) => {
     const check = coverage.publications[plat];
@@ -315,17 +299,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
     addCommentToCoverage(coverage.id, text);
     if (!textOverride) setChatMessage('');
-  };
-
-  const handleAddLinkSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!linkLabel.trim() || !linkUrl.trim()) return;
-
-    addSharedLinkToCoverage(coverage.id, linkLabel, linkUrl, linkComment);
-    setLinkLabel('');
-    setLinkUrl('');
-    setLinkComment('');
-    setShowLinkModal(false);
   };
 
   const handleAddFileSubmit = (e: React.FormEvent) => {
@@ -513,7 +486,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <Calendar size={14} /> 
-            {new Date(coverage.dateTime).toLocaleDateString()} - {new Date(coverage.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+            {formatFriendlyDate(coverage.dateTime)} - {new Date(coverage.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <MapPin size={14} /> {coverage.location}
@@ -632,139 +605,12 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
           {/* TAB: MULTIMEDIA & SHARED MATERIALS */}
           {activeTab === 'multimedia' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-              {/* Central Shared Material "Material Compartido" */}
-              <div className="card" style={{ border: '1.5px solid var(--primary)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 className="detail-section-title" style={{ border: 'none', margin: 0, padding: 0 }}>
-                    🔗 Material Compartido (Enlaces Externos)
-                  </h3>
-                  <button className="btn btn-primary" style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }} onClick={() => setShowLinkModal(true)}>
-                    <Plus size={14} /> Agregar Link
-                  </button>
-                </div>
-                
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                  Espacio exclusivo para carpetas en Drive, descargas de TransferNow/WeTransfer u otros recursos compartidos por móviles en la calle.
-                </p>
-
-                {coverage.sharedLinks.length === 0 ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)' }}>
-                    No hay enlaces compartidos todavía.
-                  </div>
-                ) : (
-                  <div className="shared-material-grid">
-                    {coverage.sharedLinks.map(link => {
-                      const u = users.find(usr => usr.id === link.userId);
-                      return (
-                        <div key={link.id} className="link-card">
-                          <div className="link-card-header">
-                            <ExternalLink size={16} color="var(--primary)" style={{ marginTop: '0.15rem' }} />
-                            <div>
-                              <h4 className="link-title">{link.title}</h4>
-                              <a href={link.url} target="_blank" rel="noreferrer" style={{ fontSize: '0.75rem', overflowWrap: 'anywhere' }}>
-                                {link.url}
-                              </a>
-                            </div>
-                          </div>
-                          {link.comments && (
-                            <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', backgroundColor: 'var(--bg-primary)', padding: '0.35rem', borderRadius: 'var(--radius-sm)' }}>
-                              "{link.comments}"
-                            </p>
-                          )}
-                          <div className="link-meta" style={{ marginTop: 'auto', display: 'flex', justifyContent: 'space-between' }}>
-                            <span>Por: {u?.name.split(' ')[0]}</span>
-                            <span>{new Date(link.uploadDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              {/* Uploaded Files section */}
-              <div className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                  <h3 className="detail-section-title" style={{ border: 'none', margin: 0, padding: 0 }}>
-                    📁 Archivos Cargados
-                  </h3>
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.6rem' }} 
-                    onClick={() => document.getElementById('real-file-upload-detail')?.click()}
-                  >
-                    <Plus size={14} /> Cargar Archivo
-                  </button>
-                  <input 
-                    type="file" 
-                    id="real-file-upload-detail" 
-                    style={{ display: 'none' }} 
-                    onChange={handleRealFileUpload} 
-                  />
-                </div>
-
-                {coverage.multimedia.length === 0 ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-                    Ningún archivo directo cargado en el hub.
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1rem' }}>
-                    {coverage.multimedia.map(item => (
-                      <div 
-                        key={item.id}
-                        onClick={() => setPreviewItem(item)}
-                        className="hover-card-bg"
-                        style={{
-                          padding: '0.75rem',
-                          border: '1px solid var(--border-color)',
-                          borderRadius: 'var(--radius-md)',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '0.5rem',
-                          backgroundColor: 'var(--bg-secondary)',
-                          cursor: 'pointer',
-                          transition: 'var(--transition)'
-                        }}
-                      >
-                        {item.type === 'photo' && (
-                          <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden', height: '120px', border: '1px solid var(--border-color)' }}>
-                            <img src={item.url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          </div>
-                        )}
-                        {item.type === 'video' && (
-                          <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden', height: '120px', border: '1px solid var(--border-color)', backgroundColor: 'black', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', gap: '0.25rem' }}>
-                            <span style={{ fontSize: '1.5rem' }}>🎬</span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Reproducir Video</span>
-                          </div>
-                        )}
-                        {item.type === 'audio' && (
-                          <div style={{ borderRadius: 'var(--radius-sm)', overflow: 'hidden', height: '120px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-primary)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)', gap: '0.25rem' }}>
-                            <span style={{ fontSize: '1.5rem' }}>🎵</span>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Reproducir Audio</span>
-                          </div>
-                        )}
-                        {item.type === 'document' && (
-                          <div style={{ height: '120px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-sm)', backgroundColor: 'var(--bg-primary)', color: 'var(--text-secondary)', gap: '0.25rem' }}>
-                            <FileText size={32} color="var(--primary)" />
-                            <span style={{ fontSize: '0.75rem', fontWeight: 600 }}>Ver Documento (PDF)</span>
-                          </div>
-                        )}
-                        
-                        <div style={{ minWidth: 0 }}>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.name}>
-                            {item.name}
-                          </div>
-                          <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between', marginTop: '0.25rem' }}>
-                            <span>{item.size}</span>
-                            <span>Por: {users.find(usr => usr.id === item.userId)?.name.split(' ')[0]}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+            <div className="card">
+              <h3 className="detail-section-title">📦 Gestor Multimedia y Archivos</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                Sube fotos, videos, audios o documentos a esta actividad, o vincula enlaces externos y carpetas de Google Drive.
+              </p>
+              <MultimediaManager coverage={coverage} />
             </div>
           )}
 
@@ -894,7 +740,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                           {isPub ? (
                             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                               <span>Por: {pubUser?.name.split(' ')[0]}</span>
-                              <span>{new Date(check.date || '').toLocaleDateString()}</span>
+                              <span>{formatFriendlyDate(check.date || '')}</span>
                               {plat === 'portal' && check.link && (
                                 <a href={check.link} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem', fontWeight: 600 }}>
                                   Enlace <ExternalLink size={12} />
@@ -1082,7 +928,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                         <span style={{ fontWeight: 700 }}>{act.userName} </span>
                         <span>{act.action}</span>
                         <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
-                          {new Date(act.timestamp).toLocaleDateString()} a las {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+                          {formatFriendlyDate(act.timestamp)} a las {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
                         </div>
                       </div>
                     </div>
@@ -1152,61 +998,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         </div>
       </div>
 
-      {/* Shared Link Creation Modal */}
-      {showLinkModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 className="modal-title">Agregar Enlace Compartido</h3>
-              <button className="modal-close" onClick={() => setShowLinkModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleAddLinkSubmit}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">Título del Enlace</label>
-                  <input
-                    type="text"
-                    required
-                    className="form-input"
-                    placeholder="Ej. Fotos en alta - Google Drive"
-                    value={linkLabel}
-                    onChange={(e) => setLinkLabel(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">URL (Enlace Web)</label>
-                  <input
-                    type="url"
-                    required
-                    className="form-input"
-                    placeholder="https://drive.google.com/..."
-                    value={linkUrl}
-                    onChange={(e) => setLinkUrl(e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Comentarios (Opcional)</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Contraseña del WeTransfer, indicaciones..."
-                    value={linkComment}
-                    onChange={(e) => setLinkComment(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowLinkModal(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Agregar Enlace
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
 
       {/* Direct File Creation Modal */}
       {showFileModal && (

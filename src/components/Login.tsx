@@ -6,7 +6,7 @@ import { Radio } from 'lucide-react';
 export const Login: React.FC = () => {
   const { login } = useHub();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('123456'); // Mock default password
+  const [password, setPassword] = useState('password123'); // Mock default password
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -15,17 +15,18 @@ export const Login: React.FC = () => {
       setError('Por favor ingresa un correo electrónico.');
       return;
     }
-    const success = login(email);
+    const success = login(email, password);
     if (success) {
       setError('');
     } else {
-      setError('Usuario no registrado. Utiliza los accesos rápidos debajo para probar.');
+      setError('Credenciales incorrectas. Verifica tu email y contraseña.');
     }
   };
 
-  const handleQuickLogin = (quickEmail: string) => {
+  const handleQuickLogin = (quickEmail: string, quickPass: string) => {
     setEmail(quickEmail);
-    login(quickEmail);
+    setPassword(quickPass);
+    login(quickEmail, quickPass);
   };
 
   return (
@@ -99,7 +100,7 @@ export const Login: React.FC = () => {
                   key={u.id}
                   type="button"
                   className="role-shortcut-btn"
-                  onClick={() => handleQuickLogin(u.email)}
+                  onClick={() => handleQuickLogin(u.email, u.password || 'password123')}
                 >
                   <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{u.name.split(' ')[0]}</span>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>

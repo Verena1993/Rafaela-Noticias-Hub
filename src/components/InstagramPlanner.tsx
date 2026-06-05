@@ -4,6 +4,7 @@ import {
   Plus, Trash2, Edit3, ChevronLeft, ChevronRight, 
   Calendar as CalendarIcon, Save
 } from 'lucide-react';
+import { formatFriendlyDate } from '../utils/dateUtils';
 import type { InstagramPost } from '../data/mockData';
 
 // Custom Instagram SVG Icon for reliability across lucide-react versions
@@ -33,8 +34,14 @@ export const InstagramPlanner: React.FC = () => {
     users 
   } = useHub();
 
-  const [selectedDate, setSelectedDate] = useState('2026-06-04');
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
   
+  const [viewMode, setViewMode] = useState<'day' | 'week' | 'month'>('day');
+
   // Create / Edit modal states
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTime, setNewTime] = useState('10:00');
@@ -50,12 +57,40 @@ export const InstagramPlanner: React.FC = () => {
   const [editAssigneeId, setEditAssigneeId] = useState('');
   const [editStatus, setEditStatus] = useState<InstagramPost['status']>('idea');
 
-  // Filter and sort posts for the active date
-  const sortedPosts = useMemo(() => {
+  // Filter and sort posts based on viewMode
+  const getPostsForDate = (dateStr: string) => {
     return instagramPosts
-      .filter(p => p.date === selectedDate)
+      .filter(p => p.date === dateStr)
       .sort((a, b) => a.time.localeCompare(b.time));
-  }, [instagramPosts, selectedDate]);
+  };
+
+  const datesToRender = useMemo(() => {
+    const dates = [];
+    const baseDate = new Date(selectedDate + 'T00:00:00');
+    
+    if (viewMode === 'day') {
+      dates.push(selectedDate);
+    } else if (viewMode === 'week') {
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + i);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        dates.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      }
+    } else if (viewMode === 'month') {
+      for (let i = 0; i < 30; i++) {
+        const d = new Date(baseDate);
+        d.setDate(d.getDate() + i);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        dates.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+      }
+    }
+    return dates;
+  }, [selectedDate, viewMode]);
+
+  const displayedPosts = useMemo(() => {
+    return instagramPosts.filter((p: InstagramPost) => datesToRender.includes(p.date));
+  }, [instagramPosts, datesToRender]);
 
   // Day browsing helpers
   const handlePrevDay = () => {
@@ -186,41 +221,67 @@ export const InstagramPlanner: React.FC = () => {
           />
         </div>
 
-        <div style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-          Día: {new Date(selectedDate + 'T00:00:00').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+        <div style={{ display: 'flex', gap: '0.25rem' }}>
+          <button 
+            className={`btn ${viewMode === 'day' ? 'btn-primary' : 'btn-secondary'}`} 
+            style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+            onClick={() => setViewMode('day')}
+          >
+            Día
+          </button>
+          <button 
+            className={`btn ${viewMode === 'week' ? 'btn-primary' : 'btn-secondary'}`} 
+            style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+            onClick={() => setViewMode('week')}
+          >
+            Semana
+          </button>
+          <button 
+            className={`btn ${viewMode === 'month' ? 'btn-primary' : 'btn-secondary'}`} 
+            style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+            onClick={() => setViewMode('month')}
+          >
+            Mes
+          </button>
         </div>
       </div>
 
       {/* Main Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '1.5rem' }}>
         {/* Timeline Area */}
-        <div className="card">
-          <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem' }}>
-            ⏰ Cronograma del Día ({sortedPosts.length} publicaciones)
-          </h3>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
+          {datesToRender.map(dateStr => {
+            const dayPosts = getPostsForDate(dateStr);
+            if (viewMode !== 'day' && dayPosts.length === 0) return null;
 
-          {sortedPosts.length === 0 ? (
-            <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-              <Instagram size={36} style={{ color: 'var(--text-muted)', margin: '0 auto 0.75rem', opacity: 0.5 }} />
-              <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>No hay publicaciones agendadas para esta fecha.</p>
-              <p style={{ fontSize: '0.8rem' }}>Haz clic en "Planificar Publicación" para armar la grilla de hoy.</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative' }}>
-              {/* Vertical line connector */}
-              <div style={{
-                position: 'absolute',
-                top: '15px',
-                bottom: '15px',
-                left: '28px',
-                width: '2px',
-                backgroundColor: 'var(--border-color)',
-                zIndex: 1
-              }} />
+            return (
+              <div key={dateStr}>
+                <h3 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.25rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                  ⏰ {formatFriendlyDate(dateStr + 'T00:00:00')} ({dayPosts.length} publicaciones)
+                </h3>
 
-              {sortedPosts.map((post) => {
-                const assignee = users.find(u => u.id === post.assigneeId);
-                const typeConfig = typeLabels[post.type];
+                {dayPosts.length === 0 ? (
+                  <div style={{ padding: '4rem 2rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <Instagram size={36} style={{ color: 'var(--text-muted)', margin: '0 auto 0.75rem', opacity: 0.5 }} />
+                    <p style={{ fontSize: '0.9rem', fontWeight: 600 }}>No hay publicaciones agendadas para esta fecha.</p>
+                    <p style={{ fontSize: '0.8rem' }}>Haz clic en "Planificar Publicación" para armar la grilla.</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', position: 'relative' }}>
+                    {/* Vertical line connector */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '15px',
+                      bottom: '15px',
+                      left: '28px',
+                      width: '2px',
+                      backgroundColor: 'var(--border-color)',
+                      zIndex: 1
+                    }} />
+
+                    {dayPosts.map((post) => {
+                      const assignee = users.find(u => u.id === post.assigneeId);
+                      const typeConfig = typeLabels[post.type];
                 
                 return (
                   <div 
@@ -326,9 +387,12 @@ export const InstagramPlanner: React.FC = () => {
                     </div>
                   </div>
                 );
-              })}
-            </div>
-          )}
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Sidebar Info & Helpers */}
@@ -348,7 +412,7 @@ export const InstagramPlanner: React.FC = () => {
             </h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
               {Object.entries(statusLabels).map(([statusKey, cfg]) => {
-                const count = sortedPosts.filter(p => p.status === statusKey).length;
+                const count = displayedPosts.filter((p: InstagramPost) => p.status === statusKey).length;
                 return (
                   <div key={statusKey} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className={`badge ${cfg.className}`} style={{ fontSize: '0.7rem', display: 'inline-block', minWidth: '95px', textAlign: 'center' }}>

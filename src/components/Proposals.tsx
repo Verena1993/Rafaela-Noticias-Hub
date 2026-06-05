@@ -15,6 +15,7 @@ import {
   FolderOpen
 } from 'lucide-react';
 import type { Proposal, ProgramType, FormatType, Coverage } from '../data/mockData';
+import { formatFriendlyDate } from '../utils/dateUtils';
 
 export const Proposals: React.FC = () => {
   const { 
@@ -145,7 +146,7 @@ export const Proposals: React.FC = () => {
       id: 'wa1',
       sender: '+54 3492 65-4321 (Vecino Bº Italia)',
       text: 'Hola Rafaela Noticias, quería denunciar que en calle Joaquín V. González al 1200 hay un basural a cielo abierto gigante que junta ratas de noche. Les mando fotos.',
-      timestamp: '2026-06-04T08:30:00',
+      timestamp: new Date().toISOString(),
       used: false,
       media: 'https://images.unsplash.com/photo-1611284446314-60a58ac0deb9?auto=format&fit=crop&w=800&q=80'
     },
@@ -161,7 +162,7 @@ export const Proposals: React.FC = () => {
       id: 'wa3',
       sender: '+54 3492 98-7654 (Laura Vecina)',
       text: 'Hola gente! Hay un bache gigante en Bv. Lehmann y Oroño, casi se mata una moto recién. Ojalá lo puedan publicar para que lo arreglen.',
-      timestamp: '2026-06-04T09:10:00',
+      timestamp: new Date().toISOString(),
       used: false,
       media: ''
     }
@@ -477,7 +478,7 @@ export const Proposals: React.FC = () => {
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                       {prop.dateTime && (
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                          <CalendarIcon size={12} /> {new Date(prop.dateTime).toLocaleDateString([], { day: '2-digit', month: '2-digit' })}
+                          <CalendarIcon size={12} /> {prop.dateTime ? formatFriendlyDate(prop.dateTime) : 'Sin fecha'}
                         </span>
                       )}
                       {prop.location && (

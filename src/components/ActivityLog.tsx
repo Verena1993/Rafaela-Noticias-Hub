@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
 import { Activity as ActivityIcon, Clock, Filter } from 'lucide-react';
+import { formatFriendlyDate } from '../utils/dateUtils';
 
 export const ActivityLog: React.FC = () => {
   const { activities, users } = useHub();
@@ -97,8 +98,8 @@ export const ActivityLog: React.FC = () => {
                     </p>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.15rem' }}>
                       <Clock size={10} />
-                      <span>
-                        {new Date(act.timestamp).toLocaleDateString()} a las {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        {formatFriendlyDate(act.timestamp)} a las {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
                       </span>
                     </div>
                   </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
+import { formatFriendlyDate } from '../utils/dateUtils';
 import { Plus, Clock, User, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 
 export const Tasks: React.FC = () => {
@@ -20,7 +21,7 @@ export const Tasks: React.FC = () => {
   const [newAssigneeId, setNewAssigneeId] = useState('');
   const [newCoverageId, setNewCoverageId] = useState('');
 
-  const now = new Date('2026-06-04T08:30:00'); // Consistent local mock time
+  const now = new Date();
 
   // Open modal config
   const openModal = () => {
@@ -198,7 +199,7 @@ export const Tasks: React.FC = () => {
                       
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', marginTop: '0.25rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          <Clock size={12} /> Vence: {new Date(task.dueDate).toLocaleDateString()} a las {new Date(task.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+                          <Clock size={12} /> Vence: {formatFriendlyDate(task.dueDate)} a las {new Date(task.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
                           {isExpired && <span style={{ color: 'var(--danger)', fontWeight: 700, marginLeft: '4px' }}>(Vencida)</span>}
                         </span>
 

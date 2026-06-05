@@ -6,6 +6,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import type { RadarCategory, NewsRadarItem } from '../data/mockData';
+import { formatFriendlyDate } from '../utils/dateUtils';
 
 const CATEGORY_CONFIG: Record<RadarCategory, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   national: { label: 'Nacional', icon: Globe, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
@@ -25,11 +26,11 @@ const FILTERS: { id: RadarCategory | 'all'; label: string }[] = [
 const DRAFT_TEMPLATES = (item: NewsRadarItem) => ({
   title: `Título SEO: ${item.title}\n\nVariante 1: El impacto de este tema en Rafaela y la región\nVariante 2: Lo que debes saber sobre ${item.title.split(':')[0]}\nVariante 3: Rafaela frente a ${item.title.substring(0, 40)}...`,
   intro: `COPETE:\n${item.summary}\n\nLa noticia generada por ${item.source} impacta directamente en el área de cobertura de Rafaela Noticias y merece seguimiento local.`,
-  body: `DESARROLLO:\n\n${item.summary}\n\nSegún información de ${item.source}, publicada el ${new Date(item.date).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })}, la situación evoluciona de manera que podría tener consecuencias directas para la comunidad de Rafaela y la región central de Santa Fe.\n\nPara profundizar en esta oportunidad editorial, se recomienda:\n• Consultar fuentes locales relacionadas\n• Buscar el ángulo regional de la noticia\n• Entrevistar a referentes locales del sector involucrado\n• Verificar impacto específico en Rafaela\n\nEste borrador fue generado automáticamente por el sistema de Radar de Noticias de Rafaela Noticias Hub y debe ser revisado, contextualizado y aprobado por un editor antes de su publicación.`,
+  body: `DESARROLLO:\n\n${item.summary}\n\nSegún información de ${item.source}, publicada el ${formatFriendlyDate(item.date)}, la situación evoluciona de manera que podría tener consecuencias directas para la comunidad de Rafaela y la región central de Santa Fe.\n\nPara profundizar en esta oportunidad editorial, se recomienda:\n• Consultar fuentes locales relacionadas\n• Buscar el ángulo regional de la noticia\n• Entrevistar a referentes locales del sector involucrado\n• Verificar impacto específico en Rafaela\n\nEste borrador fue generado automáticamente por el sistema de Radar de Noticias de Rafaela Noticias Hub y debe ser revisado, contextualizado y aprobado por un editor antes de su publicación.`,
 });
 
 export const NewsRadar: React.FC = () => {
-  const { newsRadarItems, updateNewsRadarItem } = useHub();
+  const { newsRadarItems, updateNewsRadarItem, addCoverage, updateCoverageStatus } = useHub();
   const [activeFilter, setActiveFilter] = useState<RadarCategory | 'all'>('all');
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
@@ -56,6 +57,16 @@ export const NewsRadar: React.FC = () => {
   const handleSendToEditor = (item: NewsRadarItem) => {
     setSendingId(item.id);
     setTimeout(() => {
+      // Create a Coverage in 'in_redaction' state with the AI draft
+      const coverageId = addCoverage(
+        `[Radar IA] ${item.title}`,
+        item.draft || item.summary,
+        new Date().toISOString(),
+        'Redacción (Asignación automática)',
+        []
+      );
+      updateCoverageStatus(coverageId, 'in_redaction');
+
       updateNewsRadarItem(item.id, { sentToEditor: true });
       setSentIds(prev => new Set(prev).add(item.id));
       setSendingId(null);
@@ -68,7 +79,7 @@ export const NewsRadar: React.FC = () => {
     const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
     if (diffHours < 1) return 'hace unos minutos';
     if (diffHours < 24) return `hace ${diffHours}h`;
-    return date.toLocaleDateString('es-AR', { day: '2-digit', month: 'short' });
+    return formatFriendlyDate(dateStr);
   };
 
   return (

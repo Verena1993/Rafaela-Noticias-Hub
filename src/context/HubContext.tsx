@@ -20,7 +20,7 @@ interface HubContextType {
   proposals: Proposal[];
   staffSchedules: StaffSchedule[];
   newsRadarItems: NewsRadarItem[];
-  login: (email: string) => boolean;
+  login: (email: string, password?: string) => boolean;
   logout: () => void;
   addCoverage: (title: string, description: string, dateTime: string, location: string, assignees: string[], programs?: ProgramType[], formats?: FormatType[]) => string;
   updateCoverageStatus: (coverageId: string, status: Coverage['status']) => void;
@@ -250,8 +250,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [events, coverages]);
 
   // Auth
-  const login = (email: string): boolean => {
-    const user = INITIAL_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
+  const login = (email: string, password?: string): boolean => {
+    const user = INITIAL_USERS.find(u => u.email.toLowerCase() === email.toLowerCase() && (!password || u.password === password));
     if (user) {
       setCurrentUser(user);
       return true;

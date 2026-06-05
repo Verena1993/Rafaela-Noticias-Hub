@@ -10,6 +10,7 @@ import { ActivityLog } from './components/ActivityLog';
 import { Proposals } from './components/Proposals';
 import { InstagramPlanner } from './components/InstagramPlanner';
 import { NewsRadar } from './components/NewsRadar';
+import { ProductionTable } from './components/ProductionTable';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useHub();
@@ -47,6 +48,8 @@ const AppContent: React.FC = () => {
             setAutoOpenCreateModal={setAutoOpenCreateModal}
           />
         );
+      case 'production':
+        return <ProductionTable />;
       case 'proposals':
         return (
           <Proposals />

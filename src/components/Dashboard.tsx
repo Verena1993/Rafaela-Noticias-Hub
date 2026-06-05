@@ -1,10 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import { useHub } from '../context/HubContext';
 import { 
-  FileText, CheckSquare, AlertTriangle, Play, Calendar, UserPlus, 
+  FileText, CheckSquare, AlertTriangle, UserPlus, 
   ExternalLink, ArrowRight, UserCheck, Clock, Activity as ActivityIcon
 } from 'lucide-react';
 import type { Alert, ProgramType, FormatType } from '../data/mockData';
+import { formatFriendlyDate } from '../utils/dateUtils';
 
 interface DashboardProps {
   setActiveTab: (tab: string) => void;
@@ -35,10 +36,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
   const [alertTitle, setAlertTitle] = useState('');
   const [alertSeverity, setAlertSeverity] = useState<'critical' | 'warning'>('warning');
 
-  // Stats calculation
-  const totalCoverages = coverages.length;
-  const inProgressCoverages = coverages.filter(c => c.status === 'confirmed' || c.status === 'in_redaction').length;
-  
+
   interface MyDayItem {
     id: string;
     type: string;
@@ -54,9 +52,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
     rawItem: any;
   }
 
-  // Tasks for the logged-in user
-  const myTasks = tasks.filter(t => t.assigneeId === currentUser?.id);
-  const pendingMyTasks = myTasks.filter(t => !t.completed);
+
+
 
   // 1. Get user's today's tasks
   const todayTasks: MyDayItem[] = tasks
@@ -286,7 +283,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
         <div>
           <h2 className="page-title">Panel de Control</h2>
           <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
-            Resumen de actividad y tareas para hoy <span style={{ fontWeight: 600, color: 'var(--primary)' }}>({todayStr})</span>
+            Resumen de actividad y tareas para <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{formatFriendlyDate(todayStr)}</span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -339,53 +336,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
         </div>
       )}
 
-      {/* Quick Statistics Row */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-        gap: '1rem',
-        marginBottom: '1.5rem'
-      }}>
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '0.75rem', backgroundColor: 'var(--primary-light)', borderRadius: 'var(--radius-md)' }}>
-            <FileText size={24} color="var(--primary)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{totalCoverages}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Coberturas en Hub</div>
-          </div>
-        </div>
 
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '0.75rem', backgroundColor: 'var(--info-light)', borderRadius: 'var(--radius-md)' }}>
-            <Play size={24} color="var(--info)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{inProgressCoverages}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>En Cobertura / Redacción</div>
-          </div>
-        </div>
-
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '0.75rem', backgroundColor: 'var(--warning-light)', borderRadius: 'var(--radius-md)' }}>
-            <CheckSquare size={24} color="var(--warning)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{pendingMyTasks.length}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Mis Tareas Pendientes</div>
-          </div>
-        </div>
-
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <div style={{ padding: '0.75rem', backgroundColor: 'var(--success-light)', borderRadius: 'var(--radius-md)' }}>
-            <Calendar size={24} color="var(--success)" />
-          </div>
-          <div>
-            <div style={{ fontSize: '1.5rem', fontWeight: 700 }}>{upcomingEvents.length}</div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Eventos de la Agenda</div>
-          </div>
-        </div>
-      </div>
 
       {/* Main Dashboard Layout */}
       <div className="dashboard-grid">
