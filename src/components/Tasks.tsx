@@ -50,7 +50,7 @@ export const Tasks: React.FC = () => {
 
   // Filter logic
   const filteredTasks = tasks.filter(t => {
-    if (taskFilter === 'my') {
+    if (currentUser?.role !== 'admin' || taskFilter === 'my') {
       return t.assigneeId === currentUser?.id;
     }
     return true;
@@ -88,44 +88,46 @@ export const Tasks: React.FC = () => {
       {/* Filter Row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         {/* User Scope Toggles */}
-        <div style={{
-          display: 'flex', 
-          backgroundColor: 'var(--bg-tertiary)', 
-          padding: '0.2rem', 
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--border-color)'
-        }}>
-          <button 
-            onClick={() => setTaskFilter('my')} 
-            style={{
-              background: taskFilter === 'my' ? 'var(--bg-primary)' : 'transparent',
-              border: 'none',
-              padding: '0.4rem 0.8rem',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              boxShadow: taskFilter === 'my' ? 'var(--shadow-sm)' : 'none'
-            }}
-          >
-            Mis Tareas
-          </button>
-          <button 
-            onClick={() => setTaskFilter('all')}
-            style={{
-              background: taskFilter === 'all' ? 'var(--bg-primary)' : 'transparent',
-              border: 'none',
-              padding: '0.4rem 0.8rem',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-              fontWeight: 600,
-              boxShadow: taskFilter === 'all' ? 'var(--shadow-sm)' : 'none'
-            }}
-          >
-            Todas las Tareas
-          </button>
-        </div>
+        {currentUser?.role === 'admin' && (
+          <div style={{
+            display: 'flex', 
+            backgroundColor: 'var(--bg-tertiary)', 
+            padding: '0.2rem', 
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-color)'
+          }}>
+            <button 
+              onClick={() => setTaskFilter('my')} 
+              style={{
+                background: taskFilter === 'my' ? 'var(--bg-primary)' : 'transparent',
+                border: 'none',
+                padding: '0.4rem 0.8rem',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                boxShadow: taskFilter === 'my' ? 'var(--shadow-sm)' : 'none'
+              }}
+            >
+              Mis Tareas
+            </button>
+            <button 
+              onClick={() => setTaskFilter('all')}
+              style={{
+                background: taskFilter === 'all' ? 'var(--bg-primary)' : 'transparent',
+                border: 'none',
+                padding: '0.4rem 0.8rem',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                boxShadow: taskFilter === 'all' ? 'var(--shadow-sm)' : 'none'
+              }}
+            >
+              Todas las Tareas
+            </button>
+          </div>
+        )}
 
         {/* Status Tab Row */}
         <div style={{ display: 'flex', gap: '0.5rem' }}>

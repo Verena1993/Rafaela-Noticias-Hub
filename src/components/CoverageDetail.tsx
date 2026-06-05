@@ -431,7 +431,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
       }}>
         {[
           { id: 'general', name: 'General', icon: FileText },
-          { id: 'multimedia', name: 'Multimedia & Enlaces', icon: Image },
+          { id: 'multimedia', name: 'Archivos', icon: Image },
           { id: 'chat', name: 'Chat Interno', icon: MessageSquare },
           { id: 'publications', name: 'Publicaciones', icon: Check },
           { id: 'copilot', name: 'Copiloto IA', icon: Bot },
@@ -575,7 +575,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             <div className="card">
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
                 <h3 className="detail-section-title" style={{ border: 'none', margin: 0, padding: 0 }}>Pauta / Información General</h3>
-                {(currentUser?.role === 'admin' || currentUser?.role === 'editor') && (
+                {(currentUser?.role === 'admin') && (
                   <button 
                     className="btn btn-secondary" 
                     style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}

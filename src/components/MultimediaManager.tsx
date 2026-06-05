@@ -153,11 +153,15 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
             </p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
-              {coverage.multimedia.map(item => (
+              {[...coverage.multimedia].sort((a,b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()).map(item => (
                 <div key={item.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
-                    {item.type === 'photo' && item.url.startsWith('http') ? (
+                    {item.type === 'photo' ? (
                       <img src={item.url} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : item.type === 'video' ? (
+                      <video src={item.url} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : item.type === 'audio' ? (
+                      <audio src={item.url} controls style={{ width: '95%' }} />
                     ) : (
                       getFileIcon(item.type)
                     )}
@@ -229,12 +233,17 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
       {activeTab === 'drive' && (
         <div style={{ padding: '3rem 2rem', textAlign: 'center', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--bg-secondary)' }}>
           <HardDrive size={48} style={{ color: '#10b981', margin: '0 auto 1rem auto' }} />
-          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Integración con Google Drive</h3>
-          <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto 1.5rem auto' }}>
-            Prepara la estructura corporativa. En futuras versiones, al crear una cobertura, se generará automáticamente una carpeta en Drive para almacenar crudos, audios pesados y documentos de la investigación.
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Carpeta Compartida de Google Drive</h3>
+          <p style={{ color: 'var(--text-secondary)', maxWidth: '400px', margin: '0 auto 1rem auto' }}>
+            La carpeta de esta actividad será generada automáticamente para almacenar el crudo y los documentos pesados.
           </p>
+          <div style={{ backgroundColor: 'var(--bg-primary)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', display: 'inline-block', border: '1px solid var(--border-color)' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Nombre de carpeta asignado:</span>
+            <strong style={{ fontSize: '0.9rem' }}>{coverage.dateTime.split('T')[0]} - {coverage.title}</strong>
+          </div>
+          <br />
           <button className="btn btn-secondary" disabled style={{ opacity: 0.7 }}>
-            Conectar cuenta corporativa (Próximamente)
+            Sincronizar con Drive (Próximamente)
           </button>
         </div>
       )}

@@ -287,7 +287,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>
-          {(currentUser?.role === 'admin' || currentUser?.role === 'editor') && (
+          {(currentUser?.role === 'admin') && (
             <button className="btn btn-danger" onClick={() => setShowAlertModal(true)}>
               <AlertTriangle size={16} />
               Lanzar Alerta
@@ -316,7 +316,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
                 </div>
               </div>
               <div>
-                {(currentUser?.role === 'admin' || currentUser?.role === 'editor') ? (
+                {(currentUser?.role === 'admin') ? (
                   <button 
                     className="btn btn-primary" 
                     style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}

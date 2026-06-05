@@ -328,8 +328,7 @@ export const Proposals: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  // Check if editor/admin (visual roles are hidden, but functional checks persist)
-  const isEditorOrAdmin = currentUser?.role === 'admin' || currentUser?.role === 'editor';
+  const isEditorOrAdmin = currentUser?.role === 'admin';
 
   return (
     <div className="proposals-module">
