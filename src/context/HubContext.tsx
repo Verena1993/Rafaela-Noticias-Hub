@@ -1,12 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { 
   INITIAL_USERS, INITIAL_COVERAGES, INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS,
-  INITIAL_PROPOSALS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS
+  INITIAL_PROPOSALS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR
 } from '../data/mockData';
 import type { 
   User, Coverage, Task, Alert, CalendarEvent, Notification, Activity,
   Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, StaffSchedule,
-  ProgramType, FormatType, InstagramPost
+  ProgramType, FormatType, InstagramPost, NewsRadarItem
 } from '../data/mockData';
 
 interface HubContextType {
@@ -19,9 +19,10 @@ interface HubContextType {
   notifications: Notification[];
   proposals: Proposal[];
   staffSchedules: StaffSchedule[];
+  newsRadarItems: NewsRadarItem[];
   login: (email: string) => boolean;
   logout: () => void;
-  addCoverage: (title: string, description: string, dateTime: string, location: string, priority: 'high' | 'medium' | 'low', assignees: string[], programs?: ProgramType[], formats?: FormatType[]) => string;
+  addCoverage: (title: string, description: string, dateTime: string, location: string, assignees: string[], programs?: ProgramType[], formats?: FormatType[]) => string;
   updateCoverageStatus: (coverageId: string, status: Coverage['status']) => void;
   addCommentToCoverage: (coverageId: string, text: string) => void;
   addMultimediaToCoverage: (coverageId: string, name: string, type: 'photo' | 'video' | 'audio' | 'document', url: string, size: string) => void;
@@ -31,7 +32,7 @@ interface HubContextType {
   toggleTaskCompleted: (taskId: string) => void;
   addEvent: (title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
   updateEvent: (eventId: string, title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, status?: CalendarEvent['status'], assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
-  updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, priority: 'high' | 'medium' | 'low', assignees: string[], programs: ProgramType[], formats: FormatType[], status?: Coverage['status']) => void;
+  updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, assignees: string[], programs: ProgramType[], formats: FormatType[], status?: Coverage['status']) => void;
   createAlert: (title: string, severity: 'critical' | 'warning') => void;
   assignAlert: (alertId: string, assigneeId: string) => void;
   markNotificationsAsRead: () => void;
@@ -41,8 +42,8 @@ interface HubContextType {
   activities: Activity[];
   
   // Proposals
-  addProposal: (title: string, description: string, dateTime?: string, location?: string, priority?: 'high' | 'medium' | 'low', assignees?: string[], files?: Omit<MultimediaItem, 'id' | 'uploadDate' | 'userId'>[], links?: Omit<SharedLink, 'id' | 'uploadDate' | 'userId'>[], programs?: ProgramType[], formats?: FormatType[]) => void;
-  updateProposalStatus: (proposalId: string, status: Proposal['status'], extra?: { priority?: 'high' | 'medium' | 'low'; dateTime?: string; location?: string; assignees?: string[]; programs?: ProgramType[]; formats?: FormatType[] }) => void;
+  addProposal: (title: string, description: string, dateTime?: string, location?: string, assignees?: string[], files?: Omit<MultimediaItem, 'id' | 'uploadDate' | 'userId'>[], links?: Omit<SharedLink, 'id' | 'uploadDate' | 'userId'>[], programs?: ProgramType[], formats?: FormatType[]) => void;
+  updateProposalStatus: (proposalId: string, status: Proposal['status']) => void;
   addCommentToProposal: (proposalId: string, text: string) => void;
   convertProposalToCoverage: (proposalId: string, extraDetails?: { dateTime: string; location: string; programs: ProgramType[]; formats: FormatType[]; assigneeId?: string; status: Coverage['status'] }) => string;
   recreateCoverageForEvent: (eventId: string, coverageId: string) => void;
@@ -56,6 +57,9 @@ interface HubContextType {
   updateInstagramPost: (id: string, updates: Partial<InstagramPost>) => void;
   deleteInstagramPost: (id: string) => void;
   updateProposalDetails: (proposalId: string, title: string, description: string, dateTime?: string, location?: string, assignees?: string[], programs?: ProgramType[], formats?: FormatType[]) => void;
+  
+  // News Radar
+  updateNewsRadarItem: (id: string, updates: Partial<NewsRadarItem>) => void;
 }
 
 const HubContext = createContext<HubContextType | undefined>(undefined);
@@ -116,6 +120,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [newsRadarItems, setNewsRadarItems] = useState<NewsRadarItem[]>(INITIAL_NEWS_RADAR);
 
   // Collect all activities from all coverages
   const [activities, setActivities] = useState<Activity[]>(() => {
@@ -202,8 +207,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description: evt.description || 'Creado automáticamente a partir del evento de la agenda.',
           dateTime: evt.start,
           location: evt.location || 'A determinar',
-          priority: 'medium',
-          status: evt.status === 'finished' ? 'published' : (evt.status === 'in_coverage' ? 'in_coverage' : 'pending'),
+          status: evt.status === 'published' ? 'published' : (evt.status === 'in_redaction' ? 'in_redaction' : (evt.status === 'confirmed' ? 'confirmed' : 'pending_confirmation')),
           assignees: evt.assigneeId ? [evt.assigneeId] : [],
           comments: [],
           multimedia: [],
@@ -211,11 +215,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           publications: {
             portal: { status: 'pending' },
             facebook: { status: 'pending' },
-            ig_reel: { status: 'pending' },
-            ig_carousel: { status: 'pending' },
-            ig_story: { status: 'pending' },
-            youtube: { status: 'pending' },
-            tiktok: { status: 'pending' }
+            instagram: { status: 'pending' },
+            youtube: { status: 'pending' }
           },
           activities: [
             {
@@ -295,7 +296,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     description: string, 
     dateTime: string, 
     location: string, 
-    priority: 'high' | 'medium' | 'low', 
     assignees: string[],
     programs?: ProgramType[],
     formats?: FormatType[]
@@ -307,8 +307,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description,
       dateTime,
       location,
-      priority,
-      status: 'pending',
+      status: 'pending_confirmation',
       assignees,
       comments: [],
       multimedia: [],
@@ -316,11 +315,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       publications: {
         portal: { status: 'pending' },
         facebook: { status: 'pending' },
-        ig_reel: { status: 'pending' },
-        ig_carousel: { status: 'pending' },
-        ig_story: { status: 'pending' },
-        youtube: { status: 'pending' },
-        tiktok: { status: 'pending' }
+        instagram: { status: 'pending' },
+        youtube: { status: 'pending' }
       },
       activities: [
         {
@@ -344,9 +340,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description,
       type: 'coverage',
       start: dateTime,
-      end: new Date(new Date(dateTime).getTime() + 4 * 60 * 60 * 1000).toISOString().substring(0, 16), // 4h duration default
+      end: new Date(new Date(dateTime).getTime() + 4 * 60 * 60 * 1000).toISOString().substring(0, 16),
       location,
-      status: 'pending',
+      status: 'pending_confirmation',
       assigneeId: assignees.length > 0 ? assignees[0] : undefined,
       coverageId: id,
       programs: programs || [],
@@ -376,10 +372,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const updateCoverageStatus = (coverageId: string, status: Coverage['status']) => {
     const statusMap: Record<Coverage['status'], string> = {
-      pending: 'Pendiente',
-      in_coverage: 'En Cobertura',
+      pending_confirmation: 'Pendiente de confirmación',
+      confirmed: 'Confirmada',
       in_redaction: 'En Redacción',
-      ready_to_publish: 'Lista para Publicar',
       published: 'Publicada'
     };
 
@@ -403,10 +398,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Also update corresponding calendar event status
     setEvents(prev => prev.map(e => {
       if (e.coverageId === coverageId) {
-        let eventStatus: CalendarEvent['status'] = 'pending';
-        if (status === 'in_coverage') eventStatus = 'in_coverage';
-        else if (status === 'in_redaction' || status === 'ready_to_publish') eventStatus = 'confirmed';
-        else if (status === 'published') eventStatus = 'finished';
+        let eventStatus: CalendarEvent['status'] = 'pending_confirmation';
+        if (status === 'confirmed') eventStatus = 'confirmed';
+        else if (status === 'in_redaction') eventStatus = 'in_redaction';
+        else if (status === 'published') eventStatus = 'published';
         return { ...e, status: eventStatus };
       }
       return e;
@@ -586,11 +581,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const platformNames: Record<keyof PublicationChecklist, string> = {
       portal: 'Portal Web',
       facebook: 'Facebook',
-      ig_reel: 'Instagram Reel',
-      ig_carousel: 'Instagram Carrusel',
-      ig_story: 'Instagram Historia',
-      youtube: 'YouTube',
-      tiktok: 'TikTok'
+      instagram: 'Instagram',
+      youtube: 'YouTube'
     };
 
     setCoverages(prev => prev.map(cov => {
@@ -678,7 +670,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  // Calendar
+  // Calendar addEvent - creates matching coverage automatically
   const addEvent = (
     title: string, 
     description: string, 
@@ -699,8 +691,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description,
       dateTime: start,
       location: location || '',
-      priority: 'medium',
-      status: 'pending',
+      status: 'pending_confirmation',
       assignees: assigneeId ? [assigneeId] : [],
       comments: [],
       multimedia: [],
@@ -708,11 +699,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       publications: {
         portal: { status: 'pending' },
         facebook: { status: 'pending' },
-        ig_reel: { status: 'pending' },
-        ig_carousel: { status: 'pending' },
-        ig_story: { status: 'pending' },
-        youtube: { status: 'pending' },
-        tiktok: { status: 'pending' }
+        instagram: { status: 'pending' },
+        youtube: { status: 'pending' }
       },
       activities: [
         {
@@ -737,7 +725,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       start,
       end,
       location,
-      status: 'pending',
+      status: 'pending_confirmation',
       assigneeId,
       coverageId, // Link the coverage!
       programs: programs || [],
@@ -768,10 +756,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (c.id === e.coverageId) {
               let coverageStatus: Coverage['status'] = c.status;
               if (status !== undefined) {
-                if (status === 'in_coverage') coverageStatus = 'in_coverage';
-                else if (status === 'finished') coverageStatus = 'published';
-                else if (status === 'pending') coverageStatus = 'pending';
-                else if (status === 'confirmed') coverageStatus = 'ready_to_publish'; // Map confirmed to ready_to_publish
+                if (status === 'in_redaction') coverageStatus = 'in_redaction';
+                else if (status === 'published') coverageStatus = 'published';
+                else if (status === 'pending_confirmation') coverageStatus = 'pending_confirmation';
+                else if (status === 'confirmed') coverageStatus = 'confirmed';
               }
               return {
                 ...c,
@@ -780,7 +768,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 dateTime: start,
                 location: location || c.location || '',
                 status: coverageStatus,
-                assignees: assigneeId ? [assigneeId] : [], // Sincronización de responsable!
+                assignees: assigneeId ? [assigneeId] : [],
                 programs: programs || [],
                 formats: formats || []
               };
@@ -797,7 +785,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           start,
           end,
           location,
-          status: status || 'pending',
+          status: status || 'pending_confirmation',
           assigneeId,
           programs: programs || [],
           formats: formats || []
@@ -808,13 +796,11 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     logActivity(undefined, `actualizó el compromiso de agenda: "${title}"`);
   };
 
-  // Proposals
   const addProposal = (
     title: string,
     description: string,
     dateTime?: string,
     location?: string,
-    priority?: 'high' | 'medium' | 'low',
     assignees?: string[],
     files?: Omit<MultimediaItem, 'id' | 'uploadDate' | 'userId'>[],
     links?: Omit<SharedLink, 'id' | 'uploadDate' | 'userId'>[],
@@ -852,7 +838,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       multimedia: mappedFiles,
       sharedLinks: mappedLinks,
       comments: [],
-      priority: priority || 'medium',
       status: 'new',
       assignees: assignees || [],
       programs: programs || [],
@@ -973,7 +958,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const targetPrograms = extraDetails?.programs || prop.programs || [];
     const targetFormats = extraDetails?.formats || prop.formats || [];
     const targetAssignees = extraDetails?.assigneeId ? [extraDetails.assigneeId] : prop.assignees;
-    const targetStatus = extraDetails?.status || 'pending';
+    const targetStatus = extraDetails?.status || 'pending_confirmation';
 
     const newCoverage: Coverage = {
       id,
@@ -981,7 +966,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description: prop.description,
       dateTime: targetDateTime,
       location: targetLocation,
-      priority: prop.priority || 'medium',
       status: targetStatus,
       assignees: targetAssignees,
       comments: prop.comments, // carry over
@@ -990,11 +974,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       publications: {
         portal: { status: 'pending' },
         facebook: { status: 'pending' },
-        ig_reel: { status: 'pending' },
-        ig_carousel: { status: 'pending' },
-        ig_story: { status: 'pending' },
-        youtube: { status: 'pending' },
-        tiktok: { status: 'pending' }
+        instagram: { status: 'pending' },
+        youtube: { status: 'pending' }
       },
       activities: [
         {
@@ -1012,10 +993,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCoverages(prev => [newCoverage, ...prev]);
 
     // Also add to calendar events
-    let eventStatus: CalendarEvent['status'] = 'pending';
-    if (targetStatus === 'in_coverage') eventStatus = 'in_coverage';
-    else if (targetStatus === 'in_redaction' || targetStatus === 'ready_to_publish') eventStatus = 'confirmed';
-    else if (targetStatus === 'published') eventStatus = 'finished';
+    let eventStatus: CalendarEvent['status'] = 'pending_confirmation';
+    if (targetStatus === 'confirmed') eventStatus = 'confirmed';
+    else if (targetStatus === 'in_redaction') eventStatus = 'in_redaction';
+    else if (targetStatus === 'published') eventStatus = 'published';
 
     const newEvent: CalendarEvent = {
       id: `e_${id}`,
@@ -1056,7 +1037,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     description: string,
     dateTime: string,
     location: string,
-    priority: 'high' | 'medium' | 'low',
     assignees: string[],
     programs: ProgramType[],
     formats: FormatType[],
@@ -1070,7 +1050,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description,
           dateTime,
           location,
-          priority,
           assignees,
           programs,
           formats,
@@ -1085,9 +1064,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (e.coverageId === coverageId) {
         let eventStatus: CalendarEvent['status'] = e.status;
         if (status !== undefined) {
-          if (status === 'in_coverage') eventStatus = 'in_coverage';
-          else if (status === 'published') eventStatus = 'finished';
-          else if (status === 'pending') eventStatus = 'pending';
+          if (status === 'confirmed') eventStatus = 'confirmed';
+          else if (status === 'in_redaction') eventStatus = 'in_redaction';
+          else if (status === 'published') eventStatus = 'published';
+          else if (status === 'pending_confirmation') eventStatus = 'pending_confirmation';
         }
 
         return {
@@ -1107,6 +1087,11 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     logActivity(coverageId, `actualizó los detalles y planificación de la cobertura`);
+  };
+
+  // News Radar
+  const updateNewsRadarItem = (id: string, updates: Partial<NewsRadarItem>) => {
+    setNewsRadarItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
   // Staff schedules
@@ -1219,7 +1204,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       `Cobertura originada de alerta urgente: "${alert.title}".`,
       new Date().toISOString().substring(0, 16),
       'A determinar',
-      alert.severity === 'critical' ? 'high' : 'medium',
       [assigneeId]
     );
 
@@ -1260,8 +1244,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description: event.description || 'Recreado a partir de la actividad de agenda.',
       dateTime: event.start,
       location: event.location || 'A determinar',
-      priority: 'medium',
-      status: event.status === 'finished' ? 'published' : (event.status === 'in_coverage' ? 'in_coverage' : 'pending'),
+      status: event.status === 'published' ? 'published' : (event.status === 'in_redaction' ? 'in_redaction' : (event.status === 'confirmed' ? 'confirmed' : 'pending_confirmation')),
       assignees: event.assigneeId ? [event.assigneeId] : [],
       comments: [],
       multimedia: [],
@@ -1269,11 +1252,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       publications: {
         portal: { status: 'pending' },
         facebook: { status: 'pending' },
-        ig_reel: { status: 'pending' },
-        ig_carousel: { status: 'pending' },
-        ig_story: { status: 'pending' },
-        youtube: { status: 'pending' },
-        tiktok: { status: 'pending' }
+        instagram: { status: 'pending' },
+        youtube: { status: 'pending' }
       },
       activities: [
         {
@@ -1303,6 +1283,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       notifications,
       proposals,
       staffSchedules,
+      newsRadarItems,
       login,
       logout,
       addCoverage,
@@ -1333,7 +1314,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addInstagramPost,
       updateInstagramPost,
       deleteInstagramPost,
-      updateProposalDetails
+      updateProposalDetails,
+      updateNewsRadarItem
     }}>
       {children}
     </HubContext.Provider>

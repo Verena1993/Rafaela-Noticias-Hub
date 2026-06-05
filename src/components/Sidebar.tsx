@@ -2,7 +2,7 @@ import React from 'react';
 import { useHub } from '../context/HubContext';
 import { 
   LayoutDashboard, 
-  FileText, 
+  Radar,
   Inbox,
   CheckSquare, 
   Calendar, 
@@ -45,10 +45,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
 
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
-    { id: 'coverages', name: 'Coberturas', icon: FileText },
     { id: 'proposals', name: 'Propuestas', icon: Inbox },
     { id: 'tasks', name: 'Tareas', icon: CheckSquare },
     { id: 'calendar', name: 'Calendario Editorial', icon: Calendar },
+    { id: 'radar', name: 'Radar de Noticias', icon: Radar },
     { id: 'instagram', name: 'Instagram Plan', icon: Instagram },
     { id: 'activity', name: 'Panel de Actividad', icon: Activity }
   ];

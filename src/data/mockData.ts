@@ -45,15 +45,16 @@ export interface PublicationStatus {
 export interface PublicationChecklist {
   portal: PublicationStatus;
   facebook: PublicationStatus;
-  ig_reel: PublicationStatus;
-  ig_carousel: PublicationStatus;
-  ig_story: PublicationStatus;
+  instagram: PublicationStatus;
   youtube: PublicationStatus;
-  tiktok: PublicationStatus;
 }
 
 export type ProgramType = 'Bien Despiertos' | 'Noticiero Mañana' | 'Noticiero Tarde' | 'Digital';
 export type FormatType = 'Telefónica' | 'Videollamada' | 'Presencial' | 'Móvil' | 'Grabada' | 'Vivo en redes';
+
+// Status: 4 unified editorial states
+export type CoverageStatus = 'pending_confirmation' | 'confirmed' | 'in_redaction' | 'published';
+export type EventStatus = 'pending_confirmation' | 'confirmed' | 'in_redaction' | 'published';
 
 export interface Coverage {
   id: string;
@@ -61,8 +62,7 @@ export interface Coverage {
   description: string;
   dateTime: string;
   location: string;
-  priority: 'high' | 'medium' | 'low';
-  status: 'pending' | 'in_coverage' | 'in_redaction' | 'ready_to_publish' | 'published';
+  status: CoverageStatus;
   assignees: string[]; // User IDs
   comments: Comment[];
   multimedia: MultimediaItem[];
@@ -71,6 +71,21 @@ export interface Coverage {
   activities: Activity[];
   programs?: ProgramType[];
   formats?: FormatType[];
+}
+
+// Radar de Noticias — architecture ready for external APIs and AI integration
+export type RadarCategory = 'national' | 'provincial' | 'regional' | 'trending';
+export interface NewsRadarItem {
+  id: string;
+  title: string;
+  summary: string;
+  source: string;
+  date: string; // ISO date string
+  category: RadarCategory;
+  url?: string; // Original article URL (for future API integration)
+  tags?: string[];
+  draft?: string; // AI-generated draft content
+  sentToEditor?: boolean;
 }
 
 export interface Task {
@@ -90,7 +105,7 @@ export interface CalendarEvent {
   start: string; // YYYY-MM-DDTHH:mm
   end: string;   // YYYY-MM-DDTHH:mm
   location?: string;
-  status: 'pending' | 'confirmed' | 'in_coverage' | 'finished' | 'suspended';
+  status: EventStatus;
   assigneeId?: string;
   coverageId?: string;
   programs?: ProgramType[];
@@ -186,8 +201,7 @@ export const INITIAL_COVERAGES: Coverage[] = [
     description: 'Tres autos y un camión colisionaron a la altura del Km 220 de la Ruta 34. Tránsito cortado en ambas manos. Servicios de emergencia de Rafaela trabajando en el lugar. Reportar heridos, desvíos y testimonios de bomberos.',
     dateTime: '2026-06-04T07:15:00',
     location: 'Ruta Nacional 34, Km 220, Rafaela',
-    priority: 'high',
-    status: 'in_coverage',
+    status: 'confirmed',
     assignees: ['u5', 'u9'], // Laura and Andrés
     comments: [
       {
@@ -253,11 +267,8 @@ export const INITIAL_COVERAGES: Coverage[] = [
     publications: {
       portal: { status: 'pending' },
       facebook: { status: 'pending' },
-      ig_reel: { status: 'pending' },
-      ig_carousel: { status: 'pending' },
-      ig_story: { status: 'published', date: '2026-06-04T07:55:00', userId: 'u11', link: 'https://instagram.com/stories/rafaelanoticias' },
-      youtube: { status: 'pending' },
-      tiktok: { status: 'pending' }
+      instagram: { status: 'published', date: '2026-06-04T07:55:00', userId: 'u11' },
+      youtube: { status: 'pending' }
     },
     activities: [
       { id: 'act1', userId: 'u2', userName: 'Mariano Editor', action: 'creó la cobertura y asignó a Laura Móvil 1', timestamp: '2026-06-04T07:18:00' },
@@ -275,8 +286,7 @@ export const INITIAL_COVERAGES: Coverage[] = [
     description: 'Los concejales debaten el presupuesto para obras viales de la ciudad. Se prevén cruces fuertes entre oficialismo y oposición por la tasa de seguridad. Cobertura en directo de los discursos clave.',
     dateTime: '2026-06-04T09:00:00',
     location: 'Concejo Municipal de Rafaela, Bv. Lehmann 380',
-    priority: 'medium',
-    status: 'pending',
+    status: 'pending_confirmation',
     assignees: ['u4'], // Juan Carlos
     comments: [],
     multimedia: [],
@@ -284,11 +294,8 @@ export const INITIAL_COVERAGES: Coverage[] = [
     publications: {
       portal: { status: 'pending' },
       facebook: { status: 'pending' },
-      ig_reel: { status: 'pending' },
-      ig_carousel: { status: 'pending' },
-      ig_story: { status: 'pending' },
-      youtube: { status: 'pending' },
-      tiktok: { status: 'pending' }
+      instagram: { status: 'pending' },
+      youtube: { status: 'pending' }
     },
     activities: [
       { id: 'act2_1', userId: 'u3', userName: 'Sofía Jefa de Redacción', action: 'creó la cobertura programada', timestamp: '2026-06-03T18:30:00' }
@@ -302,8 +309,7 @@ export const INITIAL_COVERAGES: Coverage[] = [
     description: 'El Intendente inaugura una plaza inclusiva con canchas de fútbol tenis, juegos interactivos e iluminación LED. Habrá feria de artesanos y espectáculos de bandas locales.',
     dateTime: '2026-06-03T17:00:00',
     location: 'Barrio Mora (Plaza Principal)',
-    priority: 'low',
-    status: 'ready_to_publish',
+    status: 'in_redaction',
     assignees: ['u7', 'u10'], // Esteban and Clara
     comments: [
       {
@@ -353,11 +359,8 @@ export const INITIAL_COVERAGES: Coverage[] = [
     publications: {
       portal: { status: 'pending' },
       facebook: { status: 'pending' },
-      ig_reel: { status: 'pending' },
-      ig_carousel: { status: 'pending' },
-      ig_story: { status: 'pending' },
-      youtube: { status: 'pending' },
-      tiktok: { status: 'pending' }
+      instagram: { status: 'pending' },
+      youtube: { status: 'pending' }
     },
     activities: [
       { id: 'act3_1', userId: 'u3', userName: 'Sofía Jefa de Redacción', action: 'creó la cobertura', timestamp: '2026-06-03T15:00:00' },
@@ -373,8 +376,7 @@ export const INITIAL_COVERAGES: Coverage[] = [
     description: 'El plantel de la Crema realiza su último entrenamiento táctico antes del trascendental partido de local. Entrevista con el entrenador sobre el equipo titular.',
     dateTime: '2026-06-04T18:00:00',
     location: 'Estadio Monumental de Alberdi, Rafaela',
-    priority: 'medium',
-    status: 'pending',
+    status: 'pending_confirmation',
     assignees: ['u14'], // Gabriela
     comments: [],
     multimedia: [],
@@ -382,11 +384,8 @@ export const INITIAL_COVERAGES: Coverage[] = [
     publications: {
       portal: { status: 'pending' },
       facebook: { status: 'pending' },
-      ig_reel: { status: 'pending' },
-      ig_carousel: { status: 'pending' },
-      ig_story: { status: 'pending' },
-      youtube: { status: 'pending' },
-      tiktok: { status: 'pending' }
+      instagram: { status: 'pending' },
+      youtube: { status: 'pending' }
     },
     activities: [
       { id: 'act4_1', userId: 'u2', userName: 'Mariano Editor', action: 'programó cobertura deportiva', timestamp: '2026-06-04T08:00:00' }
@@ -400,7 +399,6 @@ export const INITIAL_COVERAGES: Coverage[] = [
     description: 'Dotaciones de bomberos de Rafaela y localidades vecinas trabajaron por más de 5 hours para sofocar las llamas. Pérdidas totales pero sin víctimas graves confirmadas.',
     dateTime: '2026-06-03T11:00:00',
     location: 'Parque Industrial de Rafaela, calle 500',
-    priority: 'high',
     status: 'published',
     assignees: ['u6', 'u9', 'u11'], // Diego, Andres, Valentina
     comments: [
@@ -435,12 +433,9 @@ export const INITIAL_COVERAGES: Coverage[] = [
     ],
     publications: {
       portal: { status: 'published', date: '2026-06-03T14:10:00', userId: 'u6', link: 'https://rafaelanoticias.com/policiales/grave-incendio-fabrica-colchones-parque-industrial' },
-      facebook: { status: 'published', date: '2026-06-03T14:12:00', userId: 'u11', link: 'https://facebook.com/rafaelanoticias/posts/112233' },
-      ig_reel: { status: 'pending' },
-      ig_carousel: { status: 'pending' },
-      ig_story: { status: 'published', date: '2026-06-03T14:15:00', userId: 'u11', link: 'https://instagram.com/stories/rafaelanoticias' },
-      youtube: { status: 'pending' },
-      tiktok: { status: 'pending' }
+      facebook: { status: 'published', date: '2026-06-03T14:12:00', userId: 'u11' },
+      instagram: { status: 'published', date: '2026-06-03T14:15:00', userId: 'u11' },
+      youtube: { status: 'pending' }
     },
     activities: [
       { id: 'act5_1', userId: 'u2', userName: 'Mariano Editor', action: 'creó cobertura urgente', timestamp: '2026-06-03T11:05:00' },
@@ -457,8 +452,7 @@ export const INITIAL_COVERAGES: Coverage[] = [
     description: 'Anuncios sobre la copa de campeones locales.',
     dateTime: '2026-06-05T10:00:00',
     location: 'Sede de la Liga Rafaelina',
-    priority: 'medium',
-    status: 'pending',
+    status: 'confirmed',
     assignees: ['u14'],
     comments: [],
     multimedia: [],
@@ -466,11 +460,8 @@ export const INITIAL_COVERAGES: Coverage[] = [
     publications: {
       portal: { status: 'pending' },
       facebook: { status: 'pending' },
-      ig_reel: { status: 'pending' },
-      ig_carousel: { status: 'pending' },
-      ig_story: { status: 'pending' },
-      youtube: { status: 'pending' },
-      tiktok: { status: 'pending' }
+      instagram: { status: 'pending' },
+      youtube: { status: 'pending' }
     },
     activities: [
       { id: 'act_e4_1', userId: 'system', userName: 'Sistema', action: 'creó la cobertura a partir del evento de agenda', timestamp: '2026-06-04T11:00:00' }
@@ -484,8 +475,7 @@ export const INITIAL_COVERAGES: Coverage[] = [
     description: 'Sofía entrevista al candidato opositor.',
     dateTime: '2026-06-06T15:30:00',
     location: 'Estudios del Canal',
-    priority: 'medium',
-    status: 'pending',
+    status: 'confirmed',
     assignees: ['u8'],
     comments: [],
     multimedia: [],
@@ -493,17 +483,78 @@ export const INITIAL_COVERAGES: Coverage[] = [
     publications: {
       portal: { status: 'pending' },
       facebook: { status: 'pending' },
-      ig_reel: { status: 'pending' },
-      ig_carousel: { status: 'pending' },
-      ig_story: { status: 'pending' },
-      youtube: { status: 'pending' },
-      tiktok: { status: 'pending' }
+      instagram: { status: 'pending' },
+      youtube: { status: 'pending' }
     },
     activities: [
       { id: 'act_e5_1', userId: 'system', userName: 'Sistema', action: 'creó la cobertura a partir del evento de agenda', timestamp: '2026-06-04T11:00:00' }
     ],
     programs: ['Bien Despiertos'],
     formats: ['Videollamada']
+  }
+];
+
+// Radar de Noticias — mock data ready for external API/AI integration
+export const INITIAL_NEWS_RADAR: NewsRadarItem[] = [
+  {
+    id: 'nr1',
+    title: 'Santa Fe estudia nuevo esquema de regalías mineras para comunidades del interior',
+    summary: 'El gobierno provincial analiza un proyecto que redistribuiría recursos extractivos hacia municipios del centro de la provincia, incluyendo Rafaela y su región.',
+    source: 'El Litoral',
+    date: '2026-06-05T08:00:00',
+    category: 'provincial',
+    url: 'https://ellitoral.com/placeholder',
+    tags: ['economia', 'provincia', 'interior']
+  },
+  {
+    id: 'nr2',
+    title: 'Inflación de mayo: el INDEC publicará datos esta semana',
+    summary: 'Los analistas económicos proyectan una cifra entre 4,2% y 4,8% para el mes de mayo. El dato impactará en paritarias del sector público provincial.',
+    source: 'Infobae',
+    date: '2026-06-05T07:30:00',
+    category: 'national',
+    url: 'https://infobae.com/placeholder',
+    tags: ['economia', 'inflacion', 'indec']
+  },
+  {
+    id: 'nr3',
+    title: 'Atlético de Rafaela en zona de clasificación: análisis de la tabla',
+    summary: 'Tras la fecha del fin de semana, la Crema suma 28 puntos y está en el cuarto lugar de la zona. El partido del domingo ante Aldosivi será clave para mantener la posición.',
+    source: 'Diario El Ciudadano',
+    date: '2026-06-05T09:15:00',
+    category: 'regional',
+    url: 'https://ciudadanorafaela.com/placeholder',
+    tags: ['deportes', 'atletico', 'rafaela']
+  },
+  {
+    id: 'nr4',
+    title: 'Tendencia: "turismo de cercanía" crece en el interior santafesino',
+    summary: 'Cada vez más familias de grandes ciudades eligen destinos del centro provincial para escapadas de fin de semana. Rafaela, Esperanza y San Justo lideran la preferencia.',
+    source: 'La Capital',
+    date: '2026-06-04T20:00:00',
+    category: 'trending',
+    url: 'https://lacapital.com.ar/placeholder',
+    tags: ['turismo', 'tendencia', 'santa-fe']
+  },
+  {
+    id: 'nr5',
+    title: 'Gobierno nacional anuncia inversión en rutas del corredor productivo central',
+    summary: 'El Ministerio de Infraestructura confirmó obras en rutas 34 y 19, que atraviesan el corazón productivo de Santa Fe. Las obras comenzarían en el segundo semestre.',
+    source: 'Ministerio de Infraestructura',
+    date: '2026-06-05T10:00:00',
+    category: 'national',
+    url: 'https://argentina.gob.ar/placeholder',
+    tags: ['infraestructura', 'rutas', 'inversion']
+  },
+  {
+    id: 'nr6',
+    title: 'Soja: precio sostenido en Chicago favorece exportaciones del interior',
+    summary: 'Los precios internacionales de la oleaginosa se mantienen por encima de USD 380 la tonelada, beneficiando a productores de la región pampeana central.',
+    source: 'Clarín Rural',
+    date: '2026-06-05T06:00:00',
+    category: 'regional',
+    url: 'https://clarin.com/placeholder',
+    tags: ['agro', 'soja', 'precios']
   }
 ];
 
@@ -531,7 +582,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     start: '2026-06-03T17:00',
     end: '2026-06-03T19:00',
     location: 'Plaza Barrio Mora',
-    status: 'confirmed',
+    status: 'in_redaction',
     assigneeId: 'u7',
     coverageId: 'c3', // Linked to c3
     programs: ['Bien Despiertos', 'Noticiero Tarde'],
@@ -545,7 +596,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     start: '2026-06-04T07:15',
     end: '2026-06-04T11:30',
     location: 'Ruta 34 Km 220',
-    status: 'in_coverage',
+    status: 'confirmed',
     assigneeId: 'u5',
     coverageId: 'c1',
     programs: ['Bien Despiertos', 'Digital'],
@@ -559,7 +610,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     start: '2026-06-04T09:00',
     end: '2026-06-04T13:00',
     location: 'Concejo Deliberante',
-    status: 'pending',
+    status: 'pending_confirmation',
     assigneeId: 'u4',
     coverageId: 'c2',
     programs: ['Noticiero Mañana', 'Digital'],
@@ -601,7 +652,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     start: '2026-06-04T18:00',
     end: '2026-06-04T22:00',
     location: 'Estadio Monumental de Alberdi, Rafaela',
-    status: 'pending',
+    status: 'pending_confirmation',
     assigneeId: 'u14',
     coverageId: 'c4', // Linked to c4
     programs: ['Digital'],
@@ -615,7 +666,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     start: '2026-06-03T11:00',
     end: '2026-06-03T15:00',
     location: 'Parque Industrial de Rafaela, calle 500',
-    status: 'finished',
+    status: 'published',
     assigneeId: 'u6',
     coverageId: 'c5', // Linked to c5
     programs: ['Digital', 'Noticiero Tarde'],

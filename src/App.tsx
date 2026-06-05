@@ -3,71 +3,73 @@ import { HubProvider, useHub } from './context/HubContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
 import { Dashboard } from './components/Dashboard';
-import { Coverages } from './components/Coverages';
 import { CoverageDetail } from './components/CoverageDetail';
 import { Tasks } from './components/Tasks';
 import { Calendar } from './components/Calendar';
 import { ActivityLog } from './components/ActivityLog';
 import { Proposals } from './components/Proposals';
 import { InstagramPlanner } from './components/InstagramPlanner';
+import { NewsRadar } from './components/NewsRadar';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useHub();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedCoverageId, setSelectedCoverageId] = useState<string | null>(null);
-  const [autoOpenCreateModal, setAutoOpenCreateModal] = useState(false);
+  const [, setAutoOpenCreateModal] = useState(false);
 
   if (!currentUser) {
     return <Login />;
+  }
+
+  // CoverageDetail opens as overlay from any tab
+  if (selectedCoverageId) {
+    return (
+      <Layout
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        setSelectedCoverageId={setSelectedCoverageId}
+      >
+        <CoverageDetail
+          coverageId={selectedCoverageId}
+          onBack={() => setSelectedCoverageId(null)}
+        />
+      </Layout>
+    );
   }
 
   const renderActiveView = () => {
     switch (activeTab) {
       case 'dashboard':
         return (
-          <Dashboard 
-            setActiveTab={setActiveTab} 
-            setSelectedCoverageId={setSelectedCoverageId} 
-            setAutoOpenCreateModal={setAutoOpenCreateModal}
-          />
-        );
-      case 'coverages':
-        if (selectedCoverageId) {
-          return (
-            <CoverageDetail 
-              coverageId={selectedCoverageId} 
-              onBack={() => setSelectedCoverageId(null)} 
-            />
-          );
-        }
-        return (
-          <Coverages 
+          <Dashboard
+            setActiveTab={setActiveTab}
             setSelectedCoverageId={setSelectedCoverageId}
-            onViewDetail={() => {}}
-            autoOpenCreateModal={autoOpenCreateModal}
             setAutoOpenCreateModal={setAutoOpenCreateModal}
           />
         );
       case 'proposals':
-        return <Proposals />;
+        return (
+          <Proposals />
+        );
       case 'instagram':
         return <InstagramPlanner />;
       case 'tasks':
         return <Tasks />;
       case 'calendar':
         return (
-          <Calendar 
-            setSelectedCoverageId={setSelectedCoverageId} 
-            setActiveTab={setActiveTab} 
+          <Calendar
+            setSelectedCoverageId={setSelectedCoverageId}
           />
         );
+      case 'radar':
+        return <NewsRadar />;
       case 'activity':
         return <ActivityLog />;
       default:
         return (
-          <Dashboard 
-            setActiveTab={setActiveTab} 
-            setSelectedCoverageId={setSelectedCoverageId} 
+          <Dashboard
+            setActiveTab={setActiveTab}
+            setSelectedCoverageId={setSelectedCoverageId}
             setAutoOpenCreateModal={setAutoOpenCreateModal}
           />
         );
@@ -75,9 +77,9 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <Layout 
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab} 
+    <Layout
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
       setSelectedCoverageId={setSelectedCoverageId}
     >
       {renderActiveView()}

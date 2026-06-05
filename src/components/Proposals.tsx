@@ -52,7 +52,7 @@ export const Proposals: React.FC = () => {
   const [convertDateTime, setConvertDateTime] = useState('');
   const [convertLocation, setConvertLocation] = useState('');
   const [convertAssigneeId, setConvertAssigneeId] = useState('');
-  const [convertStatus, setConvertStatus] = useState<Coverage['status']>('pending');
+  const [convertStatus, setConvertStatus] = useState<Coverage['status']>('pending_confirmation');
   const [convertPrograms, setConvertPrograms] = useState<ProgramType[]>([]);
   const [convertFormats, setConvertFormats] = useState<FormatType[]>([]);
 
@@ -61,7 +61,7 @@ export const Proposals: React.FC = () => {
       setConvertDateTime(selectedProposal.dateTime || new Date().toISOString().substring(0, 16));
       setConvertLocation(selectedProposal.location || '');
       setConvertAssigneeId(selectedProposal.assignees.length > 0 ? selectedProposal.assignees[0] : '');
-      setConvertStatus('pending');
+      setConvertStatus('pending_confirmation');
       setConvertPrograms(selectedProposal.programs || []);
       setConvertFormats(selectedProposal.formats || []);
       setShowConvertModal(true);
@@ -110,7 +110,7 @@ export const Proposals: React.FC = () => {
   const [description, setDescription] = useState('');
   const [dateTime, setDateTime] = useState('');
   const [location, setLocation] = useState('');
-  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
+
   const [assignees, setAssignees] = useState<string[]>([]);
   const [newComment, setNewComment] = useState('');
   
@@ -220,7 +220,6 @@ export const Proposals: React.FC = () => {
       description,
       dateTime || undefined,
       location || undefined,
-      priority,
       assignees,
       formFiles,
       formLinks,
@@ -233,7 +232,6 @@ export const Proposals: React.FC = () => {
     setDescription('');
     setDateTime('');
     setLocation('');
-    setPriority('medium');
     setAssignees([]);
     setFormLinks([]);
     setFormFiles([]);

@@ -15,12 +15,10 @@ import type { CalendarEvent, StaffSchedule, ProgramType, FormatType } from '../d
 
 interface CalendarProps {
   setSelectedCoverageId?: (id: string | null) => void;
-  setActiveTab?: (tab: string) => void;
 }
 
 export const Calendar: React.FC<CalendarProps> = ({ 
-  setSelectedCoverageId, 
-  setActiveTab 
+  setSelectedCoverageId 
 }) => {
   const { 
     events, 
@@ -41,6 +39,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   // Date state
   const [viewDate, setViewDate] = useState<Date>(() => new Date(2026, 5, 4)); // Initial mockup date June 4th 2026
   const [selectedProgramFilter, setSelectedProgramFilter] = useState<ProgramType | 'Todos'>('Todos');
+  const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
   // Filter events by program
   const filteredEvents = events.filter(evt => {
@@ -79,7 +78,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
   const [editLoc, setEditLoc] = useState('');
-  const [editStatus, setEditStatus] = useState<CalendarEvent['status']>('pending');
+  const [editStatus, setEditStatus] = useState<CalendarEvent['status']>('pending_confirmation');
   const [editAssigneeId, setEditAssigneeId] = useState('');
   const [editPrograms, setEditPrograms] = useState<ProgramType[]>([]);
   const [editFormats, setEditFormats] = useState<FormatType[]>([]);
@@ -251,22 +250,20 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
 
   const navigateToCoverage = (coverageId: string) => {
-    if (setSelectedCoverageId && setActiveTab) {
+    if (setSelectedCoverageId) {
       setSelectedCoverageId(coverageId);
-      setActiveTab('coverages');
       setSelectedEvent(null);
     }
   };
 
   const getStatusLabel = (status: CalendarEvent['status']) => {
-    const map: Record<CalendarEvent['status'], string> = {
-      pending: 'Pendiente',
-      confirmed: 'Confirmado',
-      in_coverage: 'En Cobertura',
-      finished: 'Finalizado',
-      suspended: 'Suspendido'
+    const map: Record<string, string> = {
+      pending_confirmation: 'Pendiente de confirmación',
+      confirmed: 'Confirmada',
+      in_redaction: 'En Redacción',
+      published: 'Publicada'
     };
-    return map[status] || 'Pendiente';
+    return map[status] || 'Pendiente de confirmación';
   };
 
   return (
@@ -392,7 +389,7 @@ export const Calendar: React.FC<CalendarProps> = ({
               
               {/* Blank days */}
               {blankDays.map((_, idx) => (
-                <div key={`blank-${idx}`} className="calendar-day-cell empty" style={{ minHeight: '120px', backgroundColor: 'var(--bg-secondary)', opacity: 0.35 }}></div>
+                <div key={`blank-${idx}`} className="calendar-day-cell empty" style={{ height: '120px', backgroundColor: 'var(--bg-secondary)', opacity: 0.35 }}></div>
               ))}
 
               {/* Render Days */}
@@ -413,13 +410,17 @@ export const Calendar: React.FC<CalendarProps> = ({
                 
                 const daySched = getDaySchedule(dayStr);
 
+                const MAX_VISIBLE = 3;
+                const visibleEvents = dayEvents.slice(0, MAX_VISIBLE);
+                const hiddenCount = dayEvents.length - MAX_VISIBLE;
+
                 return (
                   <div 
                     key={day} 
                     className={`calendar-day-cell ${isToday ? 'today' : ''}`}
-                    style={{ minHeight: '120px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}
+                    style={{ height: '120px', overflow: 'hidden', display: 'flex', flexDirection: 'column', position: 'relative' }}
                   >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.2rem' }}>
                       <span 
                         className="calendar-day-num"
                         style={{ cursor: 'pointer', fontWeight: 700 }}
@@ -428,38 +429,25 @@ export const Calendar: React.FC<CalendarProps> = ({
                       >
                         {day}
                       </span>
-                      {/* Clickable staff status trigger */}
                       <button 
                         onClick={() => handleOpenStaffModal(dayStr)}
                         style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.7rem', color: 'var(--primary)', padding: '0.1rem' }}
                         title="Gestionar personal del día"
                       >
-                        <Users size={12} />
+                        <Users size={11} />
                       </button>
                     </div>
 
-                    {/* Staff visual indicators list */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.15rem', marginBottom: '0.35rem' }}>
-                      {daySched.guardIds.length > 0 && (
-                        <span style={{ fontSize: '0.65rem', background: '#d1fae5', color: '#065f46', padding: '0.05rem 0.25rem', borderRadius: '2px', fontWeight: 'bold' }} title="Guardia activa">
-                          🛡️ {daySched.guardIds.map(uid => users.find(u => u.id === uid)?.name.charAt(0)).join(', ')}
-                        </span>
-                      )}
-                      {daySched.offIds.length > 0 && (
-                        <span style={{ fontSize: '0.65rem', background: '#f1f5f9', color: '#475569', padding: '0.05rem 0.25rem', borderRadius: '2px' }} title="Franco">
-                          ☕ {daySched.offIds.map(uid => users.find(u => u.id === uid)?.name.charAt(0)).join(', ')}
-                        </span>
-                      )}
-                      {(daySched.vacationIds.length > 0 || daySched.absentIds.length > 0) && (
-                        <span style={{ fontSize: '0.65rem', background: '#fee2e2', color: '#991b1b', padding: '0.05rem 0.25rem', borderRadius: '2px' }} title="Vacaciones o Ausencia">
-                          ✈️ { [...daySched.vacationIds, ...daySched.absentIds].map(uid => users.find(u => u.id === uid)?.name.charAt(0)).join(', ') }
-                        </span>
-                      )}
-                    </div>
+                    {/* Staff indicators - compact */}
+                    {daySched.guardIds.length > 0 && (
+                      <div style={{ fontSize: '0.6rem', background: '#d1fae5', color: '#065f46', padding: '0.05rem 0.2rem', borderRadius: '2px', marginBottom: '0.15rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        🛡️ {daySched.guardIds.map(uid => users.find(u => u.id === uid)?.name.split(' ')[0]).join(', ')}
+                      </div>
+                    )}
                     
-                    {/* Events pills */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem', overflowY: 'auto', flex: 1 }}>
-                      {dayEvents.map(evt => (
+                    {/* Events pills - compact single line */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', flex: 1, overflow: 'hidden' }}>
+                      {visibleEvents.map(evt => (
                         <div 
                           key={evt.id} 
                           className={getEventClass(evt.type)}
@@ -472,10 +460,74 @@ export const Calendar: React.FC<CalendarProps> = ({
                             }
                           }}
                           title={`${evt.title} (${getEventTypeName(evt.type)})`}
+                          style={{ 
+                            fontSize: '0.65rem', 
+                            padding: '0.1rem 0.3rem',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            cursor: 'pointer',
+                            display: 'block'
+                          }}
                         >
-                          {evt.title.replace(/^\[Cobertura\] /, '')}
+                          {evt.start.split('T')[1]?.substring(0,5)} {evt.title.replace(/^\[Cobertura\] /, '')}
                         </div>
                       ))}
+                      {hiddenCount > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setExpandedDay(expandedDay === dayStr ? null : dayStr); }}
+                          style={{
+                            fontSize: '0.6rem',
+                            color: 'var(--primary)',
+                            background: 'var(--primary-light)',
+                            border: 'none',
+                            borderRadius: '2px',
+                            padding: '0.1rem 0.3rem',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            fontWeight: 600,
+                            width: '100%'
+                          }}
+                        >
+                          +{hiddenCount} más
+                        </button>
+                      )}
+                      {/* Expanded day modal */}
+                      {expandedDay === dayStr && (
+                        <div style={{
+                          position: 'absolute',
+                          zIndex: 100,
+                          background: 'var(--bg-primary)',
+                          border: '1px solid var(--border-color)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '0.75rem',
+                          minWidth: '200px',
+                          boxShadow: 'var(--shadow-lg)',
+                          marginTop: '4px',
+                          top: 0,
+                          left: 0
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <strong style={{ fontSize: '0.8rem' }}>Eventos del día {day}</strong>
+                            <button onClick={() => setExpandedDay(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}>✕</button>
+                          </div>
+                          {dayEvents.map(evt => (
+                            <div 
+                              key={evt.id}
+                              className={getEventClass(evt.type)}
+                              style={{ marginBottom: '0.25rem', cursor: 'pointer', fontSize: '0.75rem', padding: '0.25rem 0.4rem' }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setExpandedDay(null);
+                                if (evt.coverageId) navigateToCoverage(evt.coverageId);
+                                else handleSelectEventForView(evt);
+                              }}
+                            >
+                              {evt.start.split('T')[1]?.substring(0,5)} {evt.title.replace(/^\[Cobertura\] /, '')}
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -1026,11 +1078,10 @@ export const Calendar: React.FC<CalendarProps> = ({
                       value={editStatus}
                       onChange={e => setEditStatus(e.target.value as any)}
                     >
-                      <option value="pending">Pendiente</option>
-                      <option value="confirmed">Confirmado</option>
-                      <option value="in_coverage">En Cobertura</option>
-                      <option value="finished">Finalizado</option>
-                      <option value="suspended">Suspendido</option>
+                      <option value="pending_confirmation">Pendiente de confirmación</option>
+                      <option value="confirmed">Confirmada</option>
+                      <option value="in_redaction">En Redacción</option>
+                      <option value="published">Publicada</option>
                     </select>
                   </div>
 

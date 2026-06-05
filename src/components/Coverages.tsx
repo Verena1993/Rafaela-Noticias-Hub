@@ -29,7 +29,7 @@ export const Coverages: React.FC<CoveragesProps> = ({
     return d.toISOString().substring(0, 16);
   });
   const [newLocation, setNewLocation] = useState('');
-  const [newPriority, setNewPriority] = useState<'high' | 'medium' | 'low'>('medium');
+
   const [newAssignees, setNewAssignees] = useState<string[]>([]);
   
   const [newPrograms, setNewPrograms] = useState<ProgramType[]>([]);
@@ -58,10 +58,9 @@ export const Coverages: React.FC<CoveragesProps> = ({
   const [filterAssignee, setFilterAssignee] = useState('all');
 
   const columns: { id: Coverage['status']; name: string; count: number }[] = [
-    { id: 'pending', name: 'Pendiente', count: 0 },
-    { id: 'in_coverage', name: 'En Cobertura', count: 0 },
+    { id: 'pending_confirmation', name: 'Pendiente de confirmación', count: 0 },
+    { id: 'confirmed', name: 'Confirmada', count: 0 },
     { id: 'in_redaction', name: 'En Redacción', count: 0 },
-    { id: 'ready_to_publish', name: 'Lista para Publicar', count: 0 },
     { id: 'published', name: 'Publicada', count: 0 }
   ];
 
@@ -92,17 +91,14 @@ export const Coverages: React.FC<CoveragesProps> = ({
       newDescription,
       newDateTime,
       newLocation,
-      newPriority,
       newAssignees,
       newPrograms,
       newFormats
     );
 
-    // Reset fields
     setNewTitle('');
     setNewDescription('');
     setNewLocation('');
-    setNewPriority('medium');
     setNewAssignees([]);
     setNewPrograms([]);
     setNewFormats([]);

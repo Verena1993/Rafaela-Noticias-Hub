@@ -33,8 +33,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [fileName, setFileName] = useState('');
   const [fileType, setFileType] = useState<'photo' | 'video' | 'audio' | 'document'>('photo');
 
-  const [publishingPlatform, setPublishingPlatform] = useState<keyof PublicationChecklist | null>(null);
-  const [publishLink, setPublishLink] = useState('');
+
 
   // AI states
   const [aiOutput, setAiOutput] = useState('');
@@ -48,11 +47,10 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [editDescription, setEditDescription] = useState(coverage?.description || '');
   const [editDateTime, setEditDateTime] = useState(coverage?.dateTime || '');
   const [editLocation, setEditLocation] = useState(coverage?.location || '');
-  const [editPriority, setEditPriority] = useState<'high' | 'medium' | 'low'>(coverage?.priority || 'medium');
   const [editAssignees, setEditAssignees] = useState<string[]>(coverage?.assignees || []);
   const [editPrograms, setEditPrograms] = useState<ProgramType[]>(coverage?.programs || []);
   const [editFormats, setEditFormats] = useState<FormatType[]>(coverage?.formats || []);
-  const [editStatus, setEditStatus] = useState<Coverage['status']>(coverage?.status || 'pending');
+  const [editStatus, setEditStatus] = useState<Coverage['status']>(coverage?.status || 'pending_confirmation');
   const [previewItem, setPreviewItem] = useState<{ name: string; url: string; type: 'photo' | 'video' | 'audio' | 'document'; size: string } | null>(null);
 
   // Diagnostic states
@@ -85,7 +83,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
       editDescription,
       editDateTime,
       editLocation,
-      editPriority,
       editAssignees,
       editPrograms,
       editFormats,
@@ -96,6 +93,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
   // New V2 states
   const [portalUrl, setPortalUrl] = useState(coverage?.publications.portal.link || '');
+  const [portalInputUrl, setPortalInputUrl] = useState('');
   const [extractedText, setExtractedText] = useState('');
   const [extractedLoading, setExtractedLoading] = useState(false);
 
@@ -300,13 +298,14 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     if (isPub) {
       updatePublicationStatus(coverage.id, plat, 'pending');
     } else {
-      if (plat === 'portal') {
-        setPublishingPlatform('portal');
-        setPublishLink('');
-      } else {
-        updatePublicationStatus(coverage.id, plat, 'published');
-      }
+      updatePublicationStatus(coverage.id, plat, 'published');
     }
+  };
+
+  const handlePortalPublish = (e: React.FormEvent) => {
+    e.preventDefault();
+    updatePublicationStatus(coverage.id, 'portal', 'published', portalInputUrl);
+    setPortalInputUrl('');
   };
 
   const handleSendComment = (e?: React.FormEvent, textOverride?: string) => {
@@ -349,14 +348,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     setShowFileModal(false);
   };
 
-  const handlePublishSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!publishingPlatform) return;
 
-    updatePublicationStatus(coverage.id, publishingPlatform, 'published', publishLink);
-    setPublishLink('');
-    setPublishingPlatform(null);
-  };
 
   // AI Simulations
   const handleExtract = () => {
@@ -434,12 +426,11 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const platformNames: Record<keyof PublicationChecklist, string> = {
     portal: 'Portal Web',
     facebook: 'Facebook',
-    ig_reel: 'Instagram Reel',
-    ig_carousel: 'Instagram Carrusel',
-    ig_story: 'Instagram Historia',
-    youtube: 'YouTube',
-    tiktok: 'TikTok'
+    instagram: 'Instagram',
+    youtube: 'YouTube'
   };
+
+  const PUBLICATION_PLATFORMS: (keyof PublicationChecklist)[] = ['portal', 'facebook', 'instagram', 'youtube'];
 
   // Preset responses for rapid logging in mobile chat
   const presetMessages = [
@@ -454,55 +445,8 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     <div>
       {/* Back Header */}
       <button className="btn btn-secondary" onClick={onBack} style={{ marginBottom: '1rem' }}>
-        <ArrowLeft size={16} /> Volver a Coberturas
+        <ArrowLeft size={16} /> Volver
       </button>
-
-      {/* Coverage Header */}
-      <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--primary)' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.75rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem' }}>{coverage.title}</h2>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button 
-              className="btn btn-secondary" 
-              style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#25D366', borderColor: 'rgba(37, 211, 102, 0.4)', background: 'rgba(37, 211, 102, 0.05)' }}
-              onClick={handleShareWhatsApp}
-            >
-              <MessageCircle size={14} /> Compartir
-            </button>
-            
-            
-
-            
-            <div className="form-group" style={{ margin: 0 }}>
-              <select 
-                className="form-select" 
-                style={{ padding: '0.35rem 0.5rem', fontWeight: 600 }}
-                value={coverage.status}
-                onChange={handleStatusChange}
-              >
-                <option value="pending">Pendiente</option>
-                <option value="in_coverage">En Cobertura</option>
-                <option value="in_redaction">En Redacción</option>
-                <option value="ready_to_publish">Lista para Publicar</option>
-                <option value="published">Publicada</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <Calendar size={14} /> 
-            {new Date(coverage.dateTime).toLocaleDateString()} - {new Date(coverage.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
-          </span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <MapPin size={14} /> {coverage.location}
-          </span>
-        </div>
-      </div>
 
       {/* Module Tabs (Notion-inspired sticky navigation bar) */}
       <div style={{
@@ -549,6 +493,105 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         })}
       </div>
 
+      {/* Coverage Header - unified info card */}
+      <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--primary)' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.75rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem' }}>{coverage.title}</h2>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button 
+              className="btn btn-secondary" 
+              style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#25D366', borderColor: 'rgba(37, 211, 102, 0.4)', background: 'rgba(37, 211, 102, 0.05)' }}
+              onClick={handleShareWhatsApp}
+            >
+              <MessageCircle size={14} /> Compartir
+            </button>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <Calendar size={14} /> 
+            {new Date(coverage.dateTime).toLocaleDateString()} - {new Date(coverage.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <MapPin size={14} /> {coverage.location}
+          </span>
+        </div>
+
+        {/* Status selector inline */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+          <select 
+            className="form-select" 
+            style={{ padding: '0.35rem 0.5rem', fontWeight: 600, width: 'auto' }}
+            value={coverage.status}
+            onChange={handleStatusChange}
+          >
+            <option value="pending_confirmation">Pendiente de confirmación</option>
+            <option value="confirmed">Confirmada</option>
+            <option value="in_redaction">En Redacción</option>
+            <option value="published">Publicada</option>
+          </select>
+        </div>
+
+        {/* Assignees inline */}
+        {coverage.assignees.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.75rem' }}>
+            {coverage.assignees.map(uid => {
+              const u = users.find(usr => usr.id === uid);
+              return (
+                <div 
+                  key={uid} 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: '0.4rem', 
+                    padding: '0.25rem 0.6rem', 
+                    borderRadius: 'var(--radius-full)', 
+                    backgroundColor: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-color)',
+                    fontSize: '0.78rem'
+                  }}
+                >
+                  <div 
+                    style={{ 
+                      width: '18px', 
+                      height: '18px', 
+                      borderRadius: '50%', 
+                      backgroundColor: u?.avatarColor,
+                      color: 'white',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.6rem',
+                      fontWeight: 700
+                    }}
+                  >
+                    {u?.name.charAt(0)}
+                  </div>
+                  <span style={{ fontWeight: 600 }}>{u?.name}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Programs & Formats tags */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
+          {coverage.programs && coverage.programs.map((prog, idx) => (
+            <span key={idx} style={{ fontSize: '0.73rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.12rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
+              📻 {prog}
+            </span>
+          ))}
+          {coverage.formats && coverage.formats.map((form, idx) => (
+            <span key={idx} style={{ fontSize: '0.73rem', backgroundColor: '#f3e8ff', color: '#6b21a8', padding: '0.12rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
+              ⚙️ {form}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Tab Contents */}
       <div className="coverage-detail-grid">
         {/* Left main pane */}
@@ -569,7 +612,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                         setEditDescription(coverage.description);
                         setEditDateTime(coverage.dateTime);
                         setEditLocation(coverage.location);
-                        setEditPriority(coverage.priority);
                         setEditAssignees(coverage.assignees);
                         setEditPrograms(coverage.programs || []);
                         setEditFormats(coverage.formats || []);
@@ -585,87 +627,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                 {coverage.description}
               </p>
-              
-              <div style={{ marginTop: '2rem' }}>
-                <h4 style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                  Equipo Asignado
-                </h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-                  {coverage.assignees.map(uid => {
-                    const u = users.find(usr => usr.id === uid);
-                    return (
-                      <div 
-                        key={uid} 
-                        style={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: '0.5rem', 
-                          padding: '0.35rem 0.75rem', 
-                          borderRadius: 'var(--radius-full)', 
-                          backgroundColor: 'var(--bg-secondary)',
-                          border: '1px solid var(--border-color)',
-                          fontSize: '0.8rem'
-                        }}
-                      >
-                        <div 
-                          style={{ 
-                            width: '20px', 
-                            height: '20px', 
-                            borderRadius: '50%', 
-                            backgroundColor: u?.avatarColor,
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.65rem',
-                            fontWeight: 700
-                          }}
-                        >
-                          {u?.name.charAt(0)}
-                        </div>
-                        <span style={{ fontWeight: 600 }}>{u?.name}</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Program and Format metadata displays */}
-              <div style={{ marginTop: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
-                <div>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                    Programas Destino
-                  </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                    {coverage.programs && coverage.programs.length > 0 ? (
-                      coverage.programs.map((prog, idx) => (
-                        <span key={idx} style={{ fontSize: '0.75rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                          📻 {prog}
-                        </span>
-                      ))
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Ninguno</span>
-                    )}
-                  </div>
-                </div>
-                
-                <div>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                    Formatos Logísticos
-                  </h4>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                    {coverage.formats && coverage.formats.length > 0 ? (
-                      coverage.formats.map((form, idx) => (
-                        <span key={idx} style={{ fontSize: '0.75rem', backgroundColor: '#f3e8ff', color: '#6b21a8', padding: '0.15rem 0.5rem', borderRadius: '4px', fontWeight: 600 }}>
-                          ⚙️ {form}
-                        </span>
-                      ))
-                    ) : (
-                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Ninguno</span>
-                    )}
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
@@ -909,52 +870,74 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             <div className="card">
               <h3 className="detail-section-title">📢 Control de Publicación en Redes y Web</h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                Marca las plataformas donde se ha difundido la noticia. Solo el Portal Web admite ingresar una URL (opcional).
+                Marca las plataformas donde se ha difundido la noticia. El Portal Web permite registrar una URL de la nota publicada.
               </p>
 
               <div className="platform-checklist">
-                {(Object.keys(coverage.publications) as Array<keyof PublicationChecklist>).map(plat => {
+                {PUBLICATION_PLATFORMS.map(plat => {
                   const check = coverage.publications[plat];
+                  if (!check) return null;
                   const isPub = check.status === 'published';
                   const pubUser = users.find(u => u.id === check.userId);
                   
                   return (
-                    <div key={plat} className="platform-row">
-                      <div className="platform-info">
-                        <span className={`badge ${isPub ? 'status-published' : 'status-pending'}`} style={{ fontSize: '0.65rem' }}>
-                          {isPub ? 'Publicada' : 'Pendiente'}
-                        </span>
-                        <span>{platformNames[plat]}</span>
+                    <div key={plat} className="platform-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                        <div className="platform-info">
+                          <span className={`badge ${isPub ? 'status-published' : 'status-pending'}`} style={{ fontSize: '0.65rem' }}>
+                            {isPub ? 'Publicada' : 'Pendiente'}
+                          </span>
+                          <span>{platformNames[plat]}</span>
+                        </div>
+
+                        <div className="platform-actions">
+                          {isPub ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                              <span>Por: {pubUser?.name.split(' ')[0]}</span>
+                              <span>{new Date(check.date || '').toLocaleDateString()}</span>
+                              {plat === 'portal' && check.link && (
+                                <a href={check.link} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem', fontWeight: 600 }}>
+                                  Enlace <ExternalLink size={12} />
+                                </a>
+                              )}
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ padding: '0.15rem 0.35rem', fontSize: '0.65rem' }}
+                                onClick={() => handleTogglePlatform(plat)}
+                              >
+                                Revertir
+                              </button>
+                            </div>
+                          ) : (
+                            plat === 'portal' ? null : (
+                              <button 
+                                className="btn btn-primary" 
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
+                                onClick={() => handleTogglePlatform(plat)}
+                              >
+                                Marcar Publicada
+                              </button>
+                            )
+                          )}
+                        </div>
                       </div>
 
-                      <div className="platform-actions">
-                        {isPub ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                            <span>Por: {pubUser?.name.split(' ')[0]}</span>
-                            <span>{new Date(check.date || '').toLocaleDateString()}</span>
-                            {plat === 'portal' && check.link && (
-                              <a href={check.link} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem', fontWeight: 600 }}>
-                                Enlace <ExternalLink size={12} />
-                              </a>
-                            )}
-                            <button 
-                              className="btn btn-secondary" 
-                              style={{ padding: '0.15rem 0.35rem', fontSize: '0.65rem' }}
-                              onClick={() => handleTogglePlatform(plat)}
-                            >
-                              Revertir
-                            </button>
-                          </div>
-                        ) : (
-                          <button 
-                            className="btn btn-primary" 
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                            onClick={() => handleTogglePlatform(plat)}
-                          >
-                            Marcar Publicada
+                      {/* Portal: inline URL form when pending */}
+                      {plat === 'portal' && !isPub && (
+                        <form onSubmit={handlePortalPublish} style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
+                          <input
+                            type="url"
+                            className="form-input"
+                            placeholder="https://rafaelanoticias.com/nota/..."
+                            value={portalInputUrl}
+                            onChange={e => setPortalInputUrl(e.target.value)}
+                            style={{ flex: 1, padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}
+                          />
+                          <button type="submit" className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
+                            Publicar en Portal
                           </button>
-                        )}
-                      </div>
+                        </form>
+                      )}
                     </div>
                   );
                 })}
@@ -1273,43 +1256,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         </div>
       )}
 
-      {/* Publication URL Input Modal */}
-      {publishingPlatform && (
-        <div className="modal-overlay">
-          <div className="modal-content">
-            <div className="modal-header">
-              <h3 className="modal-title">Registrar Publicación en {platformNames[publishingPlatform]}</h3>
-              <button className="modal-close" onClick={() => setPublishingPlatform(null)}>✕</button>
-            </div>
-            <form onSubmit={handlePublishSubmit}>
-              <div className="modal-body">
-                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
-                  Por favor introduce el enlace de la publicación en vivo para auditar los resultados.
-                </p>
-                <div className="form-group">
-                  <label className="form-label">URL de la Publicación</label>
-                  <input
-                    type="url"
-                    required
-                    className="form-input"
-                    placeholder="https://facebook.com/posts/..."
-                    value={publishLink}
-                    onChange={(e) => setPublishLink(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setPublishingPlatform(null)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Guardar Publicación
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
 
       {/* Edit Coverage Details Modal */}
       {showEditModal && (
@@ -1374,10 +1321,9 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                     value={editStatus}
                     onChange={e => setEditStatus(e.target.value as any)}
                   >
-                    <option value="pending">Pendiente</option>
-                    <option value="in_coverage">En Cobertura</option>
+                    <option value="pending_confirmation">Pendiente de confirmación</option>
+                    <option value="confirmed">Confirmada</option>
                     <option value="in_redaction">En Redacción</option>
-                    <option value="ready_to_publish">Lista para Publicar</option>
                     <option value="published">Publicada</option>
                   </select>
                 </div>

@@ -38,7 +38,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
 
   // Stats calculation
   const totalCoverages = coverages.length;
-  const inProgressCoverages = coverages.filter(c => c.status === 'in_coverage' || c.status === 'in_redaction').length;
+  const inProgressCoverages = coverages.filter(c => c.status === 'confirmed' || c.status === 'in_redaction').length;
   
   interface MyDayItem {
     id: string;
@@ -148,7 +148,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
 
   const handleCoverageClick = (id: string) => {
     setSelectedCoverageId(id);
-    setActiveTab('coverages');
   };
 
   const decisionItems = useMemo(() => {
@@ -200,7 +199,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
 
     // 3. Events pending approval
     events.forEach(e => {
-      if (e.status === 'pending') {
+      if (e.status === 'pending_confirmation') {
         items.push({
           id: `evt_pend_${e.id}`,
           title: e.title.replace(/^\[Cobertura\] /, ''),
@@ -420,18 +419,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
 
                   // Map statuses to styling classes
                   const statusClassMap: Record<string, string> = {
+                    // Event statuses
                     pending: 'status-pending',
                     confirmed: 'status-ready_to_publish',
                     in_coverage: 'status-in_coverage',
                     finished: 'status-published',
-                    suspended: 'priority-high'
+                    suspended: 'priority-high',
+                    // Coverage statuses
+                    pending_confirmation: 'status-pending',
+                    in_redaction: 'status-in_coverage',
+                    ready_to_publish: 'status-in_coverage',
+                    published: 'status-published'
                   };
                   const statusLabelMap: Record<string, string> = {
+                    // Event statuses
                     pending: 'Pendiente',
                     confirmed: 'Confirmada',
                     in_coverage: 'En Cobertura',
                     finished: 'Finalizada',
-                    suspended: 'Suspendida'
+                    suspended: 'Suspendida',
+                    // Coverage statuses
+                    pending_confirmation: 'Pendiente de confirmación',
+                    in_redaction: 'En Redacción',
+                    ready_to_publish: 'En Redacción',
+                    published: 'Publicada'
                   };
 
                   return (
