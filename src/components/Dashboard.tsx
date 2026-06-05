@@ -24,8 +24,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
-    const sysDate = `${year}-${month}-${day}`;
-    return events.some(e => e.start.startsWith(sysDate)) ? sysDate : '2026-06-04';
+    return `${year}-${month}-${day}`;
   })();
 
   const [assigningAlert, setAssigningAlert] = useState<Alert | null>(null);
@@ -283,11 +282,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
   return (
     <div>
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <h2 className="page-title">Bienvenido, {currentUser?.name}</h2>
-          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Panel de control de la redacción. Hoy es Jueves 4 de Junio, 2026.
+          <h2 className="page-title">Panel de Control</h2>
+          <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+            Resumen de actividad y tareas para hoy <span style={{ fontWeight: 600, color: 'var(--primary)' }}>({todayStr})</span>
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem' }}>

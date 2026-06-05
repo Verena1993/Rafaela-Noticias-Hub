@@ -37,7 +37,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   
   // Date state
-  const [viewDate, setViewDate] = useState<Date>(() => new Date(2026, 5, 4)); // Initial mockup date June 4th 2026
+  const [viewDate, setViewDate] = useState<Date>(() => new Date());
   const [selectedProgramFilter, setSelectedProgramFilter] = useState<ProgramType | 'Todos'>('Todos');
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
 
@@ -95,8 +95,14 @@ export const Calendar: React.FC<CalendarProps> = ({
   const [newTitle, setNewTitle] = useState('');
   const [newDesc, setNewDesc] = useState('');
   const [newType, setNewType] = useState<CalendarEvent['type']>('press_conference');
-  const [newStart, setNewStart] = useState('2026-06-04T10:00');
-  const [newEnd, setNewEnd] = useState('2026-06-04T12:00');
+  const [newStart, setNewStart] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T10:00`;
+  });
+  const [newEnd, setNewEnd] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}T12:00`;
+  });
   const [newLoc, setNewLoc] = useState('');
   const [newAssigneeId, setNewAssigneeId] = useState('');
   const [newPrograms, setNewPrograms] = useState<ProgramType[]>([]);
@@ -650,7 +656,7 @@ export const Calendar: React.FC<CalendarProps> = ({
 
         {/* DAY VIEW */}
         {viewMode === 'day' && (() => {
-          const dayStr = viewDate.toISOString().split('T')[0];
+          const dayStr = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}-${String(viewDate.getDate()).padStart(2, '0')}`;
           const dayEvents = filteredEvents
             .filter(e => e.start.startsWith(dayStr))
             .sort((a, b) => {
@@ -671,14 +677,14 @@ export const Calendar: React.FC<CalendarProps> = ({
                     <button 
                       className="btn btn-secondary" 
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} 
-                      onClick={() => setViewDate(new Date(viewDate.setDate(viewDate.getDate() - 1)))}
+                      onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate() - 1))}
                     >
                       ◀ Anterior
                     </button>
                     <button 
                       className="btn btn-secondary" 
                       style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} 
-                      onClick={() => setViewDate(new Date(viewDate.setDate(viewDate.getDate() + 1)))}
+                      onClick={() => setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth(), viewDate.getDate() + 1))}
                     >
                       Siguiente ▶
                     </button>

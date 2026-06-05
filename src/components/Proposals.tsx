@@ -58,7 +58,10 @@ export const Proposals: React.FC = () => {
 
   const startConversion = () => {
     if (selectedProposal) {
-      setConvertDateTime(selectedProposal.dateTime || new Date().toISOString().substring(0, 16));
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const fallback = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      setConvertDateTime(selectedProposal.dateTime || fallback);
       setConvertLocation(selectedProposal.location || '');
       setConvertAssigneeId(selectedProposal.assignees.length > 0 ? selectedProposal.assignees[0] : '');
       setConvertStatus('pending_confirmation');

@@ -14,7 +14,8 @@ export const Tasks: React.FC = () => {
   const [newDueDate, setNewDueDate] = useState(() => {
     const d = new Date();
     d.setHours(d.getHours() + 2); // default deadline +2h
-    return d.toISOString().substring(0, 16);
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
   const [newAssigneeId, setNewAssigneeId] = useState('');
   const [newCoverageId, setNewCoverageId] = useState('');
