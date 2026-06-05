@@ -50,6 +50,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
     { id: 'tasks', name: 'Tareas', icon: CheckSquare },
     { id: 'calendar', name: 'Calendario Editorial', icon: Calendar },
     { id: 'radar', name: 'Radar de Noticias', icon: Radar },
+    { id: 'publications', name: 'Publicaciones', icon: CheckSquare },
     { id: 'instagram', name: 'Instagram Plan', icon: Instagram },
     { id: 'activity', name: 'Panel de Actividad', icon: Activity }
   ];

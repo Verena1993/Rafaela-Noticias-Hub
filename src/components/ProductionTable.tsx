@@ -5,6 +5,9 @@ import {
   Edit3, Table, ChevronLeft, ChevronRight, Search, Filter
 } from 'lucide-react';
 import { formatFriendlyDate } from '../utils/dateUtils';
+import type { CalendarEvent } from '../data/mockData';
+import { EventEditModal } from './EventEditModal';
+import type { EventEditData } from './EventEditModal';
 
 export const ProductionTable: React.FC = () => {
   const { events, users, coverages } = useHub();
@@ -16,6 +19,32 @@ export const ProductionTable: React.FC = () => {
   });
 
   const [searchQuery, setSearchQuery] = useState('');
+  
+  // Bugfix: Estado para el modal de edición
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const { updateEvent } = useHub();
+
+  const handleEditClick = (evt: CalendarEvent) => {
+    setEditingEvent(evt);
+  };
+
+  const handleSaveEdit = (data: EventEditData) => {
+    if (!editingEvent) return;
+    updateEvent(
+      editingEvent.id,
+      data.title,
+      data.description,
+      editingEvent.type,
+      data.start,
+      data.end,
+      data.location,
+      data.status,
+      data.assigneeId || undefined,
+      data.programs,
+      data.formats
+    );
+    setEditingEvent(null);
+  };
 
   // Day browsing helpers
   const handlePrevDay = () => {
@@ -205,7 +234,7 @@ export const ProductionTable: React.FC = () => {
                         {evt.location ? `📍 ${evt.location}` : <span style={{ color: 'var(--border-color)' }}>-</span>}
                       </td>
                       <td style={{ padding: '0.75rem 1rem', textAlign: 'center' }}>
-                        <button className="btn btn-secondary" style={{ padding: '0.25rem' }} title="Editar Actividad">
+                        <button className="btn btn-secondary" style={{ padding: '0.25rem' }} title="Editar Actividad" onClick={() => handleEditClick(evt)}>
                           <Edit3 size={14} />
                         </button>
                       </td>
@@ -217,6 +246,25 @@ export const ProductionTable: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Modal de Edición de Actividad */}
+      {editingEvent && (
+        <EventEditModal
+          initialData={{
+            title: editingEvent.title,
+            description: editingEvent.description || '',
+            start: editingEvent.start,
+            end: editingEvent.end,
+            location: editingEvent.location || '',
+            status: editingEvent.status,
+            assigneeId: editingEvent.assigneeId || '',
+            programs: editingEvent.programs || [],
+            formats: editingEvent.formats || []
+          }}
+          onSave={handleSaveEdit}
+          onClose={() => setEditingEvent(null)}
+        />
+      )}
     </div>
   );
 };

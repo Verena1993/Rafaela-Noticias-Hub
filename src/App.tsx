@@ -11,12 +11,17 @@ import { Proposals } from './components/Proposals';
 import { InstagramPlanner } from './components/InstagramPlanner';
 import { NewsRadar } from './components/NewsRadar';
 import { ProductionTable } from './components/ProductionTable';
+import { Publications } from './components/Publications';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useHub();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedCoverageId, setSelectedCoverageId] = useState<string | null>(null);
-  const [, setAutoOpenCreateModal] = useState(false);
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setSelectedCoverageId(null); // Clean coverage selection to allow navigation
+  };
 
   if (!currentUser) {
     return <Login />;
@@ -27,7 +32,7 @@ const AppContent: React.FC = () => {
     return (
       <Layout
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
+        setActiveTab={handleTabChange}
         setSelectedCoverageId={setSelectedCoverageId}
       >
         <CoverageDetail
@@ -45,7 +50,7 @@ const AppContent: React.FC = () => {
           <Dashboard
             setActiveTab={setActiveTab}
             setSelectedCoverageId={setSelectedCoverageId}
-            setAutoOpenCreateModal={setAutoOpenCreateModal}
+            setAutoOpenCreateModal={() => {}}
           />
         );
       case 'production':
@@ -56,6 +61,8 @@ const AppContent: React.FC = () => {
         );
       case 'instagram':
         return <InstagramPlanner />;
+      case 'publications':
+        return <Publications />;
       case 'tasks':
         return <Tasks />;
       case 'calendar':
@@ -73,7 +80,7 @@ const AppContent: React.FC = () => {
           <Dashboard
             setActiveTab={setActiveTab}
             setSelectedCoverageId={setSelectedCoverageId}
-            setAutoOpenCreateModal={setAutoOpenCreateModal}
+            setAutoOpenCreateModal={() => {}}
           />
         );
     }
@@ -82,7 +89,7 @@ const AppContent: React.FC = () => {
   return (
     <Layout
       activeTab={activeTab}
-      setActiveTab={setActiveTab}
+      setActiveTab={handleTabChange}
       setSelectedCoverageId={setSelectedCoverageId}
     >
       {renderActiveView()}

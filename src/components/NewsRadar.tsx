@@ -57,20 +57,27 @@ export const NewsRadar: React.FC = () => {
   const handleSendToEditor = (item: NewsRadarItem) => {
     setSendingId(item.id);
     setTimeout(() => {
+      // Auto-generate draft if not previously generated
+      let finalDraft = item.draft;
+      if (!finalDraft) {
+        const templates = DRAFT_TEMPLATES(item);
+        finalDraft = `${templates.title}\n\n${templates.intro}\n\n${templates.body}`;
+      }
+
       // Create a Coverage in 'in_redaction' state with the AI draft
       const coverageId = addCoverage(
-        `[Radar IA] ${item.title}`,
-        item.draft || item.summary,
+        `[Borrador IA] ${item.title}`,
+        finalDraft,
         new Date().toISOString(),
         'Redacción (Asignación automática)',
         []
       );
       updateCoverageStatus(coverageId, 'in_redaction');
 
-      updateNewsRadarItem(item.id, { sentToEditor: true });
+      updateNewsRadarItem(item.id, { sentToEditor: true, draft: finalDraft });
       setSentIds(prev => new Set(prev).add(item.id));
       setSendingId(null);
-    }, 800);
+    }, 1500); // simulate slightly longer AI delay
   };
 
   const formatDate = (dateStr: string) => {

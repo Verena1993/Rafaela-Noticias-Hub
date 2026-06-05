@@ -3,11 +3,13 @@ import { useHub } from '../context/HubContext';
 import { 
   ArrowLeft, Calendar, MapPin, Send, ExternalLink, 
   Image, FileText, Check, Bot, History, Sparkles, MessageSquare, Clipboard,
-  MessageCircle
+  MessageCircle, Edit3
 } from 'lucide-react';
-import type { Coverage, PublicationChecklist, ProgramType, FormatType } from '../data/mockData';
+import type { PublicationChecklist } from '../data/mockData';
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { MultimediaManager } from './MultimediaManager';
+import { EventEditModal } from './EventEditModal';
+import type { EventEditData } from './EventEditModal';
 
 interface CoverageDetailProps {
   coverageId: string;
@@ -26,13 +28,9 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [chatMessage, setChatMessage] = useState('');
   
   // Modals state
-
-
   const [showFileModal, setShowFileModal] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileType, setFileType] = useState<'photo' | 'video' | 'audio' | 'document'>('photo');
-
-
 
   // AI states
   const [aiOutput, setAiOutput] = useState('');
@@ -42,14 +40,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
   // Edit coverage state
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editTitle, setEditTitle] = useState(coverage?.title || '');
-  const [editDescription, setEditDescription] = useState(coverage?.description || '');
-  const [editDateTime, setEditDateTime] = useState(coverage?.dateTime || '');
-  const [editLocation, setEditLocation] = useState(coverage?.location || '');
-  const [editAssignees, setEditAssignees] = useState<string[]>(coverage?.assignees || []);
-  const [editPrograms, setEditPrograms] = useState<ProgramType[]>(coverage?.programs || []);
-  const [editFormats, setEditFormats] = useState<FormatType[]>(coverage?.formats || []);
-  const [editStatus, setEditStatus] = useState<Coverage['status']>(coverage?.status || 'pending_confirmation');
   const [previewItem, setPreviewItem] = useState<{ name: string; url: string; type: 'photo' | 'video' | 'audio' | 'document'; size: string } | null>(null);
 
   // Diagnostic states
@@ -60,32 +50,18 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [eventEditLocation, setEventEditLocation] = useState('');
   const [eventEditAssigneeId, setEventEditAssigneeId] = useState('');
 
-  const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
-  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];
-
-  const toggleEditProgram = (prog: ProgramType) => {
-    setEditPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);
-  };
-  const toggleEditFormat = (form: FormatType) => {
-    setEditFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
-  };
-  const handleEditAssigneeToggle = (userId: string) => {
-    setEditAssignees(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
-  };
-
-  const handleSaveCoverageDetails = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveCoverageDetails = (data: EventEditData) => {
     if (!coverage) return;
     updateCoverageDetails(
       coverage.id,
-      editTitle,
-      editDescription,
-      editDateTime,
-      editLocation,
-      editAssignees,
-      editPrograms,
-      editFormats,
-      editStatus
+      data.title,
+      data.description,
+      data.start,
+      data.location,
+      data.assigneeId ? [data.assigneeId] : [], // Converting from the single assignee modal to array
+      data.programs,
+      data.formats,
+      data.status
     );
     setShowEditModal(false);
   };
@@ -274,8 +250,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     window.open(url, '_blank');
   };
 
-
-
   const handleTogglePlatform = (plat: keyof PublicationChecklist) => {
     const check = coverage.publications[plat];
     const isPub = check.status === 'published';
@@ -321,9 +295,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     setShowFileModal(false);
   };
 
-
-
-  // AI Simulations
   const handleExtract = () => {
     if (!portalUrl) {
       alert('Por favor introduce la URL del Portal Web primero.');
@@ -405,7 +376,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
   const PUBLICATION_PLATFORMS: (keyof PublicationChecklist)[] = ['portal', 'facebook', 'instagram', 'youtube'];
 
-  // Preset responses for rapid logging in mobile chat
   const presetMessages = [
     '⚠️ ¡Estoy en camino al lugar!',
     '📍 Llegué a la locación. Iniciando cobertura.',
@@ -416,12 +386,10 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
   return (
     <div>
-      {/* Back Header */}
       <button className="btn btn-secondary" onClick={onBack} style={{ marginBottom: '1rem' }}>
         <ArrowLeft size={16} /> Volver
       </button>
 
-      {/* Module Tabs (Notion-inspired sticky navigation bar) */}
       <div style={{
         display: 'flex',
         borderBottom: '1px solid var(--border-color)',
@@ -466,20 +434,37 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         })}
       </div>
 
-      {/* Coverage Header - unified info card */}
-      <div className="card" style={{ marginBottom: '1.5rem', borderLeft: '5px solid var(--primary)' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '0.75rem' }}>
+      <div 
+        className="card" 
+        style={{ 
+          marginBottom: '2rem', 
+          borderLeft: '5px solid var(--primary)', 
+          padding: '2rem', 
+          backgroundColor: '#ffffff',
+          boxShadow: '0 4px 15px rgba(0,0,0,0.03)'
+        }}
+      >
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.25rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginTop: '0.2rem' }}>{coverage.title}</h2>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0', color: 'var(--text-primary)', lineHeight: 1.2 }}>{coverage.title}</h2>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button 
               className="btn btn-secondary" 
-              style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#25D366', borderColor: 'rgba(37, 211, 102, 0.4)', background: 'rgba(37, 211, 102, 0.05)' }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: '#25D366', borderColor: 'rgba(37, 211, 102, 0.4)', background: 'rgba(37, 211, 102, 0.05)', padding: '0.5rem 1rem' }}
               onClick={handleShareWhatsApp}
             >
               <MessageCircle size={14} /> Compartir
             </button>
+            {(currentUser?.role === 'admin') && (
+              <button 
+                className="btn btn-primary" 
+                style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.5rem 1rem' }}
+                onClick={() => setShowEditModal(true)}
+              >
+                <Edit3 size={14} /> Editar
+              </button>
+            )}
           </div>
         </div>
 
@@ -493,7 +478,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
           </span>
         </div>
 
-        {/* Status selector inline */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
           <select 
             className="form-select" 
@@ -508,7 +492,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
           </select>
         </div>
 
-        {/* Assignees inline */}
         {coverage.assignees.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.75rem' }}>
             {coverage.assignees.map(uid => {
@@ -550,7 +533,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
           </div>
         )}
 
-        {/* Programs & Formats tags */}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
           {coverage.programs && coverage.programs.map((prog, idx) => (
             <span key={idx} style={{ fontSize: '0.73rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.12rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
@@ -565,45 +547,19 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         </div>
       </div>
 
-      {/* Tab Contents */}
       <div className="coverage-detail-grid">
-        {/* Left main pane */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          
-          {/* TAB: GENERAL */}
           {activeTab === 'general' && (
-            <div className="card">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                <h3 className="detail-section-title" style={{ border: 'none', margin: 0, padding: 0 }}>Pauta / Información General</h3>
-                {(currentUser?.role === 'admin') && (
-                  <button 
-                    className="btn btn-secondary" 
-                    style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }}
-                    onClick={() => {
-                      if (coverage) {
-                        setEditTitle(coverage.title);
-                        setEditDescription(coverage.description);
-                        setEditDateTime(coverage.dateTime);
-                        setEditLocation(coverage.location);
-                        setEditAssignees(coverage.assignees);
-                        setEditPrograms(coverage.programs || []);
-                        setEditFormats(coverage.formats || []);
-                        setEditStatus(coverage.status);
-                        setShowEditModal(true);
-                      }
-                    }}
-                  >
-                    Editar Planificación
-                  </button>
-                )}
+            <div className="card" style={{ padding: '2.5rem' }}>
+              <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                <h3 className="detail-section-title" style={{ border: 'none', margin: 0, padding: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>Pauta / Información General</h3>
               </div>
-              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+              <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
                 {coverage.description}
-              </p>
+              </div>
             </div>
           )}
 
-          {/* TAB: MULTIMEDIA & SHARED MATERIALS */}
           {activeTab === 'multimedia' && (
             <div className="card">
               <h3 className="detail-section-title">📦 Gestor Multimedia y Archivos</h3>
@@ -614,7 +570,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             </div>
           )}
 
-          {/* TAB: COLLABORATIVE CHAT (Slack-like) */}
           {activeTab === 'chat' && (
             <div className="card">
               <h3 className="detail-section-title">💬 Canales de Comunicación Interna</h3>
@@ -662,7 +617,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                   )}
                 </div>
 
-                {/* Pre-recorded quick responses for phones */}
                 <div style={{ 
                   display: 'flex', 
                   gap: '0.35rem', 
@@ -694,7 +648,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                   ))}
                 </div>
 
-                {/* Chat input box */}
                 <form onSubmit={handleSendComment} className="chat-input-wrapper">
                   <input
                     type="text"
@@ -711,7 +664,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             </div>
           )}
 
-          {/* TAB: PUBLICATIONS CHECKLIST */}
           {activeTab === 'publications' && (
             <div className="card">
               <h3 className="detail-section-title">📢 Control de Publicación en Redes y Web</h3>
@@ -768,7 +720,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                         </div>
                       </div>
 
-                      {/* Portal: inline URL form when pending */}
                       {plat === 'portal' && !isPub && (
                         <form onSubmit={handlePortalPublish} style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
                           <input
@@ -791,7 +742,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             </div>
           )}
 
-          {/* TAB: AI COPILOT */}
           {activeTab === 'copilot' && (
             <div className="card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
@@ -914,7 +864,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             </div>
           )}
 
-          {/* TAB: AUDIT LOG HISTORY */}
           {activeTab === 'history' && (
             <div className="card">
               <h3 className="detail-section-title">📋 Registro de Auditoría y Actividad</h3>
@@ -940,7 +889,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
         </div>
 
-        {/* Right side pane (Quick Stats Widget) */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className="card">
             <h3 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
@@ -959,8 +907,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                 </span>
               </div>
               
-              
-
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Archivos:</span>
                 <span style={{ fontWeight: 600 }}>{coverage.multimedia.length} cargados</span>
@@ -998,9 +944,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         </div>
       </div>
 
-
-
-      {/* Direct File Creation Modal */}
       {showFileModal && (
         <div className="modal-overlay">
           <div className="modal-content">
@@ -1048,163 +991,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         </div>
       )}
 
-
-
-      {/* Edit Coverage Details Modal */}
-      {showEditModal && (
-        <div className="modal-overlay" style={{ display: 'flex', zIndex: 110 }} onClick={() => setShowEditModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Editar Planificación de Cobertura</h3>
-              <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleSaveCoverageDetails}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label">Título *</label>
-                  <input
-                    type="text"
-                    required
-                    className="form-input"
-                    value={editTitle}
-                    onChange={e => setEditTitle(e.target.value)}
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Descripción / Pauta *</label>
-                  <textarea
-                    required
-                    className="form-textarea"
-                    rows={3}
-                    value={editDescription}
-                    onChange={e => setEditDescription(e.target.value)}
-                  />
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                  <div className="form-group">
-                    <label className="form-label">Fecha y Hora</label>
-                    <input
-                      type="datetime-local"
-                      required
-                      className="form-input"
-                      value={editDateTime}
-                      onChange={e => setEditDateTime(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label">Ubicación</label>
-                    <input
-                      type="text"
-                      required
-                      className="form-input"
-                      value={editLocation}
-                      onChange={e => setEditLocation(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Estado de la Cobertura</label>
-                  <select
-                    className="form-select"
-                    value={editStatus}
-                    onChange={e => setEditStatus(e.target.value as any)}
-                  >
-                    <option value="pending_confirmation">Pendiente de confirmación</option>
-                    <option value="confirmed">Confirmada</option>
-                    <option value="in_redaction">En Redacción</option>
-                    <option value="published">Publicada</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Programas Destino</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                    {PROGRAM_OPTIONS.map(prog => {
-                      const selected = editPrograms.includes(prog);
-                      return (
-                        <button
-                          key={prog}
-                          type="button"
-                          className="btn"
-                          onClick={() => toggleEditProgram(prog)}
-                          style={{
-                            padding: '0.25rem 0.5rem',
-                            fontSize: '0.75rem',
-                            borderRadius: 'var(--radius-full)',
-                            border: '1px solid var(--border-color)',
-                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                            color: selected ? 'white' : 'var(--text-secondary)',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {prog}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Formatos Logísticos</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                    {FORMAT_OPTIONS.map(form => {
-                      const selected = editFormats.includes(form);
-                      return (
-                        <button
-                          key={form}
-                          type="button"
-                          className="btn"
-                          onClick={() => toggleEditFormat(form)}
-                          style={{
-                            padding: '0.25rem 0.5rem',
-                            fontSize: '0.75rem',
-                            borderRadius: 'var(--radius-full)',
-                            border: '1px solid var(--border-color)',
-                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                            color: selected ? 'white' : 'var(--text-secondary)',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {form}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Equipo Asignado</label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.25rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '0.5rem', borderRadius: 'var(--radius-md)' }}>
-                    {users.map(u => (
-                      <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={editAssignees.includes(u.id)}
-                          onChange={() => handleEditAssigneeToggle(u.id)}
-                        />
-                        <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: u.avatarColor }}></span>
-                        {u.name}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Guardar Planificación
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
       {/* Media Preview Modal */}
       {previewItem && (
         <div className="modal-overlay" style={{ display: 'flex', zIndex: 120 }} onClick={() => setPreviewItem(null)}>
@@ -1261,6 +1047,26 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             </div>
           </div>
         </div>
+      )}
+
+      {/* Edit Coverage Details Modal */}
+      {showEditModal && coverage && (
+        <EventEditModal
+          initialData={{
+            title: coverage.title,
+            description: coverage.description,
+            start: coverage.dateTime,
+            end: coverage.dateTime,
+            location: coverage.location,
+            status: coverage.status,
+            assigneeId: coverage.assignees.length > 0 ? coverage.assignees[0] : '',
+            programs: coverage.programs || [],
+            formats: coverage.formats || []
+          }}
+          isCoverage={true}
+          onSave={handleSaveCoverageDetails}
+          onClose={() => setShowEditModal(false)}
+        />
       )}
     </div>
   );

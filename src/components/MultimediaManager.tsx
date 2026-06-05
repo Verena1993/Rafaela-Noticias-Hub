@@ -11,10 +11,11 @@ interface MultimediaManagerProps {
 }
 
 export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }) => {
-  const { addMultimediaToCoverage, addSharedLinkToCoverage } = useHub();
+  const { addMultimediaToCoverage, addSharedLinkToCoverage, users } = useHub();
   
   const [activeTab, setActiveTab] = useState<'files' | 'links' | 'drive'>('files');
   const [dragActive, setDragActive] = useState(false);
+  const [showMobileUploadModal, setShowMobileUploadModal] = useState(false);
 
   const [newLinkUrl, setNewLinkUrl] = useState('');
   const [newLinkTitle, setNewLinkTitle] = useState('');
@@ -117,6 +118,17 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
 
       {activeTab === 'files' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <h4 style={{ fontSize: '1rem', margin: 0 }}>Carga Rápida</h4>
+            <button 
+              className="btn btn-primary" 
+              style={{ fontSize: '0.85rem' }}
+              onClick={() => setShowMobileUploadModal(true)}
+            >
+              <UploadCloud size={16} /> Subir desde celular
+            </button>
+          </div>
+
           {/* Drag & Drop Area */}
           <div 
             onDragEnter={handleDrag}
@@ -170,7 +182,14 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
                     <p style={{ fontSize: '0.8rem', fontWeight: 600, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }} title={item.name}>
                       {item.name}
                     </p>
-                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{item.size}</p>
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                      {new Date(item.uploadDate).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                      <br />
+                      <span style={{ color: 'var(--primary)', fontWeight: 500 }}>
+                        {item.userId ? (users.find(u => u.id === item.userId)?.name.split(' ')[0] || 'Usuario') : 'Usuario'}
+                      </span>
+                      {' • '}{item.size}
+                    </p>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
                     <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }} title="Descargar">
@@ -245,6 +264,40 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
           <button className="btn btn-secondary" disabled style={{ opacity: 0.7 }}>
             Sincronizar con Drive (Próximamente)
           </button>
+        </div>
+      )}
+      {/* Modal Subir desde celular */}
+      {showMobileUploadModal && (
+        <div className="modal-overlay" style={{ zIndex: 110 }} onClick={() => setShowMobileUploadModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '400px', textAlign: 'center' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Subir material desde el móvil</h3>
+              <button className="modal-close" onClick={() => setShowMobileUploadModal(false)}>✕</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center', padding: '2rem 1rem' }}>
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+                Escanea este código QR con la cámara de tu celular para abrir directamente la carpeta de subida de esta cobertura.
+              </p>
+              <div style={{ width: '180px', height: '180px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: 'var(--radius-md)' }}>
+                {/* Mock QR Code */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '4px', width: '120px', height: '120px' }}>
+                  {Array.from({ length: 25 }).map((_, i) => (
+                    <div key={i} style={{ backgroundColor: Math.random() > 0.4 ? '#0f172a' : 'transparent' }}></div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ width: '100%' }}>
+                <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>O copia este enlace de subida rápida</p>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input type="text" readOnly className="form-input" value={`https://hub.rafaelanoticias.com/upload/${coverage.id}`} style={{ fontSize: '0.8rem', backgroundColor: 'var(--bg-tertiary)' }} />
+                  <button className="btn btn-secondary" onClick={() => alert('¡Copiado!')}>Copiar</button>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ justifyContent: 'center' }}>
+              <button className="btn btn-primary" onClick={() => setShowMobileUploadModal(false)}>Listo</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

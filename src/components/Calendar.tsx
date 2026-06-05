@@ -8,11 +8,12 @@ import {
   User as UserIcon, 
   Users, 
   Eye, 
-  Edit3,
-  Save
+  Edit3
 } from 'lucide-react';
 import type { CalendarEvent, StaffSchedule, ProgramType, FormatType } from '../data/mockData';
 import { formatFriendlyDate } from '../utils/dateUtils';
+import { EventEditModal } from './EventEditModal';
+import type { EventEditData } from './EventEditModal';
 
 interface CalendarProps {
   setSelectedCoverageId?: (id: string | null) => void;
@@ -76,14 +77,8 @@ export const Calendar: React.FC<CalendarProps> = ({
   const [isEditingEvent, setIsEditingEvent] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDesc, setEditDesc] = useState('');
-  const [editType, setEditType] = useState<CalendarEvent['type']>('coverage');
   const [editStart, setEditStart] = useState('');
   const [editEnd, setEditEnd] = useState('');
-  const [editLoc, setEditLoc] = useState('');
-  const [editStatus, setEditStatus] = useState<CalendarEvent['status']>('pending_confirmation');
-  const [editAssigneeId, setEditAssigneeId] = useState('');
-  const [editPrograms, setEditPrograms] = useState<ProgramType[]>([]);
-  const [editFormats, setEditFormats] = useState<FormatType[]>([]);
 
   // Staff management modal states
   const [showStaffModal, setShowStaffModal] = useState(false);
@@ -113,14 +108,8 @@ export const Calendar: React.FC<CalendarProps> = ({
   const toggleNewProgram = (prog: ProgramType) => {
     setNewPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);
   };
-  const toggleEditProgram = (prog: ProgramType) => {
-    setEditPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);
-  };
   const toggleNewFormat = (form: FormatType) => {
     setNewFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
-  };
-  const toggleEditFormat = (form: FormatType) => {
-    setEditFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
   };
 
   const handleCreateEvent = (e: React.FormEvent) => {
@@ -217,32 +206,25 @@ export const Calendar: React.FC<CalendarProps> = ({
     // Prefill edit form
     setEditTitle(evt.title);
     setEditDesc(evt.description || '');
-    setEditType(evt.type);
     setEditStart(evt.start);
     setEditEnd(evt.end);
-    setEditLoc(evt.location || '');
-    setEditStatus(evt.status || 'pending');
-    setEditAssigneeId(evt.assigneeId || '');
-    setEditPrograms(evt.programs || []);
-    setEditFormats(evt.formats || []);
   };
 
-  const handleSaveEditedEvent = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveEditedEvent = (data: EventEditData) => {
     if (!selectedEvent) return;
 
     updateEvent(
       selectedEvent.id,
-      editTitle,
-      editDesc,
-      editType,
-      editStart,
-      editEnd,
-      editLoc || undefined,
-      editStatus,
-      editAssigneeId || undefined,
-      editPrograms,
-      editFormats
+      data.title,
+      data.description,
+      selectedEvent.type, // we don't allow changing type once linked, or maybe we do, but EventEditModal currently doesn't edit type.
+      data.start,
+      data.end,
+      data.location || undefined,
+      data.status,
+      data.assigneeId || undefined,
+      data.programs,
+      data.formats
     );
 
     setSelectedEvent(null);
@@ -1049,171 +1031,22 @@ export const Calendar: React.FC<CalendarProps> = ({
               <button className="modal-close" onClick={() => setSelectedEvent(null)}>✕</button>
             </div>
             
-            {isEditingEvent ? (
-              <form onSubmit={handleSaveEditedEvent}>
-                <div className="modal-body event-form-grid" style={{ padding: '1rem' }}>
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                    <label className="form-label">Título *</label>
-                    <input
-                      type="text"
-                      required
-                      className="form-input"
-                      value={editTitle}
-                      onChange={e => setEditTitle(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 1' }}>
-                    <label className="form-label">Tipo</label>
-                    <select 
-                      className="form-select"
-                      value={editType}
-                      onChange={e => setEditType(e.target.value as any)}
-                      disabled={!!selectedEvent.coverageId} // disable if coverage linked
-                    >
-                      <option value="coverage">Cobertura</option>
-                      <option value="press_conference">Conferencia</option>
-                      <option value="interview">Entrevista</option>
-                      <option value="event">Evento Gral.</option>
-                      <option value="key_date">Fecha Impor.</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
-                    <label className="form-label">Descripción</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editDesc}
-                      onChange={e => setEditDesc(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 1' }}>
-                    <label className="form-label">Estado</label>
-                    <select 
-                      className="form-select"
-                      value={editStatus}
-                      onChange={e => setEditStatus(e.target.value as any)}
-                    >
-                      <option value="pending_confirmation">Pendiente de confirmación</option>
-                      <option value="confirmed">Confirmada</option>
-                      <option value="in_redaction">En Redacción</option>
-                      <option value="published">Publicada</option>
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 1' }}>
-                    <label className="form-label">Inicio</label>
-                    <input
-                      type="datetime-local"
-                      required
-                      className="form-input"
-                      value={editStart}
-                      onChange={e => setEditStart(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 1' }}>
-                    <label className="form-label">Fin</label>
-                    <input
-                      type="datetime-local"
-                      required
-                      className="form-input"
-                      value={editEnd}
-                      onChange={e => setEditEnd(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 1' }}>
-                    <label className="form-label">Ubicación</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={editLoc}
-                      onChange={e => setEditLoc(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 3', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginBottom: 0 }}>
-                    <label className="form-label">Asignado</label>
-                    <select
-                      className="form-select"
-                      value={editAssigneeId}
-                      onChange={e => setEditAssigneeId(e.target.value)}
-                    >
-                      <option value="">Ninguno</option>
-                      {users.map(u => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 3', marginBottom: 0 }}>
-                    <label className="form-label">Programas Asociados</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                      {PROGRAM_OPTIONS.map(prog => {
-                        const selected = editPrograms.includes(prog);
-                        return (
-                          <button
-                            key={prog}
-                            type="button"
-                            className="btn"
-                            onClick={() => toggleEditProgram(prog)}
-                            style={{
-                              padding: '0.2rem 0.4rem',
-                              fontSize: '0.7rem',
-                              borderRadius: 'var(--radius-full)',
-                              border: '1px solid var(--border-color)',
-                              background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                              color: selected ? 'white' : 'var(--text-secondary)',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {prog}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="form-group" style={{ gridColumn: 'span 3', marginBottom: 0 }}>
-                    <label className="form-label">Formatos Logísticos</label>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
-                      {FORMAT_OPTIONS.map(form => {
-                        const selected = editFormats.includes(form);
-                        return (
-                          <button
-                            key={form}
-                            type="button"
-                            className="btn"
-                            onClick={() => toggleEditFormat(form)}
-                            style={{
-                              padding: '0.2rem 0.4rem',
-                              fontSize: '0.7rem',
-                              borderRadius: 'var(--radius-full)',
-                              border: '1px solid var(--border-color)',
-                              background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                              color: selected ? 'white' : 'var(--text-secondary)',
-                              cursor: 'pointer'
-                            }}
-                          >
-                            {form}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setIsEditingEvent(false)}>
-                    Atrás
-                  </button>
-                  <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    <Save size={14} /> Guardar
-                  </button>
-                </div>
-              </form>
+            {isEditingEvent && selectedEvent ? (
+              <EventEditModal
+                initialData={{
+                  title: editTitle,
+                  description: editDesc,
+                  start: editStart,
+                  end: editEnd,
+                  location: selectedEvent.location || '',
+                  status: selectedEvent.status || 'pending',
+                  assigneeId: selectedEvent.assigneeId || '',
+                  programs: selectedEvent.programs || [],
+                  formats: selectedEvent.formats || []
+                }}
+                onSave={handleSaveEditedEvent}
+                onClose={() => setIsEditingEvent(false)}
+              />
             ) : (
               <div>
                 <div className="modal-body event-detail-grid" style={{ padding: '1.25rem' }}>
