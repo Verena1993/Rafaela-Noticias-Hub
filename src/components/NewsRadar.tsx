@@ -2,427 +2,525 @@ import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
 import { 
   Radio, Globe, MapPin, TrendingUp, Newspaper, Sparkles, Send, 
-  ChevronRight, Clock, Tag, ExternalLink, FileText, CheckCircle2,
-  RefreshCw
+  ChevronRight, Clock, ExternalLink, FileText,
+  RefreshCw, PlaySquare, MessageCircle, AlertTriangle, Smartphone,
+  ServerCog
 } from 'lucide-react';
 import type { RadarCategory, NewsRadarItem } from '../data/mockData';
 import { formatFriendlyDate } from '../utils/dateUtils';
+import { aiService } from '../services/aiService';
+import { isSimilarTitle } from '../services/rssService';
 
+type RadarMainTab = 'feed' | 'local' | 'provincial' | 'national' | 'trends' | 'rafaela_talks' | 'diagnostics';
+
+// Color map for tags and cards based on category
 const CATEGORY_CONFIG: Record<RadarCategory, { label: string; icon: React.ElementType; color: string; bg: string }> = {
-  national: { label: 'Nacional', icon: Globe, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
-  provincial: { label: 'Provincial', icon: MapPin, color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)' },
-  regional: { label: 'Regional', icon: Newspaper, color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
-  trending: { label: 'Tendencias', icon: TrendingUp, color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+  national: { label: 'Nacional', icon: Globe, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },      // Blue
+  provincial: { label: 'Provincial', icon: MapPin, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' }, // Green
+  local: { label: 'Local', icon: Newspaper, color: '#eab308', bg: 'rgba(234,179,8,0.1)' },         // Yellow
+  trending: { label: 'Google Trends', icon: TrendingUp, color: '#f97316', bg: 'rgba(249,115,22,0.1)' },
+  social_trends: { label: 'Redes Sociales', icon: PlaySquare, color: '#a855f7', bg: 'rgba(168,85,247,0.1)' }, // Violet
+  rafaela_talks: { label: 'Comunidad Local', icon: MessageCircle, color: '#ec4899', bg: 'rgba(236,72,153,0.1)' }
 };
 
-const FILTERS: { id: RadarCategory | 'all'; label: string }[] = [
-  { id: 'all', label: 'Todas' },
-  { id: 'national', label: 'Nacional' },
-  { id: 'provincial', label: 'Provincial' },
-  { id: 'regional', label: 'Regional' },
-  { id: 'trending', label: 'Tendencias' },
-];
+const ALERT_KEYWORDS = ['accidente', 'choque', 'incendio', 'robo', 'allanamiento', 'homicidio', 'tormenta', 'evacuacion', 'evacuación', 'corte'];
 
-const DRAFT_TEMPLATES = (item: NewsRadarItem) => ({
-  title: `Título SEO: ${item.title}\n\nVariante 1: El impacto de este tema en Rafaela y la región\nVariante 2: Lo que debes saber sobre ${item.title.split(':')[0]}\nVariante 3: Rafaela frente a ${item.title.substring(0, 40)}...`,
-  intro: `COPETE:\n${item.summary}\n\nLa noticia generada por ${item.source} impacta directamente en el área de cobertura de Rafaela Noticias y merece seguimiento local.`,
-  body: `DESARROLLO:\n\n${item.summary}\n\nSegún información de ${item.source}, publicada el ${formatFriendlyDate(item.date)}, la situación evoluciona de manera que podría tener consecuencias directas para la comunidad de Rafaela y la región central de Santa Fe.\n\nPara profundizar en esta oportunidad editorial, se recomienda:\n• Consultar fuentes locales relacionadas\n• Buscar el ángulo regional de la noticia\n• Entrevistar a referentes locales del sector involucrado\n• Verificar impacto específico en Rafaela\n\nEste borrador fue generado automáticamente por el sistema de Radar de Noticias de Rafaela Noticias Hub y debe ser revisado, contextualizado y aprobado por un editor antes de su publicación.`,
-});
+const getTrendLevelColor = (level?: string) => {
+  switch (level) {
+    case 'Muy caliente': return { text: '#ef4444', bg: 'rgba(239,68,68,0.1)' }; // Red
+    case 'En crecimiento': return { text: '#f59e0b', bg: 'rgba(245,158,11,0.1)' }; // Orange
+    case 'Moderada': return { text: '#10b981', bg: 'rgba(16,185,129,0.1)' }; // Green
+    default: return { text: 'var(--text-secondary)', bg: 'var(--bg-tertiary)' };
+  }
+};
 
 export const NewsRadar: React.FC = () => {
-  const { newsRadarItems, updateNewsRadarItem, addCoverage, updateCoverageStatus } = useHub();
-  const [activeFilter, setActiveFilter] = useState<RadarCategory | 'all'>('all');
+  const { newsRadarItems, updateNewsRadarItem, addProposal, fetchLiveRadarNews, loadingRadar, coverages, proposals, rssDiagnostics } = useHub();
+  
+  const [mainTab, setMainTab] = useState<RadarMainTab>('feed');
   const [generatingId, setGeneratingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
 
-  const filtered = newsRadarItems.filter(item => 
-    activeFilter === 'all' || item.category === activeFilter
-  );
-
-  const handleGenerateDraft = (item: NewsRadarItem) => {
-    setGeneratingId(item.id);
-    setExpandedId(item.id);
-    
-    // Simulate AI processing delay
-    setTimeout(() => {
-      const templates = DRAFT_TEMPLATES(item);
-      const draft = `${templates.title}\n\n${templates.intro}\n\n${templates.body}`;
-      updateNewsRadarItem(item.id, { draft });
-      setGeneratingId(null);
-    }, 1800);
+  const checkAlreadyCovered = (item: NewsRadarItem) => {
+    if (item.sentToEditor || sentIds.has(item.id)) return true;
+    const inProposals = proposals.some(p => {
+      const hasLink = p.sharedLinks?.some(l => l.url === item.url);
+      return hasLink || isSimilarTitle(p.title.replace('[Borrador IA]', ''), item.title);
+    });
+    const inCoverages = coverages.some(c => {
+      const hasLink = c.sharedLinks?.some(l => l.url === item.url);
+      return hasLink || isSimilarTitle(c.title.replace('[Borrador IA]', ''), item.title);
+    });
+    return inProposals || inCoverages;
   };
 
-  const handleSendToEditor = (item: NewsRadarItem) => {
+  const isAlert = (title: string) => {
+    const lower = title.toLowerCase();
+    return ALERT_KEYWORDS.some(kw => lower.includes(kw));
+  };
+
+  const getWeight = (item: NewsRadarItem) => {
+    if (isAlert(item.title)) return 10;
+    
+    // Top Priority Local Sources
+    const topLocal = ['Radio Rafaela', 'Castellanos de Rafaela', 'La Opinión', 'Municipalidad de Rafaela'];
+    if (topLocal.includes(item.source)) return 6;
+    
+    if (item.category === 'trending') return 4;
+    if (item.category === 'local') return 3;
+    if (item.category === 'provincial') return 2;
+    return 1; // national
+  };
+
+  // Pure filtering: we ONLY work with items that are NOT covered.
+  // The system removes them from the Radar completely if they are covered.
+  const newItems = newsRadarItems.filter(i => !checkAlreadyCovered(i));
+
+  // Divide datasets based on newItems
+  const feedItems = newItems
+    .filter(i => ['national', 'provincial', 'local', 'trending'].includes(i.category))
+    .sort((a, b) => getWeight(b) - getWeight(a)); // Sort by priority
+  
+  const localItems = newItems.filter(i => i.category === 'local');
+  const provincialItems = newItems.filter(i => i.category === 'provincial');
+  const nationalItems = newItems.filter(i => i.category === 'national');
+  const trendingItems = newItems.filter(i => ['trending', 'social_trends'].includes(i.category));
+  const rafaelaTalks = newItems.filter(i => i.category === 'rafaela_talks');
+
+  const tiktokVideos = trendingItems.filter(i => i.socialPlatform === 'tiktok');
+  const igReels = trendingItems.filter(i => i.socialPlatform === 'instagram');
+  const xTrends = trendingItems.filter(i => i.socialPlatform === 'x');
+  const googleTrends = trendingItems.filter(i => i.category === 'trending');
+
+  const handleGenerateDraft = async (item: NewsRadarItem) => {
+    setGeneratingId(item.id);
+    setExpandedId(item.id);
+    try {
+      const seoTitle = await aiService.generateSeoTitle(item.title, item.summary);
+      const copete = await aiService.generateCopete(item.title, item.summary);
+      const draftBody = await aiService.generateDraft(item.title, item.summary, item.source);
+      const draft = `${seoTitle}\n\nCOPETE:\n${copete}\n\n${draftBody}`;
+      updateNewsRadarItem(item.id, { draft });
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setGeneratingId(null);
+    }
+  };
+
+  const handleSendToEditor = async (item: NewsRadarItem) => {
     setSendingId(item.id);
-    setTimeout(() => {
-      // Auto-generate draft if not previously generated
+    try {
       let finalDraft = item.draft;
+      let title = item.title;
       if (!finalDraft) {
-        const templates = DRAFT_TEMPLATES(item);
-        finalDraft = `${templates.title}\n\n${templates.intro}\n\n${templates.body}`;
+        title = await aiService.generateSeoTitle(item.title, item.summary);
+        const copete = await aiService.generateCopete(item.title, item.summary);
+        const draftBody = await aiService.generateDraft(item.title, item.summary, item.source);
+        finalDraft = `${title}\n\nCOPETE:\n${copete}\n\n${draftBody}`;
       }
 
-      // Create a Coverage in 'in_redaction' state with the AI draft
-      const coverageId = addCoverage(
-        `[Borrador IA] ${item.title}`,
+      addProposal(
+        `[Borrador IA] ${title}`,
         finalDraft,
-        new Date().toISOString(),
-        'Redacción (Asignación automática)',
-        []
+        undefined, undefined, [], [], 
+        item.url ? [{ title: `Fuente original: ${item.source}`, url: item.url, comments: 'Enlace detectado desde el Radar' }] : [], 
+        [], []
       );
-      updateCoverageStatus(coverageId, 'in_redaction');
-
       updateNewsRadarItem(item.id, { sentToEditor: true, draft: finalDraft });
       setSentIds(prev => new Set(prev).add(item.id));
+    } catch (e) {
+      console.error(e);
+    } finally {
       setSendingId(null);
-    }, 1500); // simulate slightly longer AI delay
+    }
   };
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    const now = new Date();
-    const diffHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    const diffHours = Math.floor((new Date().getTime() - date.getTime()) / (1000 * 60 * 60));
     if (diffHours < 1) return 'hace unos minutos';
     if (diffHours < 24) return `hace ${diffHours}h`;
     return formatFriendlyDate(dateStr);
   };
 
+  const translateConnectionType = (type: string) => {
+    switch (type) {
+      case 'rss2json_proxy': return 'Proxy Público (rss2json)';
+      case 'edge_function': return 'Edge Function (Supabase)';
+      case 'google_news': return 'Google News Engine';
+      case 'social_api': return 'Social Media API';
+      case 'rss_direct': return 'RSS Directo';
+      default: return type;
+    }
+  };
+
+  // Render a single Radar Card
+  const renderItemCard = (item: NewsRadarItem) => {
+    const catConfig = CATEGORY_CONFIG[item.category];
+    const CatIcon = catConfig.icon;
+    const isExpanded = expandedId === item.id;
+    const isGenerating = generatingId === item.id;
+    const isSending = sendingId === item.id;
+    const alertFlag = isAlert(item.title);
+    
+    return (
+      <div 
+        key={item.id} 
+        className="card"
+        style={{
+          borderLeft: alertFlag ? '4px solid #ef4444' : `4px solid ${catConfig.color}`,
+          transition: 'all 0.2s',
+          position: 'relative'
+        }}
+      >
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
+          <div style={{
+            width: '36px', height: '36px', borderRadius: 'var(--radius-md)',
+            backgroundColor: alertFlag ? 'rgba(239,68,68,0.1)' : catConfig.bg,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            {alertFlag ? <AlertTriangle size={18} style={{ color: '#ef4444' }} /> : <CatIcon size={18} style={{ color: catConfig.color }} />}
+          </div>
+          
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+              {alertFlag && (
+                <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', padding: '0.1rem 0.4rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+                  <AlertTriangle size={10} /> Alerta Crítica
+                </span>
+              )}
+              <span style={{
+                fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
+                color: catConfig.color, backgroundColor: catConfig.bg,
+                padding: '0.1rem 0.4rem', borderRadius: 'var(--radius-full)'
+              }}>
+                {catConfig.label}
+              </span>
+              
+              {item.trendLevel && (
+                <span style={{
+                  fontSize: '0.65rem', fontWeight: 600,
+                  color: getTrendLevelColor(item.trendLevel).text,
+                  backgroundColor: getTrendLevelColor(item.trendLevel).bg,
+                  padding: '0.1rem 0.4rem', borderRadius: 'var(--radius-full)'
+                }}>
+                  🔥 {item.trendLevel}
+                </span>
+              )}
+
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
+                <Clock size={11} />{formatDate(item.date)}
+              </span>
+              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>• {item.source}</span>
+            </div>
+
+            <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.4rem 0', lineHeight: 1.4, color: 'var(--text-primary)' }}>
+              {item.title}
+            </h3>
+            
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: 0 }}>
+              {item.summary}
+            </p>
+            
+            {item.views && (
+              <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.5rem' }}>
+                👁 Visualizaciones estimadas: {item.views}
+              </p>
+            )}
+          </div>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexShrink: 0 }}>
+            {!item.draft ? (
+              <button
+                className="btn btn-primary"
+                style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', whiteSpace: 'nowrap' }}
+                onClick={() => handleGenerateDraft(item)}
+                disabled={isGenerating}
+              >
+                {isGenerating ? (
+                  <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generando...</>
+                ) : (
+                  <><Sparkles size={12} /> Generar borrador</>
+                )}
+              </button>
+            ) : (
+              <button
+                className="btn btn-secondary"
+                style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem', color: 'var(--primary)' }}
+                onClick={() => setExpandedId(isExpanded ? null : item.id)}
+              >
+                <FileText size={12} />
+                {isExpanded ? 'Ocultar' : 'Ver borrador'}
+                <ChevronRight size={11} style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+              </button>
+            )}
+            
+            {item.url && (
+              <a href={item.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem', textDecoration: 'none', padding: '0.3rem 0.5rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', justifyContent: 'center' }}>
+                <ExternalLink size={10} /> Fuente Original
+              </a>
+            )}
+          </div>
+        </div>
+        
+        {isExpanded && item.draft && (
+          <div style={{ marginTop: '1rem', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Sparkles size={14} style={{ color: 'var(--primary)' }} /> Borrador generado
+              </h4>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button className="btn btn-secondary" style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }} onClick={() => navigator.clipboard.writeText(item.draft || '')}>
+                  Copiar
+                </button>
+                <button
+                  className="btn btn-primary"
+                  style={{ fontSize: '0.7rem', padding: '0.3rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                  onClick={() => handleSendToEditor(item)}
+                  disabled={isSending}
+                >
+                  {isSending ? (
+                    <><RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> Enviando...</>
+                  ) : (
+                    <><Send size={11} /> Enviar al Editor</>
+                  )}
+                </button>
+              </div>
+            </div>
+            <pre style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.7, margin: 0, fontFamily: 'inherit' }}>
+              {item.draft}
+            </pre>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const TabButton = ({ tab, icon: Icon, label, count, color }: { tab: RadarMainTab, icon: any, label: string, count?: number, color?: string }) => (
+    <button 
+      onClick={() => setMainTab(tab)}
+      style={{ 
+        background: 'none', border: 'none', padding: '0.5rem 0.75rem', cursor: 'pointer',
+        fontWeight: 700, color: mainTab === tab ? (color || 'var(--primary)') : 'var(--text-secondary)',
+        borderBottom: mainTab === tab ? `2px solid ${color || 'var(--primary)'}` : '2px solid transparent',
+        display: 'flex', alignItems: 'center', gap: '0.4rem',
+        fontSize: '0.85rem', whiteSpace: 'nowrap'
+      }}
+    >
+      <Icon size={16} /> {label} {count !== undefined && `(${count})`}
+    </button>
+  );
+
   return (
     <div>
       {/* Page Header */}
-      <div className="page-header">
+      <div className="page-header" style={{ marginBottom: '1.5rem', display: 'flex', justifyContent: 'space-between' }}>
         <div>
           <h2 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Radio size={22} style={{ color: 'var(--primary)' }} />
-            Radar de Noticias
+            Radar de Noticias 360°
           </h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-            Detección de oportunidades editoriales nacionales, provinciales y regionales.
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginLeft: '0.5rem' }}>
-              (Arquitectura preparada para integración con APIs externas e IA)
-            </span>
+            Oportunidades puras para la redacción. Todo contenido en agenda es ocultado automáticamente.
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <button className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}>
-            <RefreshCw size={14} />
-            Actualizar feed
+          <button 
+            className="btn btn-secondary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
+            onClick={() => setMainTab('diagnostics')}
+          >
+            <ServerCog size={14} /> Diagnóstico de Conexión
+          </button>
+          <button 
+            className="btn btn-primary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', opacity: loadingRadar ? 0.7 : 1 }}
+            onClick={() => fetchLiveRadarNews()}
+            disabled={loadingRadar}
+          >
+            <RefreshCw size={14} style={{ animation: loadingRadar ? 'spin 1s linear infinite' : 'none' }} />
+            {loadingRadar ? 'Analizando...' : 'Actualizar métricas'}
           </button>
         </div>
       </div>
 
-      {/* Category filter tabs */}
-      <div style={{ 
-        display: 'flex', 
-        gap: '0.5rem', 
-        marginBottom: '1.5rem',
-        overflowX: 'auto',
-        paddingBottom: '0.25rem'
-      }}>
-        {FILTERS.map(f => {
-          const isActive = activeFilter === f.id;
-          const catConfig = f.id !== 'all' ? CATEGORY_CONFIG[f.id as RadarCategory] : null;
-          return (
-            <button
-              key={f.id}
-              onClick={() => setActiveFilter(f.id as RadarCategory | 'all')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.35rem',
-                padding: '0.4rem 1rem',
-                borderRadius: 'var(--radius-full)',
-                border: isActive 
-                  ? `2px solid ${catConfig?.color || 'var(--primary)'}` 
-                  : '1px solid var(--border-color)',
-                background: isActive 
-                  ? (catConfig?.bg || 'rgba(var(--primary-rgb, 99,102,241),0.1)') 
-                  : 'var(--bg-primary)',
-                color: isActive ? (catConfig?.color || 'var(--primary)') : 'var(--text-secondary)',
-                fontWeight: isActive ? 700 : 500,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                transition: 'all 0.2s',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {catConfig && <catConfig.icon size={13} />}
-              {f.label}
-            </button>
-          );
-        })}
+      {/* Main Navigation Tabs */}
+      <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.1rem' }}>
+        <TabButton tab="feed" icon={Newspaper} label="Feed Priorizado" />
+        <TabButton tab="local" icon={MapPin} label="Locales" color="#eab308" count={localItems.length} />
+        <TabButton tab="provincial" icon={MapPin} label="Provinciales" color="#22c55e" count={provincialItems.length} />
+        <TabButton tab="national" icon={Globe} label="Nacionales" color="#3b82f6" count={nationalItems.length} />
+        <TabButton tab="trends" icon={TrendingUp} label="Tendencias" color="#a855f7" count={trendingItems.length} />
+        <TabButton tab="rafaela_talks" icon={MessageCircle} label="Comunidad" count={rafaelaTalks.length} />
       </div>
 
-      {/* News grid */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {filtered.map(item => {
-          const catConfig = CATEGORY_CONFIG[item.category];
-          const CatIcon = catConfig.icon;
-          const isExpanded = expandedId === item.id;
-          const isGenerating = generatingId === item.id;
-          const isSending = sendingId === item.id;
-          const isSent = item.sentToEditor || sentIds.has(item.id);
-          
-          return (
-            <div 
-              key={item.id} 
-              className="card"
-              style={{
-                borderLeft: `4px solid ${catConfig.color}`,
-                transition: 'all 0.2s'
-              }}
-            >
-              {/* Card header */}
-              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-                <div style={{
-                  width: '36px',
-                  height: '36px',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: catConfig.bg,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <CatIcon size={18} style={{ color: catConfig.color }} />
-                </div>
-                
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
-                    <span style={{
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      color: catConfig.color,
-                      backgroundColor: catConfig.bg,
-                      padding: '0.1rem 0.4rem',
-                      borderRadius: 'var(--radius-full)'
-                    }}>
-                      {catConfig.label}
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                      <Clock size={11} />{formatDate(item.date)}
-                    </span>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>• {item.source}</span>
-                    {isSent && (
-                      <span style={{ fontSize: '0.65rem', color: 'var(--success-text)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                        <CheckCircle2 size={11} /> Enviado al editor
-                      </span>
-                    )}
-                  </div>
-                  
-                  <h3 style={{ 
-                    fontSize: '0.95rem', 
-                    fontWeight: 700, 
-                    margin: '0 0 0.4rem 0',
-                    lineHeight: 1.4,
-                    color: 'var(--text-primary)'
-                  }}>
-                    {item.title}
-                  </h3>
-                  
-                  <p style={{ 
-                    fontSize: '0.82rem', 
-                    color: 'var(--text-secondary)', 
-                    lineHeight: 1.5,
-                    margin: 0
-                  }}>
-                    {item.summary}
-                  </p>
-                  
-                  {item.tags && item.tags.length > 0 && (
-                    <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
-                      {item.tags.map(tag => (
-                        <span key={tag} style={{
-                          fontSize: '0.65rem',
-                          padding: '0.1rem 0.4rem',
-                          borderRadius: 'var(--radius-full)',
-                          background: 'var(--bg-tertiary)',
-                          color: 'var(--text-muted)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.15rem'
-                        }}>
-                          <Tag size={9} />#{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                {/* Action buttons */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', flexShrink: 0 }}>
-                  {!item.draft ? (
-                    <button
-                      className="btn btn-primary"
-                      style={{ 
-                        fontSize: '0.75rem', 
-                        padding: '0.4rem 0.75rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.3rem',
-                        whiteSpace: 'nowrap'
-                      }}
-                      onClick={() => handleGenerateDraft(item)}
-                      disabled={isGenerating}
-                    >
-                      {isGenerating ? (
-                        <><RefreshCw size={12} style={{ animation: 'spin 1s linear infinite' }} /> Generando...</>
-                      ) : (
-                        <><Sparkles size={12} /> Generar borrador</>
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      className="btn btn-secondary"
-                      style={{ 
-                        fontSize: '0.75rem', 
-                        padding: '0.4rem 0.75rem',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.3rem',
-                        color: 'var(--primary)'
-                      }}
-                      onClick={() => setExpandedId(isExpanded ? null : item.id)}
-                    >
-                      <FileText size={12} />
-                      {isExpanded ? 'Ocultar' : 'Ver borrador'}
-                      <ChevronRight size={11} style={{ transform: isExpanded ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
-                    </button>
-                  )}
-                  
-                  {item.url && (
-                    <a
-                      href={item.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        fontSize: '0.7rem',
-                        color: 'var(--text-muted)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.2rem',
-                        textDecoration: 'none',
-                        padding: '0.3rem 0.5rem',
-                        border: '1px solid var(--border-color)',
-                        borderRadius: 'var(--radius-sm)',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <ExternalLink size={10} /> Fuente
-                    </a>
-                  )}
-                </div>
-              </div>
-              
-              {/* Draft expanded section */}
-              {isExpanded && item.draft && (
-                <div style={{
-                  marginTop: '1rem',
-                  padding: '1rem',
-                  background: 'var(--bg-secondary)',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid var(--border-color)'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                    <h4 style={{ margin: 0, fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                      <Sparkles size={14} style={{ color: 'var(--primary)' }} />
-                      Borrador generado por IA
-                    </h4>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <button
-                        className="btn btn-secondary"
-                        style={{ fontSize: '0.7rem', padding: '0.3rem 0.6rem' }}
-                        onClick={() => navigator.clipboard.writeText(item.draft || '')}
-                      >
-                        Copiar
-                      </button>
-                      <button
-                        className="btn btn-primary"
-                        style={{ 
-                          fontSize: '0.7rem', 
-                          padding: '0.3rem 0.75rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.3rem',
-                          opacity: isSent ? 0.6 : 1
-                        }}
-                        onClick={() => !isSent && handleSendToEditor(item)}
-                        disabled={isSent || isSending}
-                      >
-                        {isSending ? (
-                          <><RefreshCw size={11} style={{ animation: 'spin 1s linear infinite' }} /> Enviando...</>
-                        ) : isSent ? (
-                          <><CheckCircle2 size={11} /> Enviado</>
-                        ) : (
-                          <><Send size={11} /> Enviar al Editor</>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                  <pre style={{
-                    fontSize: '0.78rem',
-                    color: 'var(--text-secondary)',
-                    whiteSpace: 'pre-wrap',
-                    lineHeight: 1.7,
-                    margin: 0,
-                    fontFamily: 'inherit'
-                  }}>
-                    {item.draft}
-                  </pre>
-                  <p style={{ 
-                    fontSize: '0.68rem', 
-                    color: 'var(--text-muted)', 
-                    marginTop: '0.75rem',
-                    padding: '0.5rem',
-                    background: 'var(--bg-tertiary)',
-                    borderRadius: 'var(--radius-sm)',
-                    margin: '0.75rem 0 0'
-                  }}>
-                    ⚠️ Este borrador fue generado automáticamente con IA simulada. Debe ser revisado, contextualizado y aprobado por un editor antes de su publicación. En el futuro, esta IA utilizará las reglas editoriales específicas de Rafaela Noticias.
-                  </p>
-                </div>
-              )}
-            </div>
-          );
-        })}
-        
-        {filtered.length === 0 && (
-          <div className="card" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-            <Radio size={32} style={{ margin: '0 auto 0.75rem', opacity: 0.3 }} />
-            <p>No hay noticias en esta categoría</p>
+      {/* Tab Contents */}
+      {mainTab === 'feed' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <Sparkles size={16} style={{ color: 'var(--primary)' }} />
+            <span style={{ fontSize: '0.8rem', color: 'var(--text-primary)', fontWeight: 600 }}>
+              Feed inteligente ordenado por gravedad (Alertas &gt; Locales Prioritarios &gt; Tendencias &gt; Provinciales &gt; Nacionales).
+            </span>
           </div>
-        )}
-      </div>
-
-      {/* Future roadmap note */}
-      <div style={{
-        marginTop: '2rem',
-        padding: '1rem 1.25rem',
-        background: 'linear-gradient(135deg, rgba(99,102,241,0.05), rgba(139,92,246,0.05))',
-        border: '1px solid rgba(99,102,241,0.2)',
-        borderRadius: 'var(--radius-lg)',
-        display: 'flex',
-        gap: '0.75rem',
-        alignItems: 'flex-start'
-      }}>
-        <Radio size={18} style={{ color: 'var(--primary)', flexShrink: 0, marginTop: '0.1rem' }} />
-        <div>
-          <p style={{ margin: 0, fontSize: '0.8rem', fontWeight: 600, color: 'var(--primary)' }}>Arquitectura preparada para expansión</p>
-          <p style={{ margin: '0.25rem 0 0', fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-            Este módulo está diseñado para conectarse con APIs de noticias (NewsAPI, GNews, Infobae, La Capital), fuentes provinciales de Santa Fe, 
-            y modelos de IA locales para generar borradores periodísticos completos con estilo editorial de Rafaela Noticias. 
-            El flujo futuro contempla: Radar → Borrador → Editor → Portal (borrador, nunca publicación automática).
-          </p>
+          {feedItems.length === 0 ? (
+            <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No hay noticias nuevas en el feed.</p>
+          ) : (
+            feedItems.map(renderItemCard)
+          )}
         </div>
-      </div>
-      
-      <style>{`
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      )}
+
+      {mainTab === 'local' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {localItems.length === 0 ? <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No hay noticias locales pendientes.</p> : localItems.map(renderItemCard)}
+        </div>
+      )}
+
+      {mainTab === 'provincial' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {provincialItems.length === 0 ? <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No hay noticias provinciales pendientes.</p> : provincialItems.map(renderItemCard)}
+        </div>
+      )}
+
+      {mainTab === 'national' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          {nationalItems.length === 0 ? <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No hay noticias nacionales pendientes.</p> : nationalItems.map(renderItemCard)}
+        </div>
+      )}
+
+      {mainTab === 'trends' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+          {/* Google Trends Block */}
+          {googleTrends.length > 0 && (
+            <div>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <TrendingUp size={18} style={{ color: '#f97316' }} /> Tendencias de Búsqueda (Google Trends)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {googleTrends.map(renderItemCard)}
+              </div>
+            </div>
+          )}
+
+          {/* TikTok Block */}
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <PlaySquare size={18} style={{ color: '#00f2fe' }} /> Videos Virales (TikTok / YT Shorts)
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {tiktokVideos.map(renderItemCard)}
+            </div>
+          </div>
+
+          {/* Instagram Block */}
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Smartphone size={18} style={{ color: '#e1306c' }} /> Tendencias en Instagram
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {igReels.map(renderItemCard)}
+            </div>
+          </div>
+
+          {/* X Trends Block */}
+          <div>
+            <h3 style={{ fontSize: '1.1rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: '1.2rem', fontWeight: 900 }}>𝕏</span> Trending Topics (X)
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {xTrends.map(renderItemCard)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mainTab === 'rafaela_talks' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ padding: '1rem', background: 'rgba(236,72,153,0.1)', borderRadius: 'var(--radius-md)', border: '1px solid rgba(236,72,153,0.2)' }}>
+            <h3 style={{ margin: '0 0 0.5rem 0', fontSize: '0.9rem', color: '#ec4899', fontWeight: 700 }}>Monitoreo Local 24/7</h3>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+              Captura conversaciones de redes locales, grupos de Facebook y cuentas de clubes o instituciones.
+            </p>
+          </div>
+          {rafaelaTalks.length === 0 ? (
+            <p style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-muted)' }}>No hay temas detectados actualmente.</p>
+          ) : (
+            rafaelaTalks.map(renderItemCard)
+          )}
+        </div>
+      )}
+
+      {mainTab === 'diagnostics' && (
+        <div className="card">
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <ServerCog size={18} style={{ color: 'var(--primary)' }} /> Estado del Gateway y Conexiones RSS
+          </h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '1rem' }}>
+            El sistema abstrae las conexiones para tolerar bloqueos de medios. Los medios bloqueados requieren configuración del Edge Function proxy. Las noticias simuladas no se inyectan.
+          </p>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid var(--border-color)', textAlign: 'left' }}>
+                  <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Fuente</th>
+                  <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Tipo de Conexión</th>
+                  <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Estado</th>
+                  <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Noticias Extraídas</th>
+                  <th style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>Última Revisión</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rssDiagnostics.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                      No hay diagnósticos disponibles. Presiona "Actualizar métricas".
+                    </td>
+                  </tr>
+                ) : (
+                  rssDiagnostics.map(diag => (
+                    <tr key={diag.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '0.75rem', fontWeight: 600 }}>
+                        {diag.name}
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.2rem' }}>{diag.url}</div>
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        <span style={{ 
+                          backgroundColor: 'var(--bg-secondary)', padding: '0.2rem 0.5rem', 
+                          borderRadius: '4px', fontSize: '0.7rem', color: 'var(--text-primary)', border: '1px solid var(--border-color)' 
+                        }}>
+                          {translateConnectionType(diag.connectionType)}
+                        </span>
+                      </td>
+                      <td style={{ padding: '0.75rem' }}>
+                        {diag.status === 'OK' ? (
+                          <span style={{ backgroundColor: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, fontSize: '0.75rem' }}>OK</span>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
+                            <span style={{ backgroundColor: 'rgba(239,68,68,0.1)', color: '#ef4444', padding: '0.2rem 0.5rem', borderRadius: '4px', fontWeight: 600, fontSize: '0.75rem', alignSelf: 'flex-start' }}>Error</span>
+                            <span style={{ fontSize: '0.7rem', color: '#ef4444' }}>{diag.message}</span>
+                          </div>
+                        )}
+                      </td>
+                      <td style={{ padding: '0.75rem', fontWeight: 700, color: diag.status === 'OK' ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+                        {diag.itemCount}
+                      </td>
+                      <td style={{ padding: '0.75rem', color: 'var(--text-secondary)' }}>
+                        {new Date(diag.lastChecked).toLocaleTimeString('es-AR')}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };

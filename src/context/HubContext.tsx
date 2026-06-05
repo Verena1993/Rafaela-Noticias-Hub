@@ -6,7 +6,7 @@ import {
 import type { 
   User, Coverage, Task, Alert, CalendarEvent, Notification, Activity,
   Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, StaffSchedule,
-  ProgramType, FormatType, InstagramPost, NewsRadarItem
+  ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic
 } from '../data/mockData';
 
 interface HubContextType {
@@ -60,6 +60,9 @@ interface HubContextType {
   
   // News Radar
   updateNewsRadarItem: (id: string, updates: Partial<NewsRadarItem>) => void;
+  fetchLiveRadarNews: () => Promise<void>;
+  loadingRadar: boolean;
+  rssDiagnostics: RssDiagnostic[];
 }
 
 const HubContext = createContext<HubContextType | undefined>(undefined);
@@ -121,6 +124,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [searchQuery, setSearchQuery] = useState('');
   const [newsRadarItems, setNewsRadarItems] = useState<NewsRadarItem[]>(INITIAL_NEWS_RADAR);
+  const [loadingRadar, setLoadingRadar] = useState(false);
+  const [rssDiagnostics, setRssDiagnostics] = useState<RssDiagnostic[]>([]);
 
   // Collect all activities from all coverages
   const [activities, setActivities] = useState<Activity[]>(() => {
@@ -133,6 +138,56 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Sort activities by timestamp descending
     return allActs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   });
+
+  // Fetch real RSS news and Social Trends
+  const fetchLiveRadarNews = async () => {
+    setLoadingRadar(true);
+    try {
+      const { rssService } = await import('../services/rssService');
+      const { trendsService } = await import('../services/trendsService');
+      
+      const [{ items, alerts: newAlerts, diagnostics }, socialItems] = await Promise.all([
+        rssService.fetchNews(),
+        trendsService.fetchSocialTrends()
+      ]);
+      
+      const allItems = [...items, ...socialItems];
+
+      if (allItems.length > 0) {
+        setNewsRadarItems(allItems);
+      }
+      setRssDiagnostics(diagnostics);
+      
+      // Add alerts to global context
+      if (newAlerts.length > 0) {
+        setAlerts(prev => {
+          const updated = [...prev];
+          newAlerts.forEach(alertText => {
+            // Avoid duplicate alerts based on text
+            if (!updated.some(a => a.title.includes(alertText))) {
+              updated.push({
+                id: `a_rss_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
+                title: `[RADAR] ${alertText}`,
+                timestamp: new Date().toISOString(),
+                severity: 'critical',
+                status: 'active'
+              });
+            }
+          });
+          return updated;
+        });
+      }
+    } catch (e) {
+      console.error('Failed to fetch live radar news', e);
+    } finally {
+      setLoadingRadar(false);
+    }
+  };
+
+  useEffect(() => {
+    // Automatically load RSS feeds on initial mount
+    fetchLiveRadarNews();
+  }, []);
 
   // Sync to localStorage
   useEffect(() => {
@@ -1315,7 +1370,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateInstagramPost,
       deleteInstagramPost,
       updateProposalDetails,
-      updateNewsRadarItem
+      updateNewsRadarItem,
+      fetchLiveRadarNews,
+      loadingRadar,
+      rssDiagnostics
     }}>
       {children}
     </HubContext.Provider>

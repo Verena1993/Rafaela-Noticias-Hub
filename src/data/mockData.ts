@@ -75,7 +75,8 @@ export interface Coverage {
 }
 
 // Radar de Noticias — architecture ready for external APIs and AI integration
-export type RadarCategory = 'national' | 'provincial' | 'regional' | 'trending';
+export type RadarCategory = 'national' | 'provincial' | 'local' | 'trending' | 'social_trends' | 'rafaela_talks';
+
 export interface NewsRadarItem {
   id: string;
   title: string;
@@ -87,6 +88,22 @@ export interface NewsRadarItem {
   tags?: string[];
   draft?: string; // AI-generated draft content
   sentToEditor?: boolean;
+  trendLevel?: 'Muy caliente' | 'En crecimiento' | 'Moderada';
+  views?: string;
+  socialPlatform?: 'tiktok' | 'instagram' | 'x' | 'youtube' | 'local';
+}
+
+export type ConnectionType = 'rss_direct' | 'rss2json_proxy' | 'edge_function' | 'google_news' | 'social_api';
+
+export interface RssDiagnostic {
+  id: string;
+  name: string;
+  url: string;
+  status: 'OK' | 'ERROR';
+  itemCount: number;
+  message?: string;
+  lastChecked: string;
+  connectionType: ConnectionType;
 }
 
 export interface Task {
@@ -523,7 +540,7 @@ export const INITIAL_NEWS_RADAR: NewsRadarItem[] = [
     summary: 'Tras la fecha del fin de semana, la Crema suma 28 puntos y está en el cuarto lugar de la zona. El partido del domingo ante Aldosivi será clave para mantener la posición.',
     source: 'Diario El Ciudadano',
     date: '2026-06-05T09:15:00',
-    category: 'regional',
+    category: 'local',
     url: 'https://ciudadanorafaela.com/placeholder',
     tags: ['deportes', 'atletico', 'rafaela']
   },
@@ -553,7 +570,7 @@ export const INITIAL_NEWS_RADAR: NewsRadarItem[] = [
     summary: 'Los precios internacionales de la oleaginosa se mantienen por encima de USD 380 la tonelada, beneficiando a productores de la región pampeana central.',
     source: 'Clarín Rural',
     date: '2026-06-05T06:00:00',
-    category: 'regional',
+    category: 'local',
     url: 'https://clarin.com/placeholder',
     tags: ['agro', 'soja', 'precios']
   }
