@@ -22,9 +22,12 @@ console.log(`Artículos originales: ${testItems.length}`);
 console.log(`Temas detectados: ${topics.length}\n`);
 
 topics.forEach((topic, idx) => {
-  console.log(`TEMA ${idx + 1}: ${topic.title.toUpperCase()}`);
-  console.log(`- Artículos: ${topic.articleCount}`);
-  console.log(`- Medios distintos: ${topic.mediaCount}`);
+  const score = topic.editorialScore;
+  console.log(`TEMA ${idx + 1}: [${score?.priority.toUpperCase()}] ${topic.title.toUpperCase()}`);
+  console.log(`- Score: ${score?.score} / 100`);
+  console.log(`- Motivo: ${score?.reasoning}`);
+  console.log(`- Banderas: Crecimiento=${score?.flags.enCrecimiento}, Impacto Local=${score?.flags.impactoLocal}, Multifuente=${score?.flags.multifuente}, Posible Exclusiva=${score?.flags.posibleExclusiva}`);
+  console.log(`- Artículos: ${topic.articleCount} | Medios: ${topic.mediaCount}`);
   console.log(`- Categoría: ${topic.category} | Alcance: ${topic.geoScope} | Actividad: ${topic.activityLevel}`);
   console.log(`- Primer medio: ${topic.firstMedia} | Último: ${topic.lastMedia}`);
   console.log(`- Artículos agrupados:`);

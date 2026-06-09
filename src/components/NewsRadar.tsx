@@ -4,7 +4,7 @@ import {
   Radio, Globe, MapPin, TrendingUp, Newspaper, Sparkles, Send, 
   ChevronRight, Clock, ExternalLink, FileText,
   RefreshCw, PlaySquare, MessageCircle, AlertTriangle, Smartphone,
-  ServerCog, Layers, Activity
+  ServerCog, Layers, Activity, Target
 } from 'lucide-react';
 import type { RadarCategory, NewsRadarItem } from '../data/mockData';
 import { formatFriendlyDate } from '../utils/dateUtils';
@@ -12,7 +12,7 @@ import { aiService } from '../services/aiService';
 import { isSimilarTitle } from '../services/rssService';
 import { clusterItems } from '../utils/topicClustering';
 
-type RadarMainTab = 'feed' | 'topics' | 'local' | 'provincial' | 'national' | 'trends' | 'rafaela_talks' | 'diagnostics';
+type RadarMainTab = 'feed' | 'opportunities' | 'topics' | 'local' | 'provincial' | 'national' | 'trends' | 'rafaela_talks' | 'diagnostics';
 
 // Color map for tags and cards based on category
 const CATEGORY_CONFIG: Record<RadarCategory, { label: string; icon: React.ElementType; color: string; bg: string }> = {
@@ -44,6 +44,7 @@ export const NewsRadar: React.FC = () => {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
   const [topicSortBy, setTopicSortBy] = useState<'recency' | 'media_count' | 'growth'>('media_count');
+  const [oppSortBy, setOppSortBy] = useState<'score' | 'recency' | 'growth' | 'media_count' | 'local_impact'>('score');
   const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
 
   const checkAlreadyCovered = (item: NewsRadarItem) => {
@@ -115,6 +116,23 @@ export const NewsRadar: React.FC = () => {
     });
     return topics;
   }, [newItems, topicSortBy]);
+
+  const opportunityTopics = React.useMemo(() => {
+    let topics = [...clusteredTopics];
+    topics.sort((a, b) => {
+      if (oppSortBy === 'score') return (b.editorialScore?.score || 0) - (a.editorialScore?.score || 0);
+      if (oppSortBy === 'recency') return new Date(b.lastPublishedAt).getTime() - new Date(a.lastPublishedAt).getTime();
+      if (oppSortBy === 'growth') {
+        const aGrowth = a.articleCount / (Math.max(1, (new Date(a.lastPublishedAt).getTime() - new Date(a.firstPublishedAt).getTime()) / 3600000));
+        const bGrowth = b.articleCount / (Math.max(1, (new Date(b.lastPublishedAt).getTime() - new Date(b.firstPublishedAt).getTime()) / 3600000));
+        return bGrowth - aGrowth;
+      }
+      if (oppSortBy === 'media_count') return b.mediaCount - a.mediaCount;
+      if (oppSortBy === 'local_impact') return (b.editorialScore?.flags.impactoLocal ? 1 : 0) - (a.editorialScore?.flags.impactoLocal ? 1 : 0);
+      return 0;
+    });
+    return topics;
+  }, [clusteredTopics, oppSortBy]);
 
   const handleGenerateDraft = async (item: NewsRadarItem) => {
     setGeneratingId(item.id);
@@ -373,6 +391,7 @@ export const NewsRadar: React.FC = () => {
       {/* Main Navigation Tabs */}
       <div style={{ display: 'flex', gap: '0.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.1rem' }}>
         <TabButton tab="feed" icon={Newspaper} label="Feed Priorizado" />
+        <TabButton tab="opportunities" icon={Target} label="Oportunidades Editoriales" color="#8b5cf6" count={opportunityTopics.length} />
         <TabButton tab="topics" icon={Layers} label="Temas Agrupados" color="#f43f5e" count={clusteredTopics.length} />
         <TabButton tab="local" icon={MapPin} label="Locales" color="#eab308" count={localItems.length} />
         <TabButton tab="provincial" icon={MapPin} label="Provinciales" color="#22c55e" count={provincialItems.length} />
@@ -382,6 +401,94 @@ export const NewsRadar: React.FC = () => {
       </div>
 
       {/* Tab Contents */}
+      {mainTab === 'opportunities' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', gap: '1rem' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <Target size={16} style={{ color: '#8b5cf6' }} />
+              Temas evaluados y priorizados por el Motor Editorial.
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button className={`btn ${oppSortBy === 'score' ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => setOppSortBy('score')}>Mayor Score</button>
+              <button className={`btn ${oppSortBy === 'recency' ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => setOppSortBy('recency')}>Más Reciente</button>
+              <button className={`btn ${oppSortBy === 'growth' ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => setOppSortBy('growth')}>Crecimiento</button>
+              <button className={`btn ${oppSortBy === 'local_impact' ? 'btn-primary' : 'btn-secondary'}`} style={{ fontSize: '0.75rem', padding: '0.3rem 0.6rem' }} onClick={() => setOppSortBy('local_impact')}>Impacto Local</button>
+            </div>
+          </div>
+
+          {opportunityTopics.map(topic => {
+            const scoreObj = topic.editorialScore;
+            if (!scoreObj) return null;
+            
+            const isHigh = scoreObj.priority === 'Alta';
+            const isMedium = scoreObj.priority === 'Media';
+            
+            const badgeColor = isHigh ? '#ef4444' : (isMedium ? '#eab308' : '#9ca3af');
+            const badgeBg = isHigh ? 'rgba(239,68,68,0.1)' : (isMedium ? 'rgba(234,179,8,0.1)' : 'rgba(156,163,175,0.1)');
+            
+            return (
+              <div key={`opp_${topic.id}`} className="card" style={{ borderLeft: `4px solid ${badgeColor}`, marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', marginBottom: '0.5rem' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 800, textTransform: 'uppercase', color: badgeColor, backgroundColor: badgeBg, padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                      {isHigh ? '🔥' : (isMedium ? '🟡' : '⚪')} Oportunidad {scoreObj.priority}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '1.2rem', fontWeight: 900, color: badgeColor }}>
+                    Score: {scoreObj.score}
+                  </div>
+                </div>
+                
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>
+                  {topic.title}
+                </h3>
+                
+                <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem', color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Globe size={14} /> Medios: <strong>{topic.mediaCount}</strong></span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Newspaper size={14} /> Artículos: <strong>{topic.articleCount}</strong></span>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}><Clock size={14} /> Act. {formatDate(topic.lastPublishedAt)}</span>
+                </div>
+                
+                <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '0.75rem', borderRadius: 'var(--radius-sm)', marginBottom: '1rem', borderLeft: '2px solid var(--border-color)' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Motivo de Puntuación</span>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-primary)' }}>{scoreObj.reasoning}</p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  {scoreObj.flags.enCrecimiento && <span style={{ fontSize: '0.7rem', fontWeight: 600, backgroundColor: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>📈 En crecimiento</span>}
+                  {scoreObj.flags.impactoLocal && <span style={{ fontSize: '0.7rem', fontWeight: 600, backgroundColor: 'rgba(34,197,94,0.1)', color: '#22c55e', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>📍 Impacto local</span>}
+                  {scoreObj.flags.multifuente && <span style={{ fontSize: '0.7rem', fontWeight: 600, backgroundColor: 'rgba(168,85,247,0.1)', color: '#a855f7', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>📰 Multifuente</span>}
+                  {scoreObj.flags.posibleExclusiva && <span style={{ fontSize: '0.7rem', fontWeight: 600, backgroundColor: 'rgba(236,72,153,0.1)', color: '#ec4899', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>⭐ Posible exclusiva</span>}
+                </div>
+                
+                <div style={{ marginTop: '1rem', display: 'flex', justifyContent: 'flex-end' }}>
+                   <button
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.75rem', padding: '0.4rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}
+                    onClick={() => setExpandedTopicId(expandedTopicId === topic.id ? null : topic.id)}
+                  >
+                    <Layers size={12} />
+                    {expandedTopicId === topic.id ? 'Ocultar Artículos' : 'Ver Artículos Agrupados'}
+                    <ChevronRight size={11} style={{ transform: expandedTopicId === topic.id ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </button>
+                </div>
+                
+                {expandedTopicId === topic.id && (
+                  <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                    <h4 style={{ fontSize: '0.85rem', fontWeight: 700, margin: '0 0 0.5rem 0', color: 'var(--text-primary)' }}>Artículos Asociados ({topic.items.length})</h4>
+                    {topic.items.map(item => (
+                      <div key={`opp_item_${item.id}`} style={{ paddingLeft: '1rem', borderLeft: '2px solid var(--border-color)', marginLeft: '0.5rem' }}>
+                        {renderItemCard(item)}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {mainTab === 'topics' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'var(--bg-secondary)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', flexWrap: 'wrap', gap: '1rem' }}>

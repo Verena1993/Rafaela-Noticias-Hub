@@ -1,4 +1,6 @@
 import type { NewsRadarItem, RadarCategory } from '../data/mockData';
+import { calculateEditorialScore } from './editorialScoring';
+import type { EditorialScore } from './editorialScoring';
 
 export interface RadarTopic {
   id: string;
@@ -12,6 +14,7 @@ export interface RadarTopic {
   category: RadarCategory;
   geoScope: 'local' | 'provincial' | 'nacional' | 'internacional' | 'desconocido';
   activityLevel: 'Caliente' | 'Moderado' | 'En crecimiento' | 'Bajo';
+  editorialScore?: EditorialScore;
   items: NewsRadarItem[];
 }
 
@@ -146,6 +149,7 @@ export function clusterItems(items: NewsRadarItem[]): RadarTopic[] {
       bestTopic.category = calculatePredominantCategory(bestTopic.items);
       bestTopic.geoScope = calculateGeoScope(bestTopic.items);
       bestTopic.activityLevel = calculateActivityLevel(bestTopic.articleCount, bestTopic.lastPublishedAt);
+      bestTopic.editorialScore = calculateEditorialScore(bestTopic);
       
     } else {
       const newTopic: RadarTopic = {
@@ -162,6 +166,7 @@ export function clusterItems(items: NewsRadarItem[]): RadarTopic[] {
         activityLevel: calculateActivityLevel(1, item.date),
         items: [item]
       };
+      newTopic.editorialScore = calculateEditorialScore(newTopic);
       topics.push(newTopic);
     }
   }
