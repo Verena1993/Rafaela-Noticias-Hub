@@ -1,4 +1,5 @@
-import type { NewsRadarItem } from '../data/mockData';
+import type { NewsRadarItem } from '../types';
+
 
 const TIKTOK_TRENDS = [
   { title: '#RafaelaCity - Video viral de un auto que cruza en rojo', views: '150K', level: 'Muy caliente' as const },

@@ -1,5 +1,6 @@
 import { RSS_FEEDS } from '../config/rssFeeds';
-import type { NewsRadarItem, RssDiagnostic, RadarCategory, ConnectionType } from '../data/mockData';
+import type { NewsRadarItem, RssDiagnostic, RadarCategory, ConnectionType } from '../types';
+
 import { supabaseRadarGateway } from './supabaseRadarGateway';
 
 const ALERT_KEYWORDS = ['accidente', 'choque', 'incendio', 'robo', 'allanamiento', 'homicidio', 'tormenta', 'evacuacion', 'evacuación', 'corte'];
@@ -73,7 +74,7 @@ export const rssService = {
     const alerts: string[] = [];
     const diagnostics: RssDiagnostic[] = [];
 
-    for (const feed of RSS_FEEDS) {
+    const fetchPromises = RSS_FEEDS.map(async (feed) => {
       const diag: RssDiagnostic = {
         id: feed.id,
         name: feed.name,
@@ -87,9 +88,10 @@ export const rssService = {
 
       if (feed.connectionType === 'pending') {
         diag.message = 'Pendiente de configuración';
-        diagnostics.push(diag);
-        continue;
+        return { items: [], diag };
       }
+
+      const feedItems: NewsRadarItem[] = [];
 
       try {
         const { data, methodUsed, responseTimeMs } = await supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
@@ -98,24 +100,17 @@ export const rssService = {
         diag.responseTimeMs = responseTimeMs;
         let addedItems = 0;
         
-        // Assuming JSON format from Gateway (rss2json or Edge Function matching same output)
-        if (data.items && Array.isArray(data.items)) {
+        if (data && data.items && Array.isArray(data.items)) {
           data.items.forEach((item: any) => {
-            // Verify if it's an alert
             const lowerTitle = item.title.toLowerCase();
             if (ALERT_KEYWORDS.some(kw => lowerTitle.includes(kw))) {
               alerts.push(item.title);
             }
 
-            // Duplicate check within the current fetched items
-            if (allItems.some(existing => isSimilarTitle(existing.title, item.title))) {
-              return;
-            }
-
             const cleanSummary = (item.description || item.content || '').replace(/<[^>]+>/g, '').trim();
             const smartCategory = detectTrueCategory(item.title, cleanSummary, feed.name, feed.defaultCategory);
 
-            allItems.push({
+            feedItems.push({
               id: `rss_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
               title: item.title,
               summary: cleanSummary.substring(0, 200) + '...',
@@ -134,7 +129,18 @@ export const rssService = {
         diag.message = error.message || 'No se pudo conectar';
       }
 
-      diagnostics.push(diag);
+      return { items: feedItems, diag };
+    });
+
+    const results = await Promise.all(fetchPromises);
+
+    for (const result of results) {
+      diagnostics.push(result.diag);
+      for (const item of result.items) {
+        if (!allItems.some(existing => isSimilarTitle(existing.title, item.title))) {
+          allItems.push(item);
+        }
+      }
     }
 
     return { items: allItems, alerts, diagnostics };

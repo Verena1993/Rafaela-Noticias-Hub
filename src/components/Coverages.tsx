@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useHub } from '../context/HubContext';
 import { Plus, List, Kanban } from 'lucide-react';
-import type { Coverage, ProgramType, FormatType } from '../data/mockData';
+import type { Coverage, ProgramType, FormatType } from '../types';
+
 
 interface CoveragesProps {
   setSelectedCoverageId: (id: string | null) => void;

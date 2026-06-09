@@ -4,7 +4,8 @@ import {
   FileText, CheckSquare, AlertTriangle, UserPlus, 
   ExternalLink, ArrowRight, UserCheck, Clock, Activity as ActivityIcon
 } from 'lucide-react';
-import type { Alert, ProgramType, FormatType } from '../data/mockData';
+import type { Alert, ProgramType, FormatType } from '../types';
+
 import { formatFriendlyDate } from '../utils/dateUtils';
 
 interface DashboardProps {

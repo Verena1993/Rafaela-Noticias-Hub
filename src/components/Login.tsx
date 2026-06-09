@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
-import { INITIAL_USERS } from '../data/mockData';
+import { INITIAL_USERS } from '../data/initialData';
+
 import { Radio } from 'lucide-react';
 
 export const Login: React.FC = () => {

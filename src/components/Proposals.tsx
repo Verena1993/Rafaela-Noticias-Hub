@@ -14,7 +14,8 @@ import {
   MessageCircle,
   FolderOpen
 } from 'lucide-react';
-import type { Proposal, ProgramType, FormatType, Coverage } from '../data/mockData';
+import type { Proposal, ProgramType, FormatType, Coverage } from '../types';
+
 import { formatFriendlyDate } from '../utils/dateUtils';
 
 export const Proposals: React.FC = () => {

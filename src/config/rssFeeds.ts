@@ -1,4 +1,5 @@
-import type { RadarCategory, ConnectionType } from '../data/mockData';
+import type { RadarCategory, ConnectionType } from '../types';
+
 
 export interface RssFeedConfig {
   id: string;

@@ -5,7 +5,8 @@ import {
   Image, FileText, Check, Bot, History, Sparkles, MessageSquare, Clipboard,
   MessageCircle, Edit3
 } from 'lucide-react';
-import type { PublicationChecklist } from '../data/mockData';
+import type { PublicationChecklist } from '../types';
+
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { MultimediaManager } from './MultimediaManager';
 import { EventEditModal } from './EventEditModal';

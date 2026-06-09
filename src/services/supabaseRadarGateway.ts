@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { ConnectionType } from '../data/mockData';
+import type { ConnectionType } from '../types';
 
 /**
  * Supabase Radar Gateway
@@ -18,17 +18,31 @@ export const supabaseRadarGateway = {
 
     if (preferredType === 'google_news') {
       try {
-        const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+        const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`, { signal: controller.signal });
+        clearTimeout(timeoutId);
         const data = await res.json();
         if (data.status === 'ok') return { data, methodUsed: 'google_news', responseTimeMs: Math.round(performance.now() - start) };
       } catch (e) {}
     }
 
     try {
-      // Attempt 1: Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('radar-feed', {
+      // Attempt 1: Supabase Edge Function with 10s timeout
+      const controller = new AbortController();
+      const timeoutPromise = new Promise((_, reject) => {
+        const id = setTimeout(() => {
+          controller.abort();
+          reject(new Error('Edge Function timeout'));
+        }, 10000);
+      });
+
+      const fetchPromise = supabase.functions.invoke('radar-feed', {
         body: { targetUrl: url },
       });
+
+      const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      const { data, error } = result;
 
       if (!error && data && data.status === 'ok') {
         return { data, methodUsed: 'edge_function', responseTimeMs: Math.round(performance.now() - start) };
@@ -39,7 +53,10 @@ export const supabaseRadarGateway = {
 
     // Attempt 2: Fallback to rss2json
     try {
-      const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
+      const res = await fetch(`https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(url)}`, { signal: controller.signal });
+      clearTimeout(timeoutId);
       const data = await res.json();
       
       if (data.status === 'ok') {
@@ -51,14 +68,20 @@ export const supabaseRadarGateway = {
       // Attempt 3: Direct fetch as absolute last resort
       if (preferredType === 'rss_direct') {
         try {
-          const directRes = await fetch(url);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+          const directRes = await fetch(url, { signal: controller.signal });
+          clearTimeout(timeoutId);
           if (directRes.ok) {
             return { data: { status: 'raw_xml', content: await directRes.text() }, methodUsed: 'rss_direct', responseTimeMs: Math.round(performance.now() - start) };
           }
         } catch (directErr) {}
       }
       
-      throw new Error(e.message || 'Conexión bloqueada por CORS o Error 500.');
+      if (e.name === 'AbortError') {
+         throw new Error('Timeout: El servidor o proxy no respondió (8s).');
+      }
+      throw new Error(e.message || 'Conexión bloqueada o Timeout alcanzado.');
     }
   }
 };

@@ -5,7 +5,8 @@ import {
   Edit3, Table, ChevronLeft, ChevronRight, Search, Filter
 } from 'lucide-react';
 import { formatFriendlyDate } from '../utils/dateUtils';
-import type { CalendarEvent } from '../data/mockData';
+import type { CalendarEvent } from '../types';
+
 import { EventEditModal } from './EventEditModal';
 import type { EventEditData } from './EventEditModal';
 

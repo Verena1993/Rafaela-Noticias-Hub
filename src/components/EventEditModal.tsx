@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
-import type { CalendarEvent, ProgramType, FormatType } from '../data/mockData';
+import type { CalendarEvent, ProgramType, FormatType } from '../types';
+
 
 const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
 const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];

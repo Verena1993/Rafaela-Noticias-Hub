@@ -5,7 +5,8 @@ import {
   Calendar as CalendarIcon, Save
 } from 'lucide-react';
 import { formatFriendlyDate } from '../utils/dateUtils';
-import type { InstagramPost } from '../data/mockData';
+import type { InstagramPost } from '../types';
+
 
 // Custom Instagram SVG Icon for reliability across lucide-react versions
 const Instagram = ({ size = 24, className = '', style = {} }: { size?: number, className?: string, style?: React.CSSProperties }) => (

@@ -10,7 +10,8 @@ import {
   Eye, 
   Edit3
 } from 'lucide-react';
-import type { CalendarEvent, StaffSchedule, ProgramType, FormatType } from '../data/mockData';
+import type { CalendarEvent, StaffSchedule, ProgramType, FormatType } from '../types';
+
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { EventEditModal } from './EventEditModal';
 import type { EventEditData } from './EventEditModal';

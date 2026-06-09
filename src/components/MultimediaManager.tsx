@@ -4,7 +4,8 @@ import {
   UploadCloud, Image as ImageIcon, Video, Music, FileText, 
   Link as LinkIcon, Download, Trash2, ExternalLink, HardDrive
 } from 'lucide-react';
-import type { MultimediaItem, Coverage } from '../data/mockData';
+import type { MultimediaItem, Coverage } from '../types';
+
 
 interface MultimediaManagerProps {
   coverage: Coverage;

@@ -1,13 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  INITIAL_USERS, INITIAL_COVERAGES, INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS,
-  INITIAL_PROPOSALS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR
-} from '../data/mockData';
-import type { 
-  User, Coverage, Task, Alert, CalendarEvent, Notification, Activity,
-  Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, StaffSchedule,
-  ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic
-} from '../data/mockData';
+import { INITIAL_USERS, INITIAL_COVERAGES, INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS, INITIAL_PROPOSALS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR } from '../data/initialData';
+
+import type { User, Coverage, Task, Alert, CalendarEvent, Notification, Activity, Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, StaffSchedule, ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic } from '../types';
+
 
 interface HubContextType {
   currentUser: User | null;
@@ -62,6 +57,8 @@ interface HubContextType {
   updateNewsRadarItem: (id: string, updates: Partial<NewsRadarItem>) => void;
   fetchLiveRadarNews: () => Promise<void>;
   loadingRadar: boolean;
+  radarError: string | null;
+  lastRadarUpdate: string | null;
   rssDiagnostics: RssDiagnostic[];
 }
 
@@ -125,6 +122,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [searchQuery, setSearchQuery] = useState('');
   const [newsRadarItems, setNewsRadarItems] = useState<NewsRadarItem[]>(INITIAL_NEWS_RADAR);
   const [loadingRadar, setLoadingRadar] = useState(false);
+  const [radarError, setRadarError] = useState<string | null>(null);
+  const [lastRadarUpdate, setLastRadarUpdate] = useState<string | null>(new Date().toISOString());
   const [rssDiagnostics, setRssDiagnostics] = useState<RssDiagnostic[]>([]);
 
   // Collect all activities from all coverages
@@ -142,14 +141,22 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Fetch real RSS news and Social Trends
   const fetchLiveRadarNews = async () => {
     setLoadingRadar(true);
+    setRadarError(null);
     try {
       const { rssService } = await import('../services/rssService');
       const { trendsService } = await import('../services/trendsService');
       
-      const [{ items, alerts: newAlerts, diagnostics }, socialItems] = await Promise.all([
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("El análisis de fuentes excedió el tiempo límite (15s).")), 15000)
+      );
+
+      const fetchPromise = Promise.all([
         rssService.fetchNews(),
         trendsService.fetchSocialTrends()
       ]);
+
+      const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      const [{ items, alerts: newAlerts, diagnostics }, socialItems] = result;
       
       const allItems = [...items, ...socialItems];
 
@@ -157,12 +164,13 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setNewsRadarItems(allItems);
       }
       setRssDiagnostics(diagnostics);
+      setLastRadarUpdate(new Date().toISOString());
       
       // Add alerts to global context
       if (newAlerts.length > 0) {
         setAlerts(prev => {
           const updated = [...prev];
-          newAlerts.forEach(alertText => {
+          newAlerts.forEach((alertText: string) => {
             // Avoid duplicate alerts based on text
             if (!updated.some(a => a.title.includes(alertText))) {
               updated.push({
@@ -177,8 +185,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return updated;
         });
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Failed to fetch live radar news', e);
+      setRadarError(e.message || 'Error al conectar con las fuentes de noticias.');
     } finally {
       setLoadingRadar(false);
     }
@@ -1373,6 +1382,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateNewsRadarItem,
       fetchLiveRadarNews,
       loadingRadar,
+      radarError,
+      lastRadarUpdate,
       rssDiagnostics
     }}>
       {children}

@@ -1,4 +1,5 @@
-import type { NewsRadarItem, RadarCategory } from '../data/mockData';
+import type { NewsRadarItem, RadarCategory } from '../types';
+
 import { calculateEditorialScore } from './editorialScoring';
 import type { EditorialScore } from './editorialScoring';
 
