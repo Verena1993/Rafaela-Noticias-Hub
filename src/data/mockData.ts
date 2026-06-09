@@ -513,8 +513,62 @@ export const INITIAL_COVERAGES: Coverage[] = [
   }
 ];
 
-// Radar de Noticias — mock data ready for external API/AI integration
 export const INITIAL_NEWS_RADAR: NewsRadarItem[] = [
+  // Ejemplos inyectados para Fase 1 - AGRUPACIÓN DE TEMAS
+  {
+    id: 'nr_test_1',
+    title: 'Accidente en Ruta 34',
+    summary: 'Se reportó un fuerte accidente vehicular en la Ruta 34.',
+    source: 'Radio Rafaela',
+    date: new Date(Date.now() - 3600000).toISOString(), // 1h ago
+    category: 'local',
+    tags: ['policiales', 'transito']
+  },
+  {
+    id: 'nr_test_2',
+    title: 'Choque en Ruta Nacional 34',
+    summary: 'Dos vehículos colisionaron de frente en la RN34.',
+    source: 'La Opinión',
+    date: new Date(Date.now() - 3000000).toISOString(), // 50m ago
+    category: 'local',
+    tags: ['policiales', 'accidente']
+  },
+  {
+    id: 'nr_test_3',
+    title: 'Siniestro vial cerca de Rafaela',
+    summary: 'Personal de emergencias trabaja en un siniestro vial.',
+    source: 'Castellanos',
+    date: new Date(Date.now() - 2400000).toISOString(), // 40m ago
+    category: 'local',
+    tags: ['policiales']
+  },
+  {
+    id: 'nr_test_4',
+    title: 'Incendio en zona rural',
+    summary: 'Grandes lenguas de fuego en un lote cercano a la ciudad.',
+    source: 'Radio Rafaela',
+    date: new Date(Date.now() - 7200000).toISOString(), // 2h ago
+    category: 'provincial',
+    tags: ['incendio']
+  },
+  {
+    id: 'nr_test_5',
+    title: 'Fuego en establecimiento agropecuario',
+    summary: 'Se desató un foco ígneo que afectó varias hectáreas.',
+    source: 'La Opinión',
+    date: new Date(Date.now() - 7000000).toISOString(), // 1h56m ago
+    category: 'provincial',
+    tags: ['fuego', 'campo']
+  },
+  {
+    id: 'nr_test_6',
+    title: 'Bomberos trabajan en incendio de campo',
+    summary: 'Dotaciones de bomberos combaten el fuego desde tempranas horas.',
+    source: 'Castellanos',
+    date: new Date(Date.now() - 6500000).toISOString(), // 1h48m ago
+    category: 'provincial',
+    tags: ['bomberos', 'incendio']
+  },
   {
     id: 'nr1',
     title: 'Santa Fe estudia nuevo esquema de regalías mineras para comunidades del interior',
