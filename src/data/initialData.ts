@@ -332,7 +332,7 @@ export const INITIAL_TASKS: Task[] = [
 
 export const INITIAL_ALERTS: Alert[] = [
   { id: 'a1', title: '¡Urgente! Incendio de vivienda en Barrio Alberdi. Bomberos en camino.', timestamp: '2026-06-04T08:15:00', severity: 'critical', status: 'active' },
-  { id: 'a2', title: 'Alerta vial: Corte total en Av. Santa Fe por reclamo vecinal.', timestamp: '2026-06-04T08:25:00', severity: 'warning', status: 'active' }
+  { id: 'a2', title: 'Alerta vial: Corte total en Av. Santa Fe por reclamo vecinal.', timestamp: '2026-06-04T08:25:00', severity: 'high', status: 'active' }
 ];
 
 export const INITIAL_EVENTS: CalendarEvent[] = [

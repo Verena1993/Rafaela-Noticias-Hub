@@ -1,6 +1,5 @@
 import type { RadarCategory, ConnectionType } from '../types';
 
-
 export interface RssFeedConfig {
   id: string;
   name: string;
@@ -43,12 +42,12 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   // ============================================
   // LOCALES & REGIONALES (Amarillo)
   // ============================================
-  { id: 'rafaela_noticias', name: 'Rafaela Noticias', url: 'https://rafaelanoticias.com/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'rafaela_noticias', name: 'Rafaela Noticias', url: 'https://www.rafaelanoticias.com/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
   { id: 'castellanos', name: 'Diario Castellanos', url: 'https://diariocastellanos.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
-  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://rafaelainforma.com/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
-  { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://radiorafaela.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
-  { id: 'laopinion', name: 'La Opinión de Rafaela', url: 'https://diariolaopinion.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
-  { id: 'movil_quique', name: 'Móvil Quique', url: 'https://movilquique.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://www.rafaelainforma.com/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://www.radiorafaela.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'laopinion', name: 'La Opinión de Rafaela', url: 'https://www.diariolaopinion.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'movil_quique', name: 'Móvil Quique', url: 'https://movilquique.com/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
   { id: 'rafaela_online', name: 'Rafaela Online', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'lt28', name: 'LT28 Radio Rafaela', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'sociedad_rural_rafaela', name: 'Sociedad Rural de Rafaela', url: '', defaultCategory: 'local', connectionType: 'pending' },
@@ -78,5 +77,14 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   { id: 'min_seguridad', name: 'Ministerio de Seguridad', url: '', defaultCategory: 'national', connectionType: 'pending' },
   { id: 'indec', name: 'INDEC', url: '', defaultCategory: 'national', connectionType: 'pending' },
   { id: 'camara_diputados', name: 'Cámara de Diputados', url: 'https://www.diputados.gob.ar/secparl/rss', defaultCategory: 'national', connectionType: 'edge_function' },
-  { id: 'senado', name: 'Senado de la Nación', url: '', defaultCategory: 'national', connectionType: 'pending' }
+  { id: 'senado', name: 'Senado de la Nación', url: '', defaultCategory: 'national', connectionType: 'pending' },
+
+  // ============================================
+  // INTERNACIONALES (Mundo)
+  // ============================================
+  { id: 'bbc_mundo', name: 'BBC Mundo', url: 'https://feeds.bbci.co.uk/mundo/rss.xml', defaultCategory: 'international', connectionType: 'rss2json_proxy' },
+  { id: 'cnn_espanol', name: 'CNN en Español', url: 'https://cnnespanol.cnn.com/feed/', defaultCategory: 'international', connectionType: 'rss2json_proxy' },
+  { id: 'dw_espanol', name: 'DW Español', url: 'https://rss.dw.com/xml/rss-sp-all', defaultCategory: 'international', connectionType: 'rss2json_proxy' },
+  { id: 'el_pais_espana', name: 'El País España', url: 'https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada', defaultCategory: 'international', connectionType: 'rss2json_proxy' },
+  { id: 'france24_espanol', name: 'France24 Español', url: 'https://www.france24.com/es/rss', defaultCategory: 'international', connectionType: 'rss2json_proxy' }
 ];

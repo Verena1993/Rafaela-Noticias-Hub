@@ -3,6 +3,15 @@ import { INITIAL_USERS, INITIAL_COVERAGES, INITIAL_TASKS, INITIAL_ALERTS, INITIA
 
 import type { User, Coverage, Task, Alert, CalendarEvent, Notification, Activity, Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, StaffSchedule, ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic } from '../types';
 
+const generateStableId = (title: string): string => {
+  let hash = 0;
+  for (let i = 0; i < title.length; i++) {
+    hash = (hash << 5) - hash + title.charCodeAt(i);
+    hash |= 0;
+  }
+  return 'alert_' + Math.abs(hash).toString(36);
+};
+
 
 interface HubContextType {
   currentUser: User | null;
@@ -28,8 +37,10 @@ interface HubContextType {
   addEvent: (title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
   updateEvent: (eventId: string, title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, status?: CalendarEvent['status'], assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
   updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, assignees: string[], programs: ProgramType[], formats: FormatType[], status?: Coverage['status']) => void;
-  createAlert: (title: string, severity: 'critical' | 'warning') => void;
+  createAlert: (title: string, severity: 'critical' | 'high' | 'medium') => void;
   assignAlert: (alertId: string, assigneeId: string) => void;
+  closedAlertIds: Set<string>;
+  closeAlert: (id: string) => void;
   markNotificationsAsRead: () => void;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -94,6 +105,23 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : INITIAL_ALERTS;
   });
 
+  const [closedAlertIds, setClosedAlertIds] = useState<Set<string>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = sessionStorage.getItem('hub_closed_alert_ids');
+      return saved ? new Set(JSON.parse(saved)) : new Set<string>();
+    }
+    return new Set<string>();
+  });
+
+  const closeAlert = (id: string) => {
+    setClosedAlertIds(prev => {
+      const updated = new Set(prev);
+      updated.add(id);
+      sessionStorage.setItem('hub_closed_alert_ids', JSON.stringify(Array.from(updated)));
+      return updated;
+    });
+  };
+
   const [events, setEvents] = useState<CalendarEvent[]>(() => {
     const saved = localStorage.getItem('hub_events');
     return saved ? JSON.parse(saved) : INITIAL_EVENTS;
@@ -138,30 +166,24 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return allActs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   });
 
-  // Fetch real RSS news and Social Trends
+  // Fetch real RSS news
   const fetchLiveRadarNews = async () => {
     setLoadingRadar(true);
     setRadarError(null);
     try {
       const { rssService } = await import('../services/rssService');
-      const { trendsService } = await import('../services/trendsService');
       
       const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("El análisis de fuentes excedió el tiempo límite (15s).")), 15000)
+        setTimeout(() => reject(new Error("El análisis de fuentes excedió el tiempo límite (35s).")), 35000)
       );
 
-      const fetchPromise = Promise.all([
-        rssService.fetchNews(),
-        trendsService.fetchSocialTrends()
-      ]);
+      const fetchPromise = rssService.fetchNews();
 
       const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
-      const [{ items, alerts: newAlerts, diagnostics }, socialItems] = result;
-      
-      const allItems = [...items, ...socialItems];
+      const { items, alerts: newAlerts, diagnostics } = result;
 
-      if (allItems.length > 0) {
-        setNewsRadarItems(allItems);
+      if (items.length > 0) {
+        setNewsRadarItems(items);
       }
       setRssDiagnostics(diagnostics);
       setLastRadarUpdate(new Date().toISOString());
@@ -170,14 +192,15 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (newAlerts.length > 0) {
         setAlerts(prev => {
           const updated = [...prev];
-          newAlerts.forEach((alertText: string) => {
-            // Avoid duplicate alerts based on text
-            if (!updated.some(a => a.title.includes(alertText))) {
+          newAlerts.forEach((newAlert: any) => {
+            const stableId = generateStableId(newAlert.title);
+            // Avoid duplicate alerts based on text/id
+            if (!updated.some(a => a.id === stableId || a.title.includes(newAlert.title))) {
               updated.push({
-                id: `a_rss_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
-                title: `[RADAR] ${alertText}`,
+                id: stableId,
+                title: `[RADAR] ${newAlert.title}`,
                 timestamp: new Date().toISOString(),
-                severity: 'critical',
+                severity: newAlert.severity,
                 status: 'active'
               });
             }
@@ -1230,7 +1253,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Alerts
-  const createAlert = (title: string, severity: 'critical' | 'warning') => {
+  const createAlert = (title: string, severity: 'critical' | 'high' | 'medium') => {
     const newAlert: Alert = {
       id: `alert_${Date.now()}`,
       title,
@@ -1245,7 +1268,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (u.id !== currentUser?.id) {
         const notif: Notification = {
           id: `not_${Date.now()}_${u.id}`,
-          title: severity === 'critical' ? '¡ALERTA URGENTE!' : 'Alerta Informativa',
+          title: severity === 'critical' ? '¡ALERTA CRÍTICA!' : severity === 'high' ? '¡ALERTA ALTA!' : 'Alerta Media',
           message: title,
           timestamp: new Date().toISOString(),
           read: false,
@@ -1363,6 +1386,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateCoverageDetails,
       createAlert,
       assignAlert,
+      closedAlertIds,
+      closeAlert,
       markNotificationsAsRead,
       searchQuery,
       setSearchQuery,

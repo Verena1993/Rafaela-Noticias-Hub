@@ -451,6 +451,35 @@ a:hover {
   animation: pulse-border 2s infinite;
 }
 
+.urgent-banner.severity-critical {
+  background-color: rgba(239, 68, 68, 0.08);
+  border: 1.5px solid rgba(239, 68, 68, 0.3);
+  border-left: 5px solid #ef4444;
+}
+.urgent-banner.severity-critical .urgent-title {
+  color: #b91c1c;
+}
+.urgent-banner.severity-high {
+  background-color: rgba(249, 115, 22, 0.08);
+  border: 1.5px solid rgba(249, 115, 22, 0.3);
+  border-left: 5px solid #f97316;
+}
+.urgent-banner.severity-high .urgent-title {
+  color: #c2410c;
+}
+.urgent-banner.severity-medium {
+  background-color: rgba(234, 179, 8, 0.08);
+  border: 1.5px solid rgba(234, 179, 8, 0.3);
+  border-left: 5px solid #eab308;
+}
+.urgent-banner.severity-medium .urgent-title {
+  color: #854d0e;
+}
+
+.urgent-badge.badge-critical { background-color: #ef4444; color: white; }
+.urgent-badge.badge-high { background-color: #f97316; color: white; }
+.urgent-badge.badge-medium { background-color: #eab308; color: black; }
+
 @keyframes pulse-border {
   0% { border-color: rgba(239, 68, 68, 0.2); }
   50% { border-color: rgba(239, 68, 68, 0.6); }

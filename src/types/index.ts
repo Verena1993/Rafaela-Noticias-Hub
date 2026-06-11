@@ -75,7 +75,7 @@ export interface Coverage {
 }
 
 // Radar de Noticias — architecture ready for external APIs and AI integration
-export type RadarCategory = 'national' | 'provincial' | 'local' | 'trending' | 'social_trends' | 'rafaela_talks';
+export type RadarCategory = 'national' | 'provincial' | 'local' | 'international';
 
 export interface NewsRadarItem {
   id: string;
@@ -169,7 +169,7 @@ export interface Alert {
   id: string;
   title: string;
   timestamp: string;
-  severity: 'critical' | 'warning';
+  severity: 'critical' | 'high' | 'medium';
   status: 'active' | 'followed_up';
   assigneeId?: string;
   coverageId?: string;

@@ -17,7 +17,8 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedCoverageId, setAutoOpenCreateModal }) => {
   const { 
     coverages, tasks, alerts, events, activities, currentUser, users, 
-    assignAlert, toggleTaskCompleted, createAlert, proposals 
+    assignAlert, toggleTaskCompleted, createAlert, proposals,
+    closedAlertIds, closeAlert
   } = useHub();
 
   // Today's date reference
@@ -31,11 +32,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
 
   const [assigningAlert, setAssigningAlert] = useState<Alert | null>(null);
   const [selectedJournalistId, setSelectedJournalistId] = useState('');
+  const [alertsExpanded, setAlertsExpanded] = useState(true);
   
   // Alert creation state (for testing)
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
-  const [alertSeverity, setAlertSeverity] = useState<'critical' | 'warning'>('warning');
+  const [alertSeverity, setAlertSeverity] = useState<'critical' | 'high' | 'medium'>('high');
 
 
   interface MyDayItem {
@@ -117,8 +119,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
     return a.priorityIndex - b.priorityIndex;
   });
 
-  // Filter alerts (only active ones)
-  const activeAlerts = alerts.filter(a => a.status === 'active');
+  // Filter alerts (active and not closed) and sort by severity (critical first)
+  const activeAlerts = useMemo(() => {
+    return alerts
+      .filter(a => a.status === 'active' && !closedAlertIds.has(a.id))
+      .sort((a, b) => {
+        const severityOrder = { critical: 0, high: 1, medium: 2 };
+        const orderA = severityOrder[a.severity] ?? 99;
+        const orderB = severityOrder[b.severity] ?? 99;
+        return orderA - orderB;
+      });
+  }, [alerts, closedAlertIds]);
 
   // Today's events
   const upcomingEvents = events
@@ -301,39 +312,85 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
         </div>
       </div>
 
-      {/* Urgent Alerts Banner Section */}
+      {/* Urgent Alerts Section Header and controls */}
       {activeAlerts.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
-          {activeAlerts.map(alert => (
-            <div key={alert.id} className="urgent-banner">
-              <span className={`urgent-badge ${alert.severity === 'critical' ? 'priority-high' : 'priority-medium'}`}>
-                {alert.severity === 'critical' ? 'Urgente' : 'Último Momento'}
-              </span>
-              <div className="urgent-content">
-                <h4 className="urgent-title">{alert.title}</h4>
-                <div className="urgent-time">
-                  <Clock size={12} style={{ display: 'inline', marginRight: '3px', verticalAlign: 'middle' }} />
-                  {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
-                </div>
-              </div>
-              <div>
-                {(currentUser?.role === 'admin') ? (
-                  <button 
-                    className="btn btn-primary" 
-                    style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
-                    onClick={() => openAssignModal(alert)}
-                  >
-                    <UserPlus size={14} />
-                    Asignar Móvil
-                  </button>
-                ) : (
-                  <span style={{ fontSize: '0.8rem', color: 'var(--danger-text)', fontWeight: 600 }}>
-                    Esperando asignación
-                  </span>
-                )}
-              </div>
+        <div style={{ marginBottom: '1.5rem', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-lg)', overflow: 'hidden' }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center', 
+            padding: '0.75rem 1rem', 
+            backgroundColor: 'var(--bg-tertiary)',
+            borderBottom: alertsExpanded ? '1px solid var(--border-color)' : 'none',
+            cursor: 'pointer'
+          }} onClick={() => setAlertsExpanded(prev => !prev)}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>
+              <AlertTriangle size={18} style={{ color: 'var(--danger-text)' }} />
+              <span>ALERTAS DE REDACCIÓN ({activeAlerts.length})</span>
             </div>
-          ))}
+            <button 
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
+            >
+              {alertsExpanded ? '▲ Contraer' : '▼ Expandir'}
+            </button>
+          </div>
+          
+          {alertsExpanded && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '1rem', backgroundColor: 'var(--bg-secondary)' }}>
+              {activeAlerts.map(alert => (
+                <div key={alert.id} className={`urgent-banner severity-${alert.severity}`} style={{ margin: 0, position: 'relative' }}>
+                  <span className={`urgent-badge badge-${alert.severity}`}>
+                    {alert.severity === 'critical' ? '🔴 Crítica' : alert.severity === 'high' ? '🟠 Alta' : '🟡 Media'}
+                  </span>
+                  <div className="urgent-content">
+                    <h4 className="urgent-title" style={{ paddingRight: '2.5rem' }}>{alert.title}</h4>
+                    <div className="urgent-time">
+                      <Clock size={12} style={{ display: 'inline', marginRight: '3px', verticalAlign: 'middle' }} />
+                      {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {(currentUser?.role === 'admin') ? (
+                      <button 
+                        className="btn btn-primary" 
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem' }}
+                        onClick={() => openAssignModal(alert)}
+                      >
+                        <UserPlus size={14} />
+                        Asignar Móvil
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--danger-text)', fontWeight: 600 }}>
+                        Esperando asignación
+                      </span>
+                    )}
+                    
+                    <button 
+                      style={{ 
+                        background: 'none', 
+                        border: 'none', 
+                        cursor: 'pointer', 
+                        color: 'var(--text-muted)', 
+                        padding: '0.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: '50%',
+                        width: '24px',
+                        height: '24px',
+                        fontSize: '0.95rem',
+                        fontWeight: 'bold'
+                      }}
+                      onClick={() => closeAlert(alert.id)}
+                      title="Cerrar alerta"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -801,8 +858,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
                     value={alertSeverity}
                     onChange={(e) => setAlertSeverity(e.target.value as any)}
                   >
-                    <option value="warning">Último momento (Alerta media)</option>
-                    <option value="critical">Crítico (Alerta roja)</option>
+                    <option value="medium">Media (Alerta amarilla 🟡)</option>
+                    <option value="high">Alta (Alerta naranja 🟠)</option>
+                    <option value="critical">Crítico (Alerta roja 🔴)</option>
                   </select>
                 </div>
               </div>
