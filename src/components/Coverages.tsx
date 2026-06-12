@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useHub } from '../context/HubContext';
 import { Plus, List, Kanban } from 'lucide-react';
 import type { Coverage, FormatType } from '../types';
+import { TextAutocompleteModal } from './TextAutocompleteModal';
 
 
 interface CoveragesProps {
@@ -21,6 +22,7 @@ export const Coverages: React.FC<CoveragesProps> = ({
 
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAutocompleteModal, setShowAutocompleteModal] = useState(false);
 
   // Form states
   const [newTitle, setNewTitle] = useState('');
@@ -37,13 +39,37 @@ export const Coverages: React.FC<CoveragesProps> = ({
   const [newLocation, setNewLocation] = useState('');
   const [newStatus, setNewStatus] = useState<Coverage['status']>('pending_confirmation');
   const [newMainResponsable, setNewMainResponsable] = useState('');
-  const [newAssignees, setNewAssignees] = useState<string[]>([]); // Team members
-  const [newFormats, setNewFormats] = useState<FormatType[]>([]);
-  const [newLogisticsInfo, setNewLogisticsInfo] = useState('');
+  const [newSecondaryResponsable, setNewSecondaryResponsable] = useState('');
+  const [newProgram, setNewProgram] = useState('');
+  const [newFormat, setNewFormat] = useState('');
   const [newObservations, setNewObservations] = useState('');
   const [newAttachments, setNewAttachments] = useState<string[]>([]);
   const [attachmentInput, setAttachmentInput] = useState('');
-  const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
+  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo redes'];
+
+  const handleAutocompleteConfirm = (data: {
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    description: string;
+    interviewees: string[];
+    contactInfo: string;
+  }) => {
+    setNewTitle(data.title);
+    if (data.date) setNewDate(data.date);
+    if (data.time) setNewTime(data.time);
+    setNewLocation(data.location || '');
+    
+    let obs = data.description;
+    if (data.interviewees.length > 0) {
+      obs += `\n\nEntrevistados sugeridos: ${data.interviewees.join(', ')}`;
+    }
+    if (data.contactInfo && data.contactInfo !== 'No detectados') {
+      obs += `\nContacto: ${data.contactInfo}`;
+    }
+    setNewObservations(obs);
+  };
 
   const addAttachment = () => {
     if (attachmentInput.trim()) {
@@ -61,9 +87,7 @@ export const Coverages: React.FC<CoveragesProps> = ({
     }
   }, [autoOpenCreateModal, setAutoOpenCreateModal]);
 
-  const toggleNewFormat = (form: FormatType) => {
-    setNewFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
-  };
+
 
   // Filter states
   const [filterAssignee, setFilterAssignee] = useState('all');
@@ -95,30 +119,35 @@ export const Coverages: React.FC<CoveragesProps> = ({
 
   const handleCreateCoverage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    
+    const titleToSave = newTitle.trim() || 'Cobertura sin título';
+
+    const finalDate = newDate || (() => {
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    })();
+    const finalTime = newTime || '12:00';
+    const combinedDateTime = `${finalDate}T${finalTime}`;
 
     const finalAssignees: string[] = [];
     if (newMainResponsable) {
       finalAssignees.push(newMainResponsable);
     }
-    newAssignees.forEach(uid => {
-      if (!finalAssignees.includes(uid)) {
-        finalAssignees.push(uid);
-      }
-    });
-
-    const combinedDateTime = `${newDate}T${newTime}`;
+    if (newSecondaryResponsable) {
+      finalAssignees.push(newSecondaryResponsable);
+    }
 
     const createdId = addCoverage(
-      newTitle,
-      newObservations || newTitle,
+      titleToSave,
+      newObservations || titleToSave,
       combinedDateTime,
       newLocation,
       finalAssignees,
-      [],
-      newFormats,
+      newProgram ? [newProgram as any] : [],
+      newFormat ? [newFormat as any] : [],
       newStatus,
-      newLogisticsInfo,
+      '',
       newObservations,
       newAttachments
     );
@@ -137,9 +166,9 @@ export const Coverages: React.FC<CoveragesProps> = ({
     setNewLocation('');
     setNewStatus('pending_confirmation');
     setNewMainResponsable('');
-    setNewAssignees([]);
-    setNewFormats([]);
-    setNewLogisticsInfo('');
+    setNewSecondaryResponsable('');
+    setNewProgram('');
+    setNewFormat('');
     setNewObservations('');
     setNewAttachments([]);
     setAttachmentInput('');
@@ -401,15 +430,36 @@ export const Coverages: React.FC<CoveragesProps> = ({
             </div>
             <form onSubmit={handleCreateCoverage}>
               <div className="modal-body" style={{ padding: '1.5rem' }}>
-                <div className="coverage-create-grid">
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setShowAutocompleteModal(true)}
+                  style={{
+                    width: '100%',
+                    padding: '0.6rem',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    color: 'var(--primary)',
+                    border: '1px dashed var(--primary)',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    cursor: 'pointer',
+                    marginBottom: '1.25rem'
+                  }}
+                >
+                  ✨ Autocompletar desde texto con IA
+                </button>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
                   
-                  {/* Left Column - Core Data */}
-                  <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {/* Left Column - Priority 1-4, 5 */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Cobertura *</label>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Cobertura</label>
                       <input
                         type="text"
-                        required
                         className="form-input"
                         placeholder="Ej. Sesión en el Concejo Deliberante por el presupuesto."
                         value={newTitle}
@@ -419,20 +469,18 @@ export const Coverages: React.FC<CoveragesProps> = ({
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha *</label>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha</label>
                         <input
                           type="date"
-                          required
                           className="form-input"
                           value={newDate}
                           onChange={(e) => setNewDate(e.target.value)}
                         />
                       </div>
                       <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora *</label>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora</label>
                         <input
                           type="time"
-                          required
                           className="form-input"
                           value={newTime}
                           onChange={(e) => setNewTime(e.target.value)}
@@ -441,10 +489,9 @@ export const Coverages: React.FC<CoveragesProps> = ({
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación *</label>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación</label>
                       <input
                         type="text"
-                        required
                         className="form-input"
                         placeholder="Ej. Bv. Santa Fe 300, Rafaela"
                         value={newLocation}
@@ -453,123 +500,119 @@ export const Coverages: React.FC<CoveragesProps> = ({
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Estado *</label>
-                      <select
-                        className="form-select"
-                        value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value as any)}
-                        style={{ padding: '0.5rem', fontWeight: 600 }}
-                      >
-                        <option value="pending_confirmation">Pendiente de confirmación</option>
-                        <option value="confirmed">Confirmada</option>
-                        <option value="in_redaction">En Redacción</option>
-                        <option value="published">Publicada</option>
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Formato</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.2rem' }}>
-                        {FORMAT_OPTIONS.map(form => {
-                          const isSelected = newFormats.includes(form);
-                          return (
-                            <button
-                              key={form}
-                              type="button"
-                              className="btn"
-                              onClick={() => toggleNewFormat(form)}
-                              style={{
-                                padding: '0.35rem 0.75rem',
-                                fontSize: '0.75rem',
-                                borderRadius: 'var(--radius-md)',
-                                border: '1px solid var(--border-color)',
-                                background: isSelected ? 'var(--primary)' : 'var(--bg-secondary)',
-                                color: isSelected ? 'white' : 'var(--text-secondary)',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                transition: 'var(--transition)'
-                              }}
-                            >
-                              {form}
-                            </button>
-                          );
-                        })}
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Programa Destino</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        {['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'].map(prog => (
+                          <button
+                            key={prog}
+                            type="button"
+                            onClick={() => setNewProgram(prev => prev === prog ? '' : prog)}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              borderRadius: '999px',
+                              border: `1.5px solid ${newProgram === prog ? 'var(--primary)' : 'var(--border-color)'}`,
+                              background: newProgram === prog ? 'var(--primary)' : 'var(--bg-secondary)',
+                              color: newProgram === prog ? '#fff' : 'var(--text-secondary)',
+                              fontWeight: newProgram === prog ? 700 : 500,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {prog}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
 
-                  {/* Right Column - Team & Logistics */}
-                  <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {/* Right Column - Priority 6-8, Status, Attachments */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Principal *</label>
-                      <select
-                        className="form-select"
-                        required
-                        value={newMainResponsable}
-                        onChange={e => setNewMainResponsable(e.target.value)}
-                      >
-                        <option value="">Seleccionar responsable...</option>
-                        {users.map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Formato</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+                        {FORMAT_OPTIONS.map(fmt => (
+                          <button
+                            key={fmt}
+                            type="button"
+                            onClick={() => setNewFormat(prev => prev === fmt ? '' : fmt)}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              borderRadius: '999px',
+                              border: `1.5px solid ${newFormat === fmt ? 'var(--primary)' : 'var(--border-color)'}`,
+                              background: newFormat === fmt ? 'var(--primary)' : 'var(--bg-secondary)',
+                              color: newFormat === fmt ? '#fff' : 'var(--text-secondary)',
+                              fontWeight: newFormat === fmt ? 700 : 500,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {fmt}
+                          </button>
                         ))}
-                      </select>
+                      </div>
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Equipo Asignado</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                        {newAssignees.length === 0 ? (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Ningún integrante asignado al equipo</span>
-                        ) : (
-                          newAssignees.map(uid => {
-                            const u = users.find(usr => usr.id === uid);
-                            if (!u) return null;
-                            return (
-                              <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-full)', fontSize: '0.75rem' }}>
-                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: u.avatarColor }} />
-                                <span>{u.name.split(' ')[0]}</span>
-                                <button 
-                                  type="button" 
-                                  onClick={() => setNewAssignees(prev => prev.filter(id => id !== uid))} 
-                                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontWeight: 'bold', fontSize: '0.8rem', padding: '0 0.1rem' }}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                      <select
-                        className="form-select"
-                        value=""
-                        onChange={e => {
-                          const uid = e.target.value;
-                          if (uid && !newAssignees.includes(uid)) {
-                            setNewAssignees(prev => [...prev, uid]);
-                          }
-                        }}
-                        style={{ fontSize: '0.8rem', padding: '0.4rem' }}
-                      >
-                        <option value="">+ Agregar integrante...</option>
-                        {users
-                          .filter(u => u.id !== newMainResponsable && !newAssignees.includes(u.id))
-                          .map(u => (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Principal</label>
+                        <select
+                          className="form-select"
+                          value={newMainResponsable}
+                          onChange={e => setNewMainResponsable(e.target.value)}
+                        >
+                          <option value="">Seleccionar...</option>
+                          {users.map(u => (
                             <option key={u.id} value={u.id}>{u.name}</option>
                           ))}
-                      </select>
+                        </select>
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Secundario</label>
+                        <select
+                          className="form-select"
+                          value={newSecondaryResponsable}
+                          onChange={e => setNewSecondaryResponsable(e.target.value)}
+                        >
+                          <option value="">Seleccionar...</option>
+                          {users.filter(u => u.id !== newMainResponsable).map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Información Logística</label>
-                      <textarea
-                        className="form-textarea"
-                        rows={2}
-                        placeholder="Direcciones secundarias, accesos, teléfonos de contacto, transporte..."
-                        value={newLogisticsInfo}
-                        onChange={(e) => setNewLogisticsInfo(e.target.value)}
-                        style={{ fontSize: '0.85rem' }}
-                      />
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Estado</label>
+                      <div style={{ display: 'flex', gap: '0.4rem' }}>
+                        {([
+                          { value: 'pending_confirmation', label: 'Pendiente de confirmación' },
+                          { value: 'confirmed', label: 'Confirmada' },
+                        ] as { value: Coverage['status']; label: string }[]).map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setNewStatus(opt.value)}
+                            style={{
+                              padding: '0.35rem 0.75rem',
+                              borderRadius: '999px',
+                              border: `1.5px solid ${newStatus === opt.value ? 'var(--primary)' : 'var(--border-color)'}`,
+                              background: newStatus === opt.value ? 'var(--primary)' : 'var(--bg-secondary)',
+                              color: newStatus === opt.value ? '#fff' : 'var(--text-secondary)',
+                              fontWeight: newStatus === opt.value ? 700 : 500,
+                              fontSize: '0.78rem',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                              whiteSpace: 'nowrap'
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     <div className="form-group">
@@ -583,45 +626,45 @@ export const Coverages: React.FC<CoveragesProps> = ({
                         style={{ fontSize: '0.85rem' }}
                       />
                     </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjuntos (Enlaces / Archivos)</label>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.4rem' }}>
-                        {newAttachments.map((att, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', color: 'var(--text-secondary)' }}>📎 {att}</span>
-                            <button 
-                              type="button" 
-                              onClick={() => setNewAttachments(prev => prev.filter((_, i) => i !== idx))} 
-                              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.8rem' }}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          placeholder="Ej: https://drive.google.com/... o gacetilla.pdf" 
-                          style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
-                          value={attachmentInput}
-                          onChange={e => setAttachmentInput(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addAttachment();
-                            }
-                          }}
-                        />
-                        <button type="button" onClick={addAttachment} className="btn btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>
-                          Agregar
-                        </button>
-                      </div>
-                    </div>
                   </div>
 
+                </div>
+
+                <div className="form-group" style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjuntos (Enlaces / Archivos)</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.4rem' }}>
+                    {newAttachments.map((att, idx) => (
+                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', color: 'var(--text-secondary)' }}>📎 {att}</span>
+                        <button 
+                          type="button" 
+                          onClick={() => setNewAttachments(prev => prev.filter((_, i) => i !== idx))} 
+                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.8rem' }}
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="Ej: https://drive.google.com/... o gacetilla.pdf" 
+                      style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                      value={attachmentInput}
+                      onChange={e => setAttachmentInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          addAttachment();
+                        }
+                      }}
+                    />
+                    <button type="button" onClick={addAttachment} className="btn btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>
+                      Agregar
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className="modal-footer" style={{ padding: '1rem 1.5rem' }}>
@@ -635,6 +678,13 @@ export const Coverages: React.FC<CoveragesProps> = ({
             </form>
           </div>
         </div>
+      )}
+      {showAutocompleteModal && (
+        <TextAutocompleteModal
+          isOpen={showAutocompleteModal}
+          onClose={() => setShowAutocompleteModal(false)}
+          onConfirm={handleAutocompleteConfirm}
+        />
       )}
     </div>
   );

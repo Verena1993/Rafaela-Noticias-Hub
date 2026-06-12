@@ -55,7 +55,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [editAttachments, setEditAttachments] = useState<string[]>([]);
   const [editAttachmentInput, setEditAttachmentInput] = useState('');
 
-  const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
+  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo redes'];
 
   const startEditingCoverage = () => {
     if (coverage) {

@@ -15,13 +15,18 @@ import type { CalendarEvent, StaffSchedule, ProgramType, FormatType } from '../t
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { EventEditModal } from './EventEditModal';
 import type { EventEditData } from './EventEditModal';
+import { TextAutocompleteModal } from './TextAutocompleteModal';
 
 interface CalendarProps {
   setSelectedCoverageId?: (id: string | null) => void;
+  setActiveTab?: (tab: string) => void;
+  setAutoOpenCreateModal?: (open: boolean) => void;
 }
 
 export const Calendar: React.FC<CalendarProps> = ({ 
-  setSelectedCoverageId 
+  setSelectedCoverageId,
+  setActiveTab,
+  setAutoOpenCreateModal
 }) => {
   const { 
     events, 
@@ -34,10 +39,11 @@ export const Calendar: React.FC<CalendarProps> = ({
   } = useHub();
 
   const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
-  const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
+  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo redes'];
 
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showAutocompleteModal, setShowAutocompleteModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   
   // Date state
@@ -111,6 +117,41 @@ export const Calendar: React.FC<CalendarProps> = ({
   };
   const toggleNewFormat = (form: FormatType) => {
     setNewFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
+  };
+
+  const handleAutocompleteConfirm = (data: {
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    description: string;
+    interviewees: string[];
+    contactInfo: string;
+  }) => {
+    setNewTitle(data.title);
+    setNewLoc(data.location || '');
+    
+    let desc = data.description;
+    if (data.interviewees.length > 0) {
+      desc += `\n\nEntrevistados sugeridos: ${data.interviewees.join(', ')}`;
+    }
+    if (data.contactInfo && data.contactInfo !== 'No detectados') {
+      desc += `\nContacto: ${data.contactInfo}`;
+    }
+    setNewDesc(desc);
+
+    if (data.date && data.time) {
+      setNewStart(`${data.date}T${data.time}`);
+      const startDate = new Date(`${data.date}T${data.time}`);
+      if (!isNaN(startDate.getTime())) {
+        startDate.setHours(startDate.getHours() + 1);
+        const pad = (n: number) => String(n).padStart(2, '0');
+        setNewEnd(`${startDate.getFullYear()}-${pad(startDate.getMonth() + 1)}-${pad(startDate.getDate())}T${pad(startDate.getHours())}:${pad(startDate.getMinutes())}`);
+      }
+    } else if (data.date) {
+      setNewStart(`${data.date}T10:00`);
+      setNewEnd(`${data.date}T11:00`);
+    }
   };
 
   const handleCreateEvent = (e: React.FormEvent) => {
@@ -290,6 +331,17 @@ export const Calendar: React.FC<CalendarProps> = ({
             ))}
           </div>
 
+          {setActiveTab && setAutoOpenCreateModal && (
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => {
+                setAutoOpenCreateModal(true);
+                setActiveTab('coverages');
+              }}
+            >
+              Nueva Cobertura
+            </button>
+          )}
           <button className="btn btn-primary" onClick={() => {
             setNewPrograms(selectedProgramFilter !== 'Todos' ? [selectedProgramFilter] : []);
             setNewFormats([]);
@@ -870,6 +922,28 @@ export const Calendar: React.FC<CalendarProps> = ({
             </div>
             <form onSubmit={handleCreateEvent}>
               <div className="modal-body event-form-grid" style={{ padding: '1rem' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setShowAutocompleteModal(true)}
+                  style={{
+                    gridColumn: 'span 3',
+                    padding: '0.5rem',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    color: 'var(--primary)',
+                    border: '1px dashed var(--primary)',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    cursor: 'pointer',
+                    marginBottom: '0.5rem'
+                  }}
+                >
+                  ✨ Autocompletar desde texto con IA
+                </button>
                 <div className="form-group" style={{ gridColumn: 'span 2' }}>
                   <label className="form-label">Título del Compromiso *</label>
                   <input
@@ -1165,6 +1239,13 @@ export const Calendar: React.FC<CalendarProps> = ({
             )}
           </div>
         </div>
+      )}
+      {showAutocompleteModal && (
+        <TextAutocompleteModal
+          isOpen={showAutocompleteModal}
+          onClose={() => setShowAutocompleteModal(false)}
+          onConfirm={handleAutocompleteConfirm}
+        />
       )}
     </div>
   );

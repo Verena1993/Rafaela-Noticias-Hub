@@ -102,7 +102,7 @@ export const INITIAL_COVERAGES: Coverage[] = [
       { id: 'act5', userId: 'u11', userName: 'Valentina Redes', action: 'marcó como PUBLICADA en Instagram Historia', timestamp: '2026-06-04T07:55:00' }
     ],
     programs: ['Bien Despiertos', 'Digital'],
-    formats: ['Móvil', 'Vivo en redes']
+    formats: ['Móvil', 'Vivo redes']
   },
   {
     id: 'c2',
@@ -215,7 +215,7 @@ export const INITIAL_COVERAGES: Coverage[] = [
       { id: 'act4_1', userId: 'u2', userName: 'Mariano Editor', action: 'programó cobertura deportiva', timestamp: '2026-06-04T08:00:00' }
     ],
     programs: ['Digital'],
-    formats: ['Vivo en redes']
+    formats: ['Vivo redes']
   },
   {
     id: 'c5',
@@ -362,7 +362,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     assigneeId: 'u5',
     coverageId: 'c1',
     programs: ['Bien Despiertos', 'Digital'],
-    formats: ['Móvil', 'Vivo en redes']
+    formats: ['Móvil', 'Vivo redes']
   },
   {
     id: 'e3',
@@ -418,7 +418,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
     assigneeId: 'u14',
     coverageId: 'c4', // Linked to c4
     programs: ['Digital'],
-    formats: ['Vivo en redes']
+    formats: ['Vivo redes']
   },
   {
     id: 'e_c5',

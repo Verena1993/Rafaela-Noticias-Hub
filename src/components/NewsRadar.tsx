@@ -10,6 +10,7 @@ import type { RadarCategory, NewsRadarItem } from '../types';
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { aiService } from '../services/aiService';
 import { isSimilarTitle } from '../services/rssService';
+import { TextAutocompleteModal } from './TextAutocompleteModal';
 
 
 type RadarMainTab = 'all' | 'local' | 'provincial' | 'national' | 'international' | 'trends';
@@ -28,6 +29,7 @@ export const NewsRadar: React.FC = () => {
     newsRadarItems, 
     updateNewsRadarItem, 
     addProposal, 
+    addCoverage,
     fetchLiveRadarNews, 
     loadingRadar, 
     radarError, 
@@ -42,6 +44,64 @@ export const NewsRadar: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
+
+  const [showAutocompleteModal, setShowAutocompleteModal] = useState(false);
+
+  const handleAutocompleteConfirm = (data: {
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    description: string;
+    interviewees: string[];
+    contactInfo: string;
+  }, destination?: 'proposal' | 'coverage') => {
+    if (destination === 'coverage') {
+      const combinedDateTime = data.date && data.time ? `${data.date}T${data.time}` : new Date().toISOString();
+      let obs = data.description;
+      if (data.interviewees.length > 0) {
+        obs += `\n\nEntrevistados sugeridos: ${data.interviewees.join(', ')}`;
+      }
+      if (data.contactInfo && data.contactInfo !== 'No detectados') {
+        obs += `\nContacto: ${data.contactInfo}`;
+      }
+      addCoverage(
+        data.title,
+        obs || data.title,
+        combinedDateTime,
+        data.location || 'Rafaela',
+        [],
+        [],
+        [],
+        'pending_confirmation',
+        '',
+        obs,
+        []
+      );
+      alert('¡Cobertura creada exitosamente desde texto!');
+    } else {
+      let desc = data.description;
+      if (data.interviewees.length > 0) {
+        desc += `\n\nEntrevistados sugeridos: ${data.interviewees.join(', ')}`;
+      }
+      if (data.contactInfo && data.contactInfo !== 'No detectados') {
+        desc += `\nContacto: ${data.contactInfo}`;
+      }
+      const combinedDateTime = data.date && data.time ? `${data.date}T${data.time}` : undefined;
+      addProposal(
+        data.title,
+        desc,
+        combinedDateTime,
+        data.location || undefined,
+        [],
+        [],
+        [],
+        [],
+        []
+      );
+      alert('¡Propuesta creada exitosamente desde texto!');
+    }
+  };
 
   const checkAlreadyCovered = (item: NewsRadarItem) => {
     if (item.sentToEditor || sentIds.has(item.id)) return true;
@@ -457,6 +517,13 @@ export const NewsRadar: React.FC = () => {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button 
+            className="btn btn-secondary" 
+            style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
+            onClick={() => setShowAutocompleteModal(true)}
+          >
+            <span>📋</span> Crear desde texto
+          </button>
+          <button 
             className="btn btn-primary" 
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', opacity: loadingRadar ? 0.7 : 1 }}
             onClick={() => fetchLiveRadarNews()}
@@ -699,6 +766,14 @@ export const NewsRadar: React.FC = () => {
         </div>
       )}
 
+      {showAutocompleteModal && (
+        <TextAutocompleteModal
+          isOpen={showAutocompleteModal}
+          onClose={() => setShowAutocompleteModal(false)}
+          onConfirm={handleAutocompleteConfirm}
+          showDestinationSelect={true}
+        />
+      )}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );

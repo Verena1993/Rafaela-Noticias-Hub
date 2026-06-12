@@ -3,7 +3,15 @@ import { useHub } from '../context/HubContext';
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { Plus, Clock, User, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 
-export const Tasks: React.FC = () => {
+interface TasksProps {
+  setActiveTab?: (tab: string) => void;
+  setAutoOpenCreateModal?: (open: boolean) => void;
+}
+
+export const Tasks: React.FC<TasksProps> = ({
+  setActiveTab,
+  setAutoOpenCreateModal
+}) => {
   const { tasks, users, currentUser, addTask, toggleTaskCompleted, coverages } = useHub();
 
   const [showAddModal, setShowAddModal] = useState(false);
@@ -80,9 +88,22 @@ export const Tasks: React.FC = () => {
           </p>
         </div>
 
-        <button className="btn btn-primary" onClick={openModal}>
-          <Plus size={16} /> Crear Tarea
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+          {setActiveTab && setAutoOpenCreateModal && (
+            <button 
+              className="btn btn-secondary" 
+              onClick={() => {
+                setAutoOpenCreateModal(true);
+                setActiveTab('coverages');
+              }}
+            >
+              Nueva Cobertura
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={openModal}>
+            <Plus size={16} /> Crear Tarea
+          </button>
+        </div>
       </div>
 
       {/* Filter Row */}

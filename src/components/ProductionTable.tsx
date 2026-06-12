@@ -10,7 +10,15 @@ import type { CalendarEvent } from '../types';
 import { EventEditModal } from './EventEditModal';
 import type { EventEditData } from './EventEditModal';
 
-export const ProductionTable: React.FC = () => {
+interface ProductionTableProps {
+  setActiveTab?: (tab: string) => void;
+  setAutoOpenCreateModal?: (open: boolean) => void;
+}
+
+export const ProductionTable: React.FC<ProductionTableProps> = ({
+  setActiveTab,
+  setAutoOpenCreateModal
+}) => {
   const { events, users, coverages } = useHub();
 
   const [selectedDate, setSelectedDate] = useState(() => {
@@ -109,6 +117,18 @@ export const ProductionTable: React.FC = () => {
             Planificación detallada de notas, actividades y recursos para todos los programas.
           </p>
         </div>
+        
+        {setActiveTab && setAutoOpenCreateModal && (
+          <button 
+            className="btn btn-primary" 
+            onClick={() => {
+              setAutoOpenCreateModal(true);
+              setActiveTab('coverages');
+            }}
+          >
+            Nueva Cobertura
+          </button>
+        )}
       </div>
 
       {/* Toolbar */}

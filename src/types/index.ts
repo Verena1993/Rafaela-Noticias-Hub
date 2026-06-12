@@ -51,7 +51,7 @@ export interface PublicationChecklist {
 }
 
 export type ProgramType = 'Bien Despiertos' | 'Noticiero Mañana' | 'Noticiero Tarde' | 'Digital';
-export type FormatType = 'TV' | 'Radio' | 'Web' | 'Redes' | 'Multiplataforma';
+export type FormatType = 'Telefónica' | 'Videollamada' | 'Presencial' | 'Móvil' | 'Grabada' | 'Vivo redes';
 
 // Status: 4 unified editorial states
 export type CoverageStatus = 'pending_confirmation' | 'confirmed' | 'in_redaction' | 'published';

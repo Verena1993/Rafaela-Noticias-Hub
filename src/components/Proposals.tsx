@@ -15,8 +15,8 @@ import {
   FolderOpen
 } from 'lucide-react';
 import type { Proposal, ProgramType, FormatType, Coverage } from '../types';
-
 import { formatFriendlyDate } from '../utils/dateUtils';
+import { TextAutocompleteModal } from './TextAutocompleteModal';
 
 export const Proposals: React.FC = () => {
   const { 
@@ -39,6 +39,10 @@ export const Proposals: React.FC = () => {
   // Media Preview State
   const [previewItem, setPreviewItem] = useState<{ name: string; url: string; type: 'photo' | 'video' | 'audio' | 'document'; size: string } | null>(null);
 
+  // Autocomplete Modal State
+  const [showAutocompleteModal, setShowAutocompleteModal] = useState(false);
+  const [autocompleteTarget, setAutocompleteTarget] = useState<'proposal' | 'conversion'>('proposal');
+
   // Edit Proposal states
   const [showEditProposalModal, setShowEditProposalModal] = useState(false);
   const [editProposalTitle, setEditProposalTitle] = useState('');
@@ -51,24 +55,35 @@ export const Proposals: React.FC = () => {
 
   // Convert Proposal states
   const [showConvertModal, setShowConvertModal] = useState(false);
-  const [convertDateTime, setConvertDateTime] = useState('');
+  const [convertDate, setConvertDate] = useState('');
+  const [convertTime, setConvertTime] = useState('');
   const [convertLocation, setConvertLocation] = useState('');
   const [convertAssigneeId, setConvertAssigneeId] = useState('');
   const [convertStatus, setConvertStatus] = useState<Coverage['status']>('pending_confirmation');
-  const [convertPrograms, setConvertPrograms] = useState<ProgramType[]>([]);
-  const [convertFormats, setConvertFormats] = useState<FormatType[]>([]);
+  const [convertProgram, setConvertProgram] = useState('');
+  const [convertFormat, setConvertFormat] = useState('');
 
   const startConversion = () => {
     if (selectedProposal) {
-      const now = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      const fallback = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      setConvertDateTime(selectedProposal.dateTime || fallback);
+      let datePart = '';
+      let timePart = '';
+      if (selectedProposal.dateTime) {
+        const parts = selectedProposal.dateTime.split('T');
+        datePart = parts[0] || '';
+        timePart = parts[1]?.substring(0, 5) || '';
+      } else {
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        datePart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+        timePart = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+      }
+      setConvertDate(datePart);
+      setConvertTime(timePart);
       setConvertLocation(selectedProposal.location || '');
       setConvertAssigneeId(selectedProposal.assignees.length > 0 ? selectedProposal.assignees[0] : '');
       setConvertStatus('pending_confirmation');
-      setConvertPrograms(selectedProposal.programs || []);
-      setConvertFormats(selectedProposal.formats || []);
+      setConvertProgram(selectedProposal.programs && selectedProposal.programs.length > 0 ? selectedProposal.programs[0] : '');
+      setConvertFormat(selectedProposal.formats && selectedProposal.formats.length > 0 ? selectedProposal.formats[0] : '');
       setShowConvertModal(true);
     }
   };
@@ -123,7 +138,7 @@ export const Proposals: React.FC = () => {
   const [proposalFormats, setProposalFormats] = useState<FormatType[]>([]);
 
   const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
-  const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
+  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo redes'];
 
   const toggleProposalProgram = (prog: ProgramType) => {
     setProposalPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);
@@ -242,7 +257,48 @@ export const Proposals: React.FC = () => {
     setFormFiles([]);
     setProposalPrograms([]);
     setProposalFormats([]);
-    setShowAddModal(false);
+  };
+
+  const handleProposalAutocompleteConfirm = (data: {
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    description: string;
+    interviewees: string[];
+    contactInfo: string;
+  }) => {
+    setTitle(data.title);
+    
+    let desc = data.description;
+    if (data.interviewees.length > 0) {
+      desc += `\n\nEntrevistados sugeridos: ${data.interviewees.join(', ')}`;
+    }
+    if (data.contactInfo && data.contactInfo !== 'No detectados') {
+      desc += `\nContacto: ${data.contactInfo}`;
+    }
+    setDescription(desc);
+    
+    if (data.date && data.time) {
+      setDateTime(`${data.date}T${data.time}`);
+    } else if (data.date) {
+      setDateTime(`${data.date}T12:00`);
+    }
+    setLocation(data.location || '');
+  };
+
+  const handleConversionAutocompleteConfirm = (data: {
+    title: string;
+    date: string;
+    time: string;
+    location: string;
+    description: string;
+    interviewees: string[];
+    contactInfo: string;
+  }) => {
+    if (data.date) setConvertDate(data.date);
+    if (data.time) setConvertTime(data.time);
+    setConvertLocation(data.location || '');
   };
 
   const handleCreateFromWhatsApp = (msg: typeof mockWhatsAppMessages[0]) => {
@@ -835,6 +891,31 @@ export const Proposals: React.FC = () => {
             </div>
 
             <form onSubmit={handleCreateProposal} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  setAutocompleteTarget('proposal');
+                  setShowAutocompleteModal(true);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '0.5rem',
+                  borderRadius: '6px',
+                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                  color: 'var(--primary)',
+                  border: '1px dashed var(--primary)',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  cursor: 'pointer',
+                  marginBottom: '0.5rem'
+                }}
+              >
+                ✨ Autocompletar desde texto con IA
+              </button>
               <div className="form-group">
                 <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Título de la Propuesta *</label>
                 <input 
@@ -1043,13 +1124,22 @@ export const Proposals: React.FC = () => {
             </div>
             <form onSubmit={(e) => {
               e.preventDefault();
+
+              const finalDate = convertDate || (() => {
+                const d = new Date();
+                const pad = (n: number) => String(n).padStart(2, '0');
+                return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+              })();
+              const finalTime = convertTime || '12:00';
+              const combinedDateTime = `${finalDate}T${finalTime}`;
+
               const createdId = convertProposalToCoverage(selectedProposal.id, {
-                dateTime: convertDateTime,
+                dateTime: combinedDateTime,
                 location: convertLocation,
                 assigneeId: convertAssigneeId || undefined,
                 status: convertStatus,
-                programs: convertPrograms,
-                formats: convertFormats
+                programs: convertProgram ? [convertProgram as any] : [],
+                formats: convertFormat ? [convertFormat as any] : []
               });
               if (createdId) {
                 setShowConvertModal(false);
@@ -1058,26 +1148,60 @@ export const Proposals: React.FC = () => {
               }
             }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setAutocompleteTarget('conversion');
+                    setShowAutocompleteModal(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.5rem',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    color: 'var(--primary)',
+                    border: '1px dashed var(--primary)',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    cursor: 'pointer',
+                    marginBottom: '0.5rem'
+                  }}
+                >
+                  ✨ Autocompletar desde texto con IA
+                </button>
                 <div style={{ padding: '0.75rem', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                   <strong>Propuesta:</strong> {selectedProposal.title}
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600 }}>Fecha y Hora Programada *</label>
-                  <input
-                    type="datetime-local"
-                    required
-                    className="form-control"
-                    value={convertDateTime}
-                    onChange={e => setConvertDateTime(e.target.value)}
-                  />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600 }}>Fecha</label>
+                    <input
+                      type="date"
+                      className="form-control"
+                      value={convertDate}
+                      onChange={e => setConvertDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label" style={{ fontWeight: 600 }}>Hora</label>
+                    <input
+                      type="time"
+                      className="form-control"
+                      value={convertTime}
+                      onChange={e => setConvertTime(e.target.value)}
+                    />
+                  </div>
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600 }}>Ubicación real de cobertura *</label>
+                  <label className="form-label" style={{ fontWeight: 600 }}>Ubicación</label>
                   <input
                     type="text"
-                    required
                     className="form-control"
                     placeholder="Ej. Bv. Santa Fe 1200, Rafaela"
                     value={convertLocation}
@@ -1086,13 +1210,44 @@ export const Proposals: React.FC = () => {
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600 }}>Responsable Principal (Periodista)</label>
+                  <label className="form-label" style={{ fontWeight: 600 }}>Programa Destino</label>
+                  <select
+                    className="form-select"
+                    value={convertProgram}
+                    onChange={(e) => setConvertProgram(e.target.value)}
+                    style={{ padding: '0.5rem', fontWeight: 500 }}
+                  >
+                    <option value="">Seleccionar programa...</option>
+                    <option value="Bien Despiertos">Bien Despiertos</option>
+                    <option value="Noticiero Mañana">Noticiero Mañana</option>
+                    <option value="Noticiero Tarde">Noticiero Tarde</option>
+                    <option value="Digital">Digital</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>Formato</label>
+                  <select
+                    className="form-select"
+                    value={convertFormat}
+                    onChange={(e) => setConvertFormat(e.target.value)}
+                    style={{ padding: '0.5rem', fontWeight: 500 }}
+                  >
+                    <option value="">Seleccionar formato...</option>
+                    {FORMAT_OPTIONS.map(form => (
+                      <option key={form} value={form}>{form}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600 }}>Responsable Principal</label>
                   <select
                     className="form-select"
                     value={convertAssigneeId}
                     onChange={e => setConvertAssigneeId(e.target.value)}
                   >
-                    <option value="">Sin asignar</option>
+                    <option value="">Seleccionar responsable...</option>
                     {users.map(u => (
                       <option key={u.id} value={u.id}>{u.name}</option>
                     ))}
@@ -1106,72 +1261,11 @@ export const Proposals: React.FC = () => {
                     value={convertStatus}
                     onChange={e => setConvertStatus(e.target.value as any)}
                   >
-                    <option value="pending">Pendiente</option>
-                    <option value="in_coverage">En Cobertura</option>
+                    <option value="pending_confirmation">Pendiente de confirmación</option>
+                    <option value="confirmed">Confirmada</option>
                     <option value="in_redaction">En Redacción</option>
-                    <option value="ready_to_publish">Lista para Publicar</option>
+                    <option value="published">Publicada</option>
                   </select>
-                </div>
-
-                {/* Programs and Formats */}
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600 }}>Programas Destino</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                    {PROGRAM_OPTIONS.map(prog => {
-                      const selected = convertPrograms.includes(prog);
-                      return (
-                        <button
-                          key={prog}
-                          type="button"
-                          className="btn"
-                          onClick={() => {
-                            setConvertPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);
-                          }}
-                          style={{
-                            padding: '0.25rem 0.5rem',
-                            fontSize: '0.75rem',
-                            borderRadius: 'var(--radius-full)',
-                            border: '1px solid var(--border-color)',
-                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                            color: selected ? 'white' : 'var(--text-secondary)',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {prog}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600 }}>Formatos Logísticos</label>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                    {FORMAT_OPTIONS.map(form => {
-                      const selected = convertFormats.includes(form);
-                      return (
-                        <button
-                          key={form}
-                          type="button"
-                          className="btn"
-                          onClick={() => {
-                            setConvertFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
-                          }}
-                          style={{
-                            padding: '0.25rem 0.5rem',
-                            fontSize: '0.75rem',
-                            borderRadius: 'var(--radius-full)',
-                            border: '1px solid var(--border-color)',
-                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                            color: selected ? 'white' : 'var(--text-secondary)',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          {form}
-                        </button>
-                      );
-                    })}
-                  </div>
                 </div>
               </div>
               <div className="modal-footer">
@@ -1374,6 +1468,13 @@ export const Proposals: React.FC = () => {
             </form>
           </div>
         </div>
+      )}
+      {showAutocompleteModal && (
+        <TextAutocompleteModal
+          isOpen={showAutocompleteModal}
+          onClose={() => setShowAutocompleteModal(false)}
+          onConfirm={autocompleteTarget === 'proposal' ? handleProposalAutocompleteConfirm : handleConversionAutocompleteConfirm}
+        />
       )}
     </div>
   );

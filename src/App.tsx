@@ -65,7 +65,12 @@ const AppContent: React.FC = () => {
           />
         );
       case 'production':
-        return <ProductionTable />;
+        return (
+          <ProductionTable 
+            setActiveTab={setActiveTab}
+            setAutoOpenCreateModal={setAutoOpenCreateModal}
+          />
+        );
       case 'proposals':
         return (
           <Proposals />
@@ -75,11 +80,18 @@ const AppContent: React.FC = () => {
       case 'publications':
         return <Publications />;
       case 'tasks':
-        return <Tasks />;
+        return (
+          <Tasks 
+            setActiveTab={setActiveTab}
+            setAutoOpenCreateModal={setAutoOpenCreateModal}
+          />
+        );
       case 'calendar':
         return (
           <Calendar
             setSelectedCoverageId={setSelectedCoverageId}
+            setActiveTab={setActiveTab}
+            setAutoOpenCreateModal={setAutoOpenCreateModal}
           />
         );
       case 'radar':
