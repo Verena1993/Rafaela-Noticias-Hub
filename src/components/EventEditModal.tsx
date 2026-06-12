@@ -4,7 +4,7 @@ import type { CalendarEvent, ProgramType, FormatType } from '../types';
 
 
 const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
-const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];
+const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
 
 export interface EventEditData {
   title: string;

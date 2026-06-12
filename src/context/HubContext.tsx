@@ -26,7 +26,7 @@ interface HubContextType {
   newsRadarItems: NewsRadarItem[];
   login: (email: string, password?: string) => boolean;
   logout: () => void;
-  addCoverage: (title: string, description: string, dateTime: string, location: string, assignees: string[], programs?: ProgramType[], formats?: FormatType[]) => string;
+  addCoverage: (title: string, description: string, dateTime: string, location: string, assignees: string[], programs?: ProgramType[], formats?: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[]) => string;
   updateCoverageStatus: (coverageId: string, status: Coverage['status']) => void;
   addCommentToCoverage: (coverageId: string, text: string) => void;
   addMultimediaToCoverage: (coverageId: string, name: string, type: 'photo' | 'video' | 'audio' | 'document', url: string, size: string) => void;
@@ -36,7 +36,7 @@ interface HubContextType {
   toggleTaskCompleted: (taskId: string) => void;
   addEvent: (title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
   updateEvent: (eventId: string, title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, status?: CalendarEvent['status'], assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
-  updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, assignees: string[], programs: ProgramType[], formats: FormatType[], status?: Coverage['status']) => void;
+  updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, assignees: string[], programs: ProgramType[], formats: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[]) => void;
   createAlert: (title: string, severity: 'critical' | 'high' | 'medium') => void;
   assignAlert: (alertId: string, assigneeId: string) => void;
   closedAlertIds: Set<string>;
@@ -201,7 +201,12 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 title: `[RADAR] ${newAlert.title}`,
                 timestamp: new Date().toISOString(),
                 severity: newAlert.severity,
-                status: 'active'
+                status: 'active',
+                sourceName: newAlert.sourceName,
+                sourceUrl: newAlert.sourceUrl,
+                publishedAt: newAlert.publishedAt,
+                category: newAlert.category,
+                region: newAlert.region
               });
             }
           });
@@ -385,7 +390,11 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     location: string, 
     assignees: string[],
     programs?: ProgramType[],
-    formats?: FormatType[]
+    formats?: FormatType[],
+    status?: Coverage['status'],
+    logisticsInfo?: string,
+    observations?: string,
+    attachments?: string[]
   ): string => {
     const id = `cov_${Date.now()}`;
     const newCoverage: Coverage = {
@@ -394,7 +403,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       description,
       dateTime,
       location,
-      status: 'pending_confirmation',
+      status: status || 'pending_confirmation',
       assignees,
       comments: [],
       multimedia: [],
@@ -415,7 +424,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       ],
       programs: programs || [],
-      formats: formats || []
+      formats: formats || [],
+      logisticsInfo: logisticsInfo || '',
+      observations: observations || '',
+      attachments: attachments || []
     };
 
     setCoverages(prev => [newCoverage, ...prev]);
@@ -429,7 +441,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       start: dateTime,
       end: new Date(new Date(dateTime).getTime() + 4 * 60 * 60 * 1000).toISOString().substring(0, 16),
       location,
-      status: 'pending_confirmation',
+      status: status || 'pending_confirmation',
       assigneeId: assignees.length > 0 ? assignees[0] : undefined,
       coverageId: id,
       programs: programs || [],
@@ -1127,7 +1139,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     assignees: string[],
     programs: ProgramType[],
     formats: FormatType[],
-    status?: Coverage['status']
+    status?: Coverage['status'],
+    logisticsInfo?: string,
+    observations?: string,
+    attachments?: string[]
   ) => {
     setCoverages(prev => prev.map(c => {
       if (c.id === coverageId) {
@@ -1140,7 +1155,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           assignees,
           programs,
           formats,
-          status: status !== undefined ? status : c.status
+          status: status !== undefined ? status : c.status,
+          logisticsInfo: logisticsInfo !== undefined ? logisticsInfo : c.logisticsInfo,
+          observations: observations !== undefined ? observations : c.observations,
+          attachments: attachments !== undefined ? attachments : c.attachments
         };
       }
       return c;

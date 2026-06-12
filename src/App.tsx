@@ -12,11 +12,13 @@ import { InstagramPlanner } from './components/InstagramPlanner';
 import { NewsRadar } from './components/NewsRadar';
 import { ProductionTable } from './components/ProductionTable';
 import { Publications } from './components/Publications';
+import { Coverages } from './components/Coverages';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useHub();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedCoverageId, setSelectedCoverageId] = useState<string | null>(null);
+  const [autoOpenCreateModal, setAutoOpenCreateModal] = useState(false);
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
@@ -50,7 +52,16 @@ const AppContent: React.FC = () => {
           <Dashboard
             setActiveTab={setActiveTab}
             setSelectedCoverageId={setSelectedCoverageId}
-            setAutoOpenCreateModal={() => {}}
+            setAutoOpenCreateModal={setAutoOpenCreateModal}
+          />
+        );
+      case 'coverages':
+        return (
+          <Coverages
+            setSelectedCoverageId={setSelectedCoverageId}
+            onViewDetail={() => {}}
+            autoOpenCreateModal={autoOpenCreateModal}
+            setAutoOpenCreateModal={setAutoOpenCreateModal}
           />
         );
       case 'production':
@@ -80,7 +91,7 @@ const AppContent: React.FC = () => {
           <Dashboard
             setActiveTab={setActiveTab}
             setSelectedCoverageId={setSelectedCoverageId}
-            setAutoOpenCreateModal={() => {}}
+            setAutoOpenCreateModal={setAutoOpenCreateModal}
           />
         );
     }

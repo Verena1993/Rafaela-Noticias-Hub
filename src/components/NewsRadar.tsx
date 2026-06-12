@@ -611,7 +611,7 @@ export const NewsRadar: React.FC = () => {
                     }
 
                     return (
-                      <div key={alert.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                      <div key={alert.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', paddingTop: '0.25rem' }}>
                         <span style={{ 
                           fontSize: '0.65rem', 
                           fontWeight: 700, 
@@ -624,12 +624,37 @@ export const NewsRadar: React.FC = () => {
                         }}>
                           {badgeLabel}
                         </span>
-                        <h5 style={{ margin: '0 0 0.3rem 0', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        <h5 style={{ margin: '0 0 0.35rem 0', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                           {alert.title.replace('[RADAR] ', '')}
                         </h5>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', justifyContent: 'space-between' }}>
-                          <span>Última hora</span>
-                          <span>{new Date(alert.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+                          {alert.sourceName && <span><strong>Fuente:</strong> {alert.sourceName}</span>}
+                          {alert.publishedAt && <span><strong>Publicado:</strong> {new Date(alert.publishedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs</span>}
+                          {alert.region && <span><strong>Región:</strong> {alert.region}</span>}
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
+                          {alert.sourceUrl && (
+                            <a 
+                              href={alert.sourceUrl} 
+                              target="_blank" 
+                              rel="noreferrer" 
+                              style={{ 
+                                fontSize: '0.7rem', 
+                                color: 'var(--primary)', 
+                                textDecoration: 'underline',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.15rem'
+                              }}
+                            >
+                              <ExternalLink size={10} />
+                              Ver fuente
+                            </a>
+                          )}
+                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
+                            {new Date(alert.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
+                          </span>
                         </div>
                       </div>
                     );

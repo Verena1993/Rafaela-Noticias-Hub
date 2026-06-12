@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useHub } from '../context/HubContext';
 import { Plus, List, Kanban } from 'lucide-react';
-import type { Coverage, ProgramType, FormatType } from '../types';
+import type { Coverage, FormatType } from '../types';
 
 
 interface CoveragesProps {
@@ -24,21 +24,33 @@ export const Coverages: React.FC<CoveragesProps> = ({
 
   // Form states
   const [newTitle, setNewTitle] = useState('');
-  const [newDescription, setNewDescription] = useState('');
-  const [newDateTime, setNewDateTime] = useState(() => {
+  const [newDate, setNewDate] = useState(() => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  });
+  const [newTime, setNewTime] = useState(() => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
   const [newLocation, setNewLocation] = useState('');
-
-  const [newAssignees, setNewAssignees] = useState<string[]>([]);
-  
-  const [newPrograms, setNewPrograms] = useState<ProgramType[]>([]);
+  const [newStatus, setNewStatus] = useState<Coverage['status']>('pending_confirmation');
+  const [newMainResponsable, setNewMainResponsable] = useState('');
+  const [newAssignees, setNewAssignees] = useState<string[]>([]); // Team members
   const [newFormats, setNewFormats] = useState<FormatType[]>([]);
+  const [newLogisticsInfo, setNewLogisticsInfo] = useState('');
+  const [newObservations, setNewObservations] = useState('');
+  const [newAttachments, setNewAttachments] = useState<string[]>([]);
+  const [attachmentInput, setAttachmentInput] = useState('');
+  const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
 
-  const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
-  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];
+  const addAttachment = () => {
+    if (attachmentInput.trim()) {
+      setNewAttachments(prev => [...prev, attachmentInput.trim()]);
+      setAttachmentInput('');
+    }
+  };
 
   useEffect(() => {
     if (autoOpenCreateModal) {
@@ -49,9 +61,6 @@ export const Coverages: React.FC<CoveragesProps> = ({
     }
   }, [autoOpenCreateModal, setAutoOpenCreateModal]);
 
-  const toggleNewProgram = (prog: ProgramType) => {
-    setNewPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);
-  };
   const toggleNewFormat = (form: FormatType) => {
     setNewFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
   };
@@ -88,35 +97,57 @@ export const Coverages: React.FC<CoveragesProps> = ({
     e.preventDefault();
     if (!newTitle.trim()) return;
 
+    const finalAssignees: string[] = [];
+    if (newMainResponsable) {
+      finalAssignees.push(newMainResponsable);
+    }
+    newAssignees.forEach(uid => {
+      if (!finalAssignees.includes(uid)) {
+        finalAssignees.push(uid);
+      }
+    });
+
+    const combinedDateTime = `${newDate}T${newTime}`;
+
     const createdId = addCoverage(
       newTitle,
-      newDescription,
-      newDateTime,
+      newObservations || newTitle,
+      combinedDateTime,
       newLocation,
-      newAssignees,
-      newPrograms,
-      newFormats
+      finalAssignees,
+      [],
+      newFormats,
+      newStatus,
+      newLogisticsInfo,
+      newObservations,
+      newAttachments
     );
 
     setNewTitle('');
-    setNewDescription('');
+    setNewDate(() => {
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    });
+    setNewTime(() => {
+      const d = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    });
     setNewLocation('');
+    setNewStatus('pending_confirmation');
+    setNewMainResponsable('');
     setNewAssignees([]);
-    setNewPrograms([]);
     setNewFormats([]);
+    setNewLogisticsInfo('');
+    setNewObservations('');
+    setNewAttachments([]);
+    setAttachmentInput('');
     setShowAddModal(false);
 
     // Auto open details of new coverage
     setSelectedCoverageId(createdId);
     onViewDetail();
-  };
-
-  const handleAssigneeCheckboxChange = (userId: string) => {
-    setNewAssignees(prev => 
-      prev.includes(userId) 
-        ? prev.filter(id => id !== userId) 
-        : [...prev, userId]
-    );
   };
 
   const handleCardClick = (id: string) => {
@@ -362,20 +393,20 @@ export const Coverages: React.FC<CoveragesProps> = ({
 
       {/* New Coverage Modal */}
       {showAddModal && (
-        <div className="modal-overlay">
-          <div className="modal-content" style={{ maxWidth: '1000px' }}>
+        <div className="modal-overlay" style={{ display: 'flex', zIndex: 110 }} onClick={() => setShowAddModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '950px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">Programar Nueva Cobertura</h3>
               <button className="modal-close" onClick={() => setShowAddModal(false)}>✕</button>
             </div>
             <form onSubmit={handleCreateCoverage}>
-              <div className="modal-body">
+              <div className="modal-body" style={{ padding: '1.5rem' }}>
                 <div className="coverage-create-grid">
                   
-                  {/* Left Column */}
-                  <div className="coverage-create-col">
+                  {/* Left Column - Core Data */}
+                  <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     <div className="form-group">
-                      <label className="form-label">Título de la Noticia / Cobertura</label>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Cobertura *</label>
                       <input
                         type="text"
                         required
@@ -386,80 +417,61 @@ export const Coverages: React.FC<CoveragesProps> = ({
                       />
                     </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha *</label>
+                        <input
+                          type="date"
+                          required
+                          className="form-input"
+                          value={newDate}
+                          onChange={(e) => setNewDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora *</label>
+                        <input
+                          type="time"
+                          required
+                          className="form-input"
+                          value={newTime}
+                          onChange={(e) => setNewTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
                     <div className="form-group">
-                      <label className="form-label">Descripción / Pauta</label>
-                      <textarea
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación *</label>
+                      <input
+                        type="text"
                         required
-                        className="form-textarea"
-                        rows={4}
-                        placeholder="Detalles sobre lo que el móvil debe reportar..."
-                        value={newDescription}
-                        onChange={(e) => setNewDescription(e.target.value)}
+                        className="form-input"
+                        placeholder="Ej. Bv. Santa Fe 300, Rafaela"
+                        value={newLocation}
+                        onChange={(e) => setNewLocation(e.target.value)}
                       />
                     </div>
 
-                    <div className="form-row-grid">
-                      <div className="form-group">
-                        <label className="form-label">Fecha y Hora</label>
-                        <input
-                          type="datetime-local"
-                          required
-                          className="form-input"
-                          value={newDateTime}
-                          onChange={(e) => setNewDateTime(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Ubicación</label>
-                        <input
-                          type="text"
-                          required
-                          className="form-input"
-                          placeholder="Ej. Bv. Santa Fe 300, Rafaela"
-                          value={newLocation}
-                          onChange={(e) => setNewLocation(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="coverage-create-col">
-                    {/* Programs and Formats Selectors */}
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Programas Destino</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                        {PROGRAM_OPTIONS.map(prog => {
-                          const selected = newPrograms.includes(prog);
-                          return (
-                            <button
-                              key={prog}
-                              type="button"
-                              className="btn"
-                              onClick={() => toggleNewProgram(prog)}
-                              style={{
-                                padding: '0.25rem 0.5rem',
-                                fontSize: '0.75rem',
-                                borderRadius: 'var(--radius-full)',
-                                border: '1px solid var(--border-color)',
-                                background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                                color: selected ? 'white' : 'var(--text-secondary)',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              {prog}
-                            </button>
-                          );
-                        })}
-                      </div>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Estado *</label>
+                      <select
+                        className="form-select"
+                        value={newStatus}
+                        onChange={(e) => setNewStatus(e.target.value as any)}
+                        style={{ padding: '0.5rem', fontWeight: 600 }}
+                      >
+                        <option value="pending_confirmation">Pendiente de confirmación</option>
+                        <option value="confirmed">Confirmada</option>
+                        <option value="in_redaction">En Redacción</option>
+                        <option value="published">Publicada</option>
+                      </select>
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Formatos de Cobertura</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Formato</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.2rem' }}>
                         {FORMAT_OPTIONS.map(form => {
-                          const selected = newFormats.includes(form);
+                          const isSelected = newFormats.includes(form);
                           return (
                             <button
                               key={form}
@@ -467,13 +479,15 @@ export const Coverages: React.FC<CoveragesProps> = ({
                               className="btn"
                               onClick={() => toggleNewFormat(form)}
                               style={{
-                                padding: '0.25rem 0.5rem',
+                                padding: '0.35rem 0.75rem',
                                 fontSize: '0.75rem',
-                                borderRadius: 'var(--radius-full)',
+                                borderRadius: 'var(--radius-md)',
                                 border: '1px solid var(--border-color)',
-                                background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                                color: selected ? 'white' : 'var(--text-secondary)',
-                                cursor: 'pointer'
+                                background: isSelected ? 'var(--primary)' : 'var(--bg-secondary)',
+                                color: isSelected ? 'white' : 'var(--text-secondary)',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'var(--transition)'
                               }}
                             >
                               {form}
@@ -482,36 +496,135 @@ export const Coverages: React.FC<CoveragesProps> = ({
                         })}
                       </div>
                     </div>
+                  </div>
+
+                  {/* Right Column - Team & Logistics */}
+                  <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Principal *</label>
+                      <select
+                        className="form-select"
+                        required
+                        value={newMainResponsable}
+                        onChange={e => setNewMainResponsable(e.target.value)}
+                      >
+                        <option value="">Seleccionar responsable...</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </div>
 
                     <div className="form-group">
-                      <label className="form-label">Asignar Equipo (Selecciona uno o más)</label>
-                      <div className="assignee-select-grid" style={{ maxHeight: '140px', overflowY: 'auto' }}>
-                        {users.map(u => (
-                          <label key={u.id} className="assignee-checkbox-label">
-                            <input
-                              type="checkbox"
-                              checked={newAssignees.includes(u.id)}
-                              onChange={() => handleAssigneeCheckboxChange(u.id)}
-                            />
-                            <span 
-                              style={{ 
-                                display: 'inline-block', 
-                                width: '8px', 
-                                height: '8px', 
-                                borderRadius: '50%', 
-                                backgroundColor: u.avatarColor 
-                              }}
-                            />
-                            <span>{u.name}</span>
-                          </label>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Equipo Asignado</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                        {newAssignees.length === 0 ? (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Ningún integrante asignado al equipo</span>
+                        ) : (
+                          newAssignees.map(uid => {
+                            const u = users.find(usr => usr.id === uid);
+                            if (!u) return null;
+                            return (
+                              <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-full)', fontSize: '0.75rem' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: u.avatarColor }} />
+                                <span>{u.name.split(' ')[0]}</span>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setNewAssignees(prev => prev.filter(id => id !== uid))} 
+                                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontWeight: 'bold', fontSize: '0.8rem', padding: '0 0.1rem' }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <select
+                        className="form-select"
+                        value=""
+                        onChange={e => {
+                          const uid = e.target.value;
+                          if (uid && !newAssignees.includes(uid)) {
+                            setNewAssignees(prev => [...prev, uid]);
+                          }
+                        }}
+                        style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                      >
+                        <option value="">+ Agregar integrante...</option>
+                        {users
+                          .filter(u => u.id !== newMainResponsable && !newAssignees.includes(u.id))
+                          .map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Información Logística</label>
+                      <textarea
+                        className="form-textarea"
+                        rows={2}
+                        placeholder="Direcciones secundarias, accesos, teléfonos de contacto, transporte..."
+                        value={newLogisticsInfo}
+                        onChange={(e) => setNewLogisticsInfo(e.target.value)}
+                        style={{ fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Observaciones</label>
+                      <textarea
+                        className="form-textarea"
+                        rows={2}
+                        placeholder="Comentarios adicionales, enfoques sugeridos..."
+                        value={newObservations}
+                        onChange={(e) => setNewObservations(e.target.value)}
+                        style={{ fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjuntos (Enlaces / Archivos)</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.4rem' }}>
+                        {newAttachments.map((att, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', color: 'var(--text-secondary)' }}>📎 {att}</span>
+                            <button 
+                              type="button" 
+                              onClick={() => setNewAttachments(prev => prev.filter((_, i) => i !== idx))} 
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.8rem' }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
                         ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          placeholder="Ej: https://drive.google.com/... o gacetilla.pdf" 
+                          style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                          value={attachmentInput}
+                          onChange={e => setAttachmentInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addAttachment();
+                            }
+                          }}
+                        />
+                        <button type="button" onClick={addAttachment} className="btn btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>
+                          Agregar
+                        </button>
                       </div>
                     </div>
                   </div>
 
                 </div>
               </div>
-              <div className="modal-footer">
+              <div className="modal-footer" style={{ padding: '1rem 1.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                   Cancelar
                 </button>

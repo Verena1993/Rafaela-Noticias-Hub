@@ -5,12 +5,10 @@ import {
   Image, FileText, Check, Bot, History, Sparkles, MessageSquare, Clipboard,
   MessageCircle, Edit3
 } from 'lucide-react';
-import type { PublicationChecklist } from '../types';
+import type { Coverage, FormatType, PublicationChecklist } from '../types';
 
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { MultimediaManager } from './MultimediaManager';
-import { EventEditModal } from './EventEditModal';
-import type { EventEditData } from './EventEditModal';
 
 interface CoverageDetailProps {
   coverageId: string;
@@ -43,6 +41,81 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [showEditModal, setShowEditModal] = useState(false);
   const [previewItem, setPreviewItem] = useState<{ name: string; url: string; type: 'photo' | 'video' | 'audio' | 'document'; size: string } | null>(null);
 
+  // Redesigned Edit states
+  const [editTitle, setEditTitle] = useState('');
+  const [editDate, setEditDate] = useState('');
+  const [editTime, setEditTime] = useState('');
+  const [editLocation, setEditLocation] = useState('');
+  const [editStatus, setEditStatus] = useState<Coverage['status']>('pending_confirmation');
+  const [editMainResponsable, setEditMainResponsable] = useState('');
+  const [editAssigneesList, setEditAssigneesList] = useState<string[]>([]);
+  const [editFormats, setEditFormats] = useState<FormatType[]>([]);
+  const [editLogisticsInfo, setEditLogisticsInfo] = useState('');
+  const [editObservations, setEditObservations] = useState('');
+  const [editAttachments, setEditAttachments] = useState<string[]>([]);
+  const [editAttachmentInput, setEditAttachmentInput] = useState('');
+
+  const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
+
+  const startEditingCoverage = () => {
+    if (coverage) {
+      setEditTitle(coverage.title);
+      const [datePart, timePart] = (coverage.dateTime || '').split('T');
+      setEditDate(datePart || '');
+      setEditTime(timePart?.substring(0, 5) || '');
+      setEditLocation(coverage.location);
+      setEditStatus(coverage.status);
+      setEditMainResponsable(coverage.assignees.length > 0 ? coverage.assignees[0] : '');
+      setEditAssigneesList(coverage.assignees.slice(1));
+      setEditFormats(coverage.formats || []);
+      setEditLogisticsInfo(coverage.logisticsInfo || '');
+      setEditObservations(coverage.observations || '');
+      setEditAttachments(coverage.attachments || []);
+      setEditAttachmentInput('');
+      setShowEditModal(true);
+    }
+  };
+
+  const addEditAttachment = () => {
+    if (editAttachmentInput.trim()) {
+      setEditAttachments(prev => [...prev, editAttachmentInput.trim()]);
+      setEditAttachmentInput('');
+    }
+  };
+
+  const handleSaveCoverageDetails = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!coverage) return;
+
+    const finalAssignees: string[] = [];
+    if (editMainResponsable) {
+      finalAssignees.push(editMainResponsable);
+    }
+    editAssigneesList.forEach(uid => {
+      if (!finalAssignees.includes(uid)) {
+        finalAssignees.push(uid);
+      }
+    });
+
+    const combinedDateTime = `${editDate}T${editTime}`;
+
+    updateCoverageDetails(
+      coverage.id,
+      editTitle,
+      editObservations || editTitle,
+      combinedDateTime,
+      editLocation,
+      finalAssignees,
+      coverage.programs || [],
+      editFormats,
+      editStatus,
+      editLogisticsInfo,
+      editObservations,
+      editAttachments
+    );
+    setShowEditModal(false);
+  };
+
   // Diagnostic states
   const [isEditingEvent, setIsEditingEvent] = useState(false);
   const [eventEditTitle, setEventEditTitle] = useState('');
@@ -50,22 +123,6 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [eventEditEnd, setEventEditEnd] = useState('');
   const [eventEditLocation, setEventEditLocation] = useState('');
   const [eventEditAssigneeId, setEventEditAssigneeId] = useState('');
-
-  const handleSaveCoverageDetails = (data: EventEditData) => {
-    if (!coverage) return;
-    updateCoverageDetails(
-      coverage.id,
-      data.title,
-      data.description,
-      data.start,
-      data.location,
-      data.assigneeId ? [data.assigneeId] : [], // Converting from the single assignee modal to array
-      data.programs,
-      data.formats,
-      data.status
-    );
-    setShowEditModal(false);
-  };
 
   // New V2 states
   const [portalUrl, setPortalUrl] = useState(coverage?.publications.portal.link || '');
@@ -461,7 +518,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
               <button 
                 className="btn btn-primary" 
                 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.5rem 1rem' }}
-                onClick={() => setShowEditModal(true)}
+                onClick={startEditingCoverage}
               >
                 <Edit3 size={14} /> Editar
               </button>
@@ -551,13 +608,53 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
       <div className="coverage-detail-grid">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           {activeTab === 'general' && (
-            <div className="card" style={{ padding: '2.5rem' }}>
-              <div style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                <h3 className="detail-section-title" style={{ border: 'none', margin: 0, padding: 0, fontSize: '1.2rem', color: 'var(--text-primary)' }}>Pauta / Información General</h3>
+            <div className="card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Pauta / Información General</h3>
+                <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+                  {coverage.description}
+                </div>
               </div>
-              <div style={{ fontSize: '1rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-                {coverage.description}
-              </div>
+
+              {coverage.logisticsInfo && (
+                <div>
+                  <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Información Logística</h3>
+                  <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+                    {coverage.logisticsInfo}
+                  </div>
+                </div>
+              )}
+
+              {coverage.observations && (
+                <div>
+                  <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Observaciones</h3>
+                  <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
+                    {coverage.observations}
+                  </div>
+                </div>
+              )}
+
+              {coverage.attachments && coverage.attachments.length > 0 && (
+                <div>
+                  <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Adjuntos</h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
+                    {coverage.attachments.map((att, idx) => {
+                      const isUrl = att.startsWith('http://') || att.startsWith('https://');
+                      return (
+                        <div key={idx} style={{ fontSize: '0.9rem' }}>
+                          {isUrl ? (
+                            <a href={att} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}>
+                              📎 {att} <ExternalLink size={12} />
+                            </a>
+                          ) : (
+                            <span style={{ color: 'var(--text-secondary)' }}>📎 {att}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -1052,22 +1149,250 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
       {/* Edit Coverage Details Modal */}
       {showEditModal && coverage && (
-        <EventEditModal
-          initialData={{
-            title: coverage.title,
-            description: coverage.description,
-            start: coverage.dateTime,
-            end: coverage.dateTime,
-            location: coverage.location,
-            status: coverage.status,
-            assigneeId: coverage.assignees.length > 0 ? coverage.assignees[0] : '',
-            programs: coverage.programs || [],
-            formats: coverage.formats || []
-          }}
-          isCoverage={true}
-          onSave={handleSaveCoverageDetails}
-          onClose={() => setShowEditModal(false)}
-        />
+        <div className="modal-overlay" style={{ display: 'flex', zIndex: 110 }} onClick={() => setShowEditModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '950px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Editar Planificación de Cobertura</h3>
+              <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleSaveCoverageDetails}>
+              <div className="modal-body" style={{ padding: '1.5rem' }}>
+                <div className="coverage-create-grid">
+                  
+                  {/* Left Column - Core Data */}
+                  <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Cobertura *</label>
+                      <input
+                        type="text"
+                        required
+                        className="form-input"
+                        placeholder="Ej. Sesión en el Concejo Deliberante por el presupuesto."
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                      />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha *</label>
+                        <input
+                          type="date"
+                          required
+                          className="form-input"
+                          value={editDate}
+                          onChange={(e) => setEditDate(e.target.value)}
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora *</label>
+                        <input
+                          type="time"
+                          required
+                          className="form-input"
+                          value={editTime}
+                          onChange={(e) => setEditTime(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación *</label>
+                      <input
+                        type="text"
+                        required
+                        className="form-input"
+                        placeholder="Ej. Bv. Santa Fe 300, Rafaela"
+                        value={editLocation}
+                        onChange={(e) => setEditLocation(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Estado *</label>
+                      <select
+                        className="form-select"
+                        value={editStatus}
+                        onChange={(e) => setEditStatus(e.target.value as any)}
+                        style={{ padding: '0.5rem', fontWeight: 600 }}
+                      >
+                        <option value="pending_confirmation">Pendiente de confirmación</option>
+                        <option value="confirmed">Confirmada</option>
+                        <option value="in_redaction">En Redacción</option>
+                        <option value="published">Publicada</option>
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Formato</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.2rem' }}>
+                        {FORMAT_OPTIONS.map(form => {
+                          const isSelected = editFormats.includes(form);
+                          return (
+                            <button
+                              key={form}
+                              type="button"
+                              className="btn"
+                              onClick={() => {
+                                setEditFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
+                              }}
+                              style={{
+                                padding: '0.35rem 0.75rem',
+                                fontSize: '0.75rem',
+                                borderRadius: 'var(--radius-md)',
+                                border: '1px solid var(--border-color)',
+                                background: isSelected ? 'var(--primary)' : 'var(--bg-secondary)',
+                                color: isSelected ? 'white' : 'var(--text-secondary)',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                transition: 'var(--transition)'
+                              }}
+                            >
+                              {form}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column - Team & Logistics */}
+                  <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Principal *</label>
+                      <select
+                        className="form-select"
+                        required
+                        value={editMainResponsable}
+                        onChange={e => setEditMainResponsable(e.target.value)}
+                      >
+                        <option value="">Seleccionar responsable...</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Equipo Asignado</label>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.4rem' }}>
+                        {editAssigneesList.length === 0 ? (
+                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Ningún integrante asignado al equipo</span>
+                        ) : (
+                          editAssigneesList.map(uid => {
+                            const u = users.find(usr => usr.id === uid);
+                            if (!u) return null;
+                            return (
+                              <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-full)', fontSize: '0.75rem' }}>
+                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: u.avatarColor }} />
+                                <span>{u.name.split(' ')[0]}</span>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setEditAssigneesList(prev => prev.filter(id => id !== uid))} 
+                                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontWeight: 'bold', fontSize: '0.8rem', padding: '0 0.1rem' }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                      <select
+                        className="form-select"
+                        value=""
+                        onChange={e => {
+                          const uid = e.target.value;
+                          if (uid && !editAssigneesList.includes(uid)) {
+                            setEditAssigneesList(prev => [...prev, uid]);
+                          }
+                        }}
+                        style={{ fontSize: '0.8rem', padding: '0.4rem' }}
+                      >
+                        <option value="">+ Agregar integrante...</option>
+                        {users
+                          .filter(u => u.id !== editMainResponsable && !editAssigneesList.includes(u.id))
+                          .map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Información Logística</label>
+                      <textarea
+                        className="form-textarea"
+                        rows={2}
+                        placeholder="Direcciones secundarias, accesos, teléfonos de contacto, transporte..."
+                        value={editLogisticsInfo}
+                        onChange={(e) => setEditLogisticsInfo(e.target.value)}
+                        style={{ fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Observaciones</label>
+                      <textarea
+                        className="form-textarea"
+                        rows={2}
+                        placeholder="Comentarios adicionales, enfoques sugeridos..."
+                        value={editObservations}
+                        onChange={(e) => setEditObservations(e.target.value)}
+                        style={{ fontSize: '0.85rem' }}
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjuntos (Enlaces / Archivos)</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.4rem' }}>
+                        {editAttachments.map((att, idx) => (
+                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', color: 'var(--text-secondary)' }}>📎 {att}</span>
+                            <button 
+                              type="button" 
+                              onClick={() => setEditAttachments(prev => prev.filter((_, i) => i !== idx))} 
+                              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.8rem' }}
+                            >
+                              🗑️
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.25rem' }}>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          placeholder="Ej: https://drive.google.com/... o gacetilla.pdf" 
+                          style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
+                          value={editAttachmentInput}
+                          onChange={e => setEditAttachmentInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addEditAttachment();
+                            }
+                          }}
+                        />
+                        <button type="button" onClick={addEditAttachment} className="btn btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>
+                          Agregar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+              <div className="modal-footer" style={{ padding: '1rem 1.5rem' }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>
+                  Cancelar
+                </button>
+                <button type="submit" className="btn btn-primary">
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

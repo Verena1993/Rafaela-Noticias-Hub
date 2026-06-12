@@ -123,7 +123,7 @@ export const Proposals: React.FC = () => {
   const [proposalFormats, setProposalFormats] = useState<FormatType[]>([]);
 
   const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
-  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];
+  const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
 
   const toggleProposalProgram = (prog: ProgramType) => {
     setProposalPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);

@@ -342,14 +342,32 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
                   <span className={`urgent-badge badge-${alert.severity}`}>
                     {alert.severity === 'critical' ? '🔴 Crítica' : alert.severity === 'high' ? '🟠 Alta' : '🟡 Media'}
                   </span>
-                  <div className="urgent-content">
-                    <h4 className="urgent-title" style={{ paddingRight: '2.5rem' }}>{alert.title}</h4>
-                    <div className="urgent-time">
-                      <Clock size={12} style={{ display: 'inline', marginRight: '3px', verticalAlign: 'middle' }} />
-                      {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+                  <div className="urgent-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <h4 className="urgent-title" style={{ paddingRight: '2.5rem', margin: 0, fontWeight: 700, fontSize: '0.92rem' }}>{alert.title}</h4>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                      {alert.sourceName && <span><strong>Fuente:</strong> {alert.sourceName}</span>}
+                      {alert.publishedAt && <span><strong>Publicado:</strong> {new Date(alert.publishedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} hs</span>}
+                      {alert.category && <span><strong>Categoría:</strong> <span style={{ textTransform: 'capitalize' }}>{alert.category}</span></span>}
+                      {alert.region && <span><strong>Región:</strong> {alert.region}</span>}
+                    </div>
+                    <div className="urgent-time" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      <Clock size={10} style={{ display: 'inline', marginRight: '3px', verticalAlign: 'middle' }} />
+                      Detectado: {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                    {alert.sourceUrl && (
+                      <a 
+                        href={alert.sourceUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="btn btn-secondary" 
+                        style={{ fontSize: '0.75rem', padding: '0.35rem 0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem', textDecoration: 'none', color: 'var(--text-primary)', border: '1px solid var(--border-color)', background: '#fff' }}
+                      >
+                        <ExternalLink size={12} />
+                        Abrir noticia original
+                      </a>
+                    )}
                     {(currentUser?.role === 'admin') ? (
                       <button 
                         className="btn btn-primary" 

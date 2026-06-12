@@ -51,7 +51,7 @@ export interface PublicationChecklist {
 }
 
 export type ProgramType = 'Bien Despiertos' | 'Noticiero Mañana' | 'Noticiero Tarde' | 'Digital';
-export type FormatType = 'Telefónica' | 'Videollamada' | 'Presencial' | 'Móvil' | 'Grabada' | 'Vivo en redes';
+export type FormatType = 'TV' | 'Radio' | 'Web' | 'Redes' | 'Multiplataforma';
 
 // Status: 4 unified editorial states
 export type CoverageStatus = 'pending_confirmation' | 'confirmed' | 'in_redaction' | 'published';
@@ -72,6 +72,9 @@ export interface Coverage {
   activities: Activity[];
   programs?: ProgramType[];
   formats?: FormatType[];
+  logisticsInfo?: string;
+  observations?: string;
+  attachments?: string[];
 }
 
 // Radar de Noticias — architecture ready for external APIs and AI integration
@@ -91,6 +94,8 @@ export interface NewsRadarItem {
   trendLevel?: 'Muy caliente' | 'En crecimiento' | 'Moderada';
   views?: string;
   socialPlatform?: 'tiktok' | 'instagram' | 'x' | 'youtube' | 'local';
+  editorialScore?: number;
+  motivoClasificacion?: string;
 }
 
 export type ConnectionType = 'rss_direct' | 'rss2json_proxy' | 'edge_function' | 'google_news' | 'social_api' | 'pending';
@@ -173,6 +178,11 @@ export interface Alert {
   status: 'active' | 'followed_up';
   assigneeId?: string;
   coverageId?: string;
+  sourceName?: string;
+  sourceUrl?: string;
+  publishedAt?: string;
+  category?: string;
+  region?: string;
 }
 
 export interface Activity {

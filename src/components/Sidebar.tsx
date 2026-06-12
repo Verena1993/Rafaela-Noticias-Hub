@@ -8,7 +8,8 @@ import {
   Calendar, 
   Activity, 
   LogOut,
-  Table
+  Table,
+  Kanban
 } from 'lucide-react';
 
 // Custom Instagram SVG Icon for reliability across lucide-react versions
@@ -45,6 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
   if (!currentUser) return null;
   const menuItems = [
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
+    { id: 'coverages', name: 'Coberturas', icon: Kanban },
     { id: 'production', name: 'Producción', icon: Table },
     { id: 'proposals', name: 'Propuestas', icon: Inbox },
     { id: 'tasks', name: 'Tareas', icon: CheckSquare },

@@ -34,7 +34,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   } = useHub();
 
   const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
-  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];
+  const FORMAT_OPTIONS: FormatType[] = ['TV', 'Radio', 'Web', 'Redes', 'Multiplataforma'];
 
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   const [showAddModal, setShowAddModal] = useState(false);
