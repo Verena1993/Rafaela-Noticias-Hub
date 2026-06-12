@@ -204,95 +204,96 @@ export const calculateEditorialScore = (
   return { score, reasons };
 };
 
-export const classifyAlert = (title: string, summary: string, category: RadarCategory): 'critical' | 'high' | 'medium' | null => {
+export const classifyAlert = (title: string, summary: string, category: RadarCategory): 'critical' | 'high' | null => {
   const text = `${title} ${summary}`;
+  const hasWord = (kws: string[]) => hasExactWordMatch(text, kws);
 
-  const hasMatch = (keywords: string[]) => hasExactWordMatch(text, keywords);
-
-  // 1. Exclude these topics from alerts entirely (Cambio 6 + Economy)
-  const excludedKeywords = [
-    'deportes', 'deporte', 'fútbol', 'futbol', 'tenis', 'automovilismo', 'espectáculos', 
-    'espectaculo', 'farándula', 'farandula', 'opinión', 'opinion', 'columna', 'columnas', 
-    'análisis histórico', 'analisis historico', 'curiosidades', 'curiosidad', 'entrevista', 
-    'entrevistas', 'ranking', 'viral', 'redes sociales', 'instagram', 'tiktok', 'twitter', 'facebook',
-    'economía', 'economia', 'dólar', 'dolar', 'inflación', 'inflacion', 'precios', 'tarifas', 'aumento'
+  // ── ALWAYS EXCLUDED ─────────────────────────────────────────────────────
+  const NEVER_ALERT = [
+    'deportes', 'deporte', 'fútbol', 'futbol', 'tenis', 'automovilismo',
+    'espectáculos', 'espectaculos', 'farándula', 'farandula',
+    'opinión', 'opinion', 'columna', 'columnas', 'análisis', 'analisis',
+    'entrevista', 'entrevistas', 'ranking', 'viral',
+    'turismo', 'cultura', 'cine', 'televisión', 'television', 'streaming',
+    'moda', 'curiosidades', 'celebridades', 'instagram', 'tiktok',
+    'twitter', 'facebook', 'inflación', 'inflacion', 'tarifas', 'precios',
+    'economía', 'economia', 'dólar', 'dolar', 'aumento de precios',
+    'historia', 'histórico', 'historico', 'efeméride', 'efemeride',
+    'migración', 'migracion', 'turista', 'turistas'
   ];
-  if (hasMatch(excludedKeywords)) {
+  if (hasWord(NEVER_ALERT)) return null;
+
+  // ── EMERGENCY KEYWORDS (shared across levels) ────────────────────────────
+  const EMERGENCY_CRITICAL = [
+    'incendio', 'explosión', 'explosion', 'homicidio', 'femicidio',
+    'asesinato', 'mataron', 'tiroteo', 'balacera', 'secuestro',
+    'allanamiento', 'desaparición de persona', 'desaparicion de persona',
+    'búsqueda de menor', 'busqueda de menor', 'amenaza de bomba',
+    'emergencia policial', 'emergencia sanitaria', 'evacuación masiva', 'evacuacion masiva',
+    'derrumbe', 'temporal severo', 'inundación', 'inundacion',
+    'accidente fatal', 'choque fatal', 'falleció', 'fallecio',
+    'víctima fatal', 'victima fatal', 'cuerpo sin vida', 'policía asesinado', 'policia asesinado'
+  ];
+  const EMERGENCY_HIGH = [
+    'accidente grave', 'choque grave', 'choque múltiple', 'choque multiple',
+    'incendio importante', 'heridos graves', 'entradera violenta',
+    'robo a mano armada', 'robo violento', 'emergencia climática', 'emergencia climatica',
+    'corte total de ruta', 'corte masivo', 'búsqueda', 'busqueda', 'evacuación', 'evacuacion'
+  ];
+
+  // ── LOCAL ────────────────────────────────────────────────────────────────
+  // Must mention a local locality AND an emergency keyword
+  if (category === 'local') {
+    const hasCritical = hasWord(EMERGENCY_CRITICAL);
+    const hasHigh = hasWord(EMERGENCY_HIGH);
+    if (hasCritical) return 'critical';
+    if (hasHigh) return 'high';
+    return null; // Local news without emergency → not an alert
+  }
+
+  // ── PROVINCIAL ────────────────────────────────────────────────────────────
+  if (category === 'provincial') {
+    const PROVINCIAL_CRITICAL = [
+      'homicidio', 'femicidio', 'asesinato', 'mataron', 'tiroteo', 'balacera',
+      'policía asesinado', 'policia asesinado', 'tragedia', 'catástrofe', 'catastrofe',
+      'accidente fatal', 'desastre', 'enfrentamiento armado', 'secuestro',
+      'incendio con víctimas', 'incendio con victimas', 'explosión', 'explosion'
+    ];
+    if (hasWord(PROVINCIAL_CRITICAL)) return 'critical';
+    const PROVINCIAL_HIGH = [
+      'emergencia provincial', 'inundación severa', 'inundacion severa',
+      'temporal severo', 'evacuación masiva', 'evacuacion masiva',
+      'accidente grave múltiple', 'varias víctimas', 'varias victimas'
+    ];
+    if (hasWord(PROVINCIAL_HIGH)) return 'high';
     return null;
   }
 
-  // 2. Define Severity keywords
-  const criticalKeywords = [
-    'asesinato', 'homicidio', 'mataron', 'murió en ataque', 'murio en ataque', 
-    'policía asesinado', 'policia asesinado', 'femicidio', 'tiroteo', 'balacera', 
-    'narcotráfico', 'narcotrafico', 'secuestro', 'explosión', 'explosion', 
-    'incendio con víctimas', 'incendio con victimas', 'derrumbe con víctimas', 'derrumbe con victimas', 
-    'accidente fatal múltiple', 'accidente fatal multiple', 'tragedia', 'catástrofe', 'catastrofe', 
-    'atentado', 'terrorismo', 'estado de emergencia', 'evacuación masiva', 'evacuacion masiva'
-  ];
-
-  const highKeywords = [
-    'heridos graves', 'choque grave', 'incendio importante', 
-    'operativo policial relevante', 'desaparición de personas', 'desaparicion de personas', 
-    'inundaciones', 'temporal severo'
-  ];
-
-  // 3. Define special combinations
-  const hasPoliciaAsesinado = (hasMatch(['policía']) || hasMatch(['policia'])) && hasMatch(['asesinado']);
-  const hasFederalTiroteo = hasMatch(['federal']) && hasMatch(['tiroteo']);
-  const hasBalaceraMuerto = hasMatch(['balacera']) && hasMatch(['muerto']);
-  const hasNarcotraficoHomicidio = (hasMatch(['narcotráfico']) || hasMatch(['narcotrafico'])) && hasMatch(['homicidio']);
-
-  let severity: 'critical' | 'high' | null = null;
-
-  if (hasMatch(criticalKeywords) || hasPoliciaAsesinado || hasFederalTiroteo || hasBalaceraMuerto || hasNarcotraficoHomicidio) {
-    severity = 'critical';
-  } else if (hasMatch(highKeywords)) {
-    severity = 'high';
-  }
-
-  if (!severity) {
-    return null;
-  }
-
-  // 4. Apply category-specific restrictions and Rosario multiplier
-  const isRosario = hasMatch(['rosario']);
-  const isPoliceIncident = hasMatch([
-    'asesinato', 'homicidio', 'mataron', 'murió en ataque', 'murio en ataque', 'policía', 'policia',
-    'femicidio', 'tiroteo', 'balacera', 'narcotráfico', 'narcotrafico', 'secuestro', 'detenido', 
-    'prisión', 'prision', 'robo', 'asalto', 'policial', 'tiros', 'disparos', 'gendarmería', 
-    'comisaría', 'comisaria', 'federal'
-  ]);
-
-  // Rosario Multiplier: Rosario police incidents automatically elevate to critical
-  if (isRosario && isPoliceIncident && (category === 'local' || category === 'provincial')) {
-    return 'critical';
-  }
-
-  if (category === 'local' || category === 'provincial') {
-    return severity;
-  }
-
+  // ── NATIONAL ─────────────────────────────────────────────────────────────
   if (category === 'national') {
-    const nationalAlertKeywords = [
-      'atentado', 'crisis institucional', 'desastre', 'accidente masivo',
-      'fallecimiento de figura', 'muerte de', 'falleció'
+    const NATIONAL_CRITICAL = [
+      'atentado', 'tragedia masiva', 'accidente masivo', 'crisis institucional',
+      'catástrofe nacional', 'catastrofe nacional', 'golpe de estado',
+      'muerte de presidente', 'estado de sitio', 'intervención federal',
+      'accidente con múltiples víctimas', 'accidente con multiples victimas',
+      'desastre nacional', 'emergencia nacional'
     ];
-    if (hasMatch(nationalAlertKeywords)) {
-      return severity;
-    }
+    if (hasWord(NATIONAL_CRITICAL)) return 'critical';
     return null;
   }
 
+  // ── INTERNATIONAL ─────────────────────────────────────────────────────────
   if (category === 'international') {
-    const internationalAlertKeywords = [
-      'torres gemelas', '9/11', 'pandemia', 'guerra', 'terremoto', 'tsunami',
-      'atentado masivo', 'catástrofe mundial', 'catastrofe mundial', 'muerte de jefe de estado',
-      'muerte de presidente', 'muerte de primer ministro'
+    const INTL_CRITICAL = [
+      'guerra', 'invasión', 'invasion', 'atentado masivo', 'terrorismo',
+      'terremoto', 'sismo devastador', 'tsunami', 'huracán', 'huracan',
+      'catástrofe mundial', 'catastrofe mundial',
+      'accidente aéreo masivo', 'accidente aereo masivo',
+      'pandemia', 'epidemia global',
+      'muerte de jefe de estado', 'muerte de presidente',
+      'golpe de estado'
     ];
-    if (hasMatch(internationalAlertKeywords)) {
-      return 'critical';
-    }
+    if (hasWord(INTL_CRITICAL)) return 'critical';
     return null;
   }
 
@@ -368,9 +369,9 @@ const detectTrueCategory = (title: string, summary: string, source: string, defa
 };
 
 export const rssService = {
-  fetchNews: async (): Promise<{ items: NewsRadarItem[]; alerts: { title: string; severity: 'critical' | 'high' | 'medium' }[]; diagnostics: RssDiagnostic[] }> => {
+  fetchNews: async (): Promise<{ items: NewsRadarItem[]; alerts: { title: string; severity: 'critical' | 'high'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string }[]; diagnostics: RssDiagnostic[] }> => {
     const allItems: NewsRadarItem[] = [];
-    const alerts: { title: string; severity: 'critical' | 'high' | 'medium' }[] = [];
+    const alerts: { title: string; severity: 'critical' | 'high'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string }[] = [];
     const diagnostics: RssDiagnostic[] = [];
 
     const results: any[] = [];
@@ -499,7 +500,15 @@ export const rssService = {
               // Process alerts (only for selected news)
               const classification = classifyAlert(x.item.title, x.cleanSummary, x.smartCategory);
               if (classification) {
-                alerts.push({ title: x.item.title, severity: classification });
+                alerts.push({
+                  title: x.item.title,
+                  severity: classification,
+                  sourceName: feed.name,
+                  sourceUrl: x.item.link || '',
+                  publishedAt: x.parsedDate.toISOString(),
+                  category: x.smartCategory,
+                  region: x.regionDetectada || undefined
+                });
               }
 
               feedItems.push({

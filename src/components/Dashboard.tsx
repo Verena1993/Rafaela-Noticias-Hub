@@ -119,10 +119,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
     return a.priorityIndex - b.priorityIndex;
   });
 
-  // Filter alerts (active and not closed) and sort by severity (critical first)
+  // Filter alerts: only critical + high, active, not closed
   const activeAlerts = useMemo(() => {
     return alerts
-      .filter(a => a.status === 'active' && !closedAlertIds.has(a.id))
+      .filter(a => a.status === 'active' && !closedAlertIds.has(a.id) && (a.severity === 'critical' || a.severity === 'high'))
       .sort((a, b) => {
         const severityOrder = { critical: 0, high: 1, medium: 2 };
         const orderA = severityOrder[a.severity] ?? 99;

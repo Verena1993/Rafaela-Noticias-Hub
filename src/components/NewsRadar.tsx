@@ -138,47 +138,49 @@ export const NewsRadar: React.FC = () => {
     return newItems.filter(item => item.category === mainTab);
   }, [newItems, mainTab]);
 
-  // Geographical Priority helper
-  const getGeoPriority = (item: NewsRadarItem) => {
-    const source = item.source.toLowerCase();
-    const title = item.title.toLowerCase();
-    const summary = item.summary.toLowerCase();
-    
-    // Prioridad 1: Rafaela, Castellanos
-    if (source.includes('rafaela') || source.includes('castellanos') ||
-        title.includes('rafaela') || title.includes('castellanos') ||
-        summary.includes('rafaela') || summary.includes('castellanos')) {
-      return 1;
-    }
-    
-    // Prioridad 2: Sunchales, Frontera, San Vicente, Esperanza
-    const p2 = ['sunchales', 'frontera', 'san vicente', 'esperanza'];
-    if (p2.some(kw => source.includes(kw) || title.includes(kw) || summary.includes(kw))) {
-      return 2;
-    }
-    
-    // Prioridad 3: Provincia de Santa Fe
-    const p3 = ['santa fe', 'rosario', 'santafe', 'lt10', 'rosario3', 'el litoral', 'uno santa fe', 'sin mordaza', 'radio eme', 'rosario plus', 'notife', 'telefe santa fe', 'gobierno de santa fe'];
-    if (item.category === 'provincial' || p3.some(kw => source.includes(kw) || title.includes(kw) || summary.includes(kw))) {
-      return 3;
-    }
-    
-    // Prioridad 4: Nacionales
-    const p4 = ['clarín', 'clarin', 'la nación', 'la nacion', 'infobae', 'perfil', 'ámbito', 'ambito', 'tn', 'c5n', 'página 12', 'pagina 12', 'noticias argentinas', 'telam', 'cronista', 'casa rosada'];
-    if (item.category === 'national' || p4.some(kw => source.includes(kw) || title.includes(kw) || summary.includes(kw))) {
-      return 4;
-    }
-    
-    // Prioridad 5: Internacionales
-    return 5;
+  // Geographical Priority — exact-word based, full coverage territory
+  const getGeoPriority = (item: NewsRadarItem): number => {
+    const combined = `${item.source} ${item.title} ${item.summary}`.toLowerCase();
+    const hasWord = (words: string[]) => words.some(w => {
+      const escaped = w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      return new RegExp(`\\b${escaped}\\b`).test(combined);
+    });
+
+    // P1: Rafaela (máxima prioridad absoluta)
+    if (hasWord(['rafaela', 'castellanos'])) return 1;
+
+    // P2: Ciudades principales de cobertura
+    if (hasWord(['san cristobal', 'san cristóbal', 'sunchales', 'esperanza'])) return 2;
+
+    // P3: Resto del área de cobertura
+    if (hasWord([
+      'lehmann', 'ataliva', 'tacural', 'ramona', 'humberto primo', 'humberto',
+      'bella italia', 'san vicente', 'virginia', 'pilar', 'aurelia',
+      'angelica', 'angélica', 'clucellas', 'maria juana', 'maría juana',
+      'egusquiza', 'presidente roca', 'zenon pereyra', 'zenón pereyra',
+      'colonia aldao', 'arrufo', 'arrufó', 'ceres', 'hersilia', 'suardi',
+      'san guillermo', 'monigotes', 'palacios', 'moises ville', 'moisés ville',
+      'susana', 'vila', 'frontera'
+    ])) return 3;
+
+    // P4: Provincia de Santa Fe
+    if (hasWord(['santa fe', 'rosario', 'reconquista', 'venado tuerto', 'san lorenzo', 'casilda', 'san justo'])
+        || item.category === 'provincial') return 4;
+
+    // P5: Nacional
+    if (item.category === 'national') return 5;
+
+    // P6: Internacional
+    return 6;
   };
 
   const getGeoLocationText = (item: NewsRadarItem) => {
     const prio = getGeoPriority(item);
-    if (prio === 1) return 'Rafaela / Castellanos';
-    if (prio === 2) return 'Región (Sunchales/Esperanza/etc.)';
-    if (prio === 3) return 'Provincia de Santa Fe';
-    if (prio === 4) return 'Nacional';
+    if (prio === 1) return 'Rafaela';
+    if (prio === 2) return 'San Cristóbal / Sunchales / Esperanza';
+    if (prio === 3) return 'Área de cobertura local';
+    if (prio === 4) return 'Provincia de Santa Fe';
+    if (prio === 5) return 'Nacional';
     return 'Internacional';
   };
 
@@ -189,12 +191,12 @@ export const NewsRadar: React.FC = () => {
       const timeA = new Date(a.date).getTime();
       const timeB = new Date(b.date).getTime();
       
-      // If difference is 10 minutes or less, prioritize geographically
-      if (Math.abs(timeA - timeB) <= 10 * 60 * 1000) {
+      // Within 30 min window: geographic priority always wins
+      if (Math.abs(timeA - timeB) <= 30 * 60 * 1000) {
         const prioA = getGeoPriority(a);
         const prioB = getGeoPriority(b);
         if (prioA !== prioB) {
-          return prioA - prioB; // Lower priority number first
+          return prioA - prioB;
         }
       }
       
