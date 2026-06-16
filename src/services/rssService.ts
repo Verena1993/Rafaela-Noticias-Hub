@@ -1,7 +1,17 @@
 import { RSS_FEEDS } from '../config/rssFeeds';
+import { EDITORIAL_SOURCES } from '../config/editorialSources';
 import type { NewsRadarItem, RssDiagnostic, RadarCategory, ConnectionType } from '../types';
 
 import { supabaseRadarGateway } from './supabaseRadarGateway';
+
+export const getDomainFromUrl = (urlStr: string): string => {
+  try {
+    const url = new URL(urlStr);
+    return url.hostname.replace(/^www\./, '');
+  } catch (e) {
+    return '';
+  }
+};
 
 export const removeAccents = (str: string): string => {
   return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -17,137 +27,12 @@ export const hasExactWordMatch = (text: string, keywords: string[]): boolean => 
   });
 };
 
-export const detectPersonEntities = (text: string): boolean => {
-  const clean = removeAccents(text).toLowerCase();
-  const patterns = [
-    /\bpilar sordo\b/i,
-    /\besperanza gomez\b/i,
-    /\bsan martin\b/i,
-    /\bbelgrano\b/i,
-    /\bmoreno\b/i,
-    /\bcristobal colon\b/i,
-    /\bsan cristobal colon\b/i
-  ];
-  return patterns.some(p => p.test(clean));
-};
-
-const INTERNATIONAL_INDICATORS = [
-  'iran', 'israel', 'ucrania', 'segunda guerra mundial', 'bbc', 'dw', 'guerra', 'naciones unidas',
-  'estados unidos', 'ee.uu.', 'eeuu', 'ee uu', 'francia', 'alemania', 'rusia', 'china', 'roma',
-  'madrid', 'españa', 'espana', 'brasil', 'chile', 'uruguay', 'paraguay', 'bolivia', 'peru', 'perú',
-  'colombia', 'venezuela', 'europa', 'asia', 'oriente medio', 'gaza', 'palestina', 'biden', 'putin', 'netanyahu',
-  'londres', 'reino unido', 'uk', 'parís', 'paris', 'tokio', 'japon', 'japón', 'italia', 'vaticano'
-];
-
-const LOCAL_KEYWORDS = [
-  'rafaela', 'barrio alberdi', 'barranquitas', 'villa rosas', 'italia', '9 de julio', 'mosconi', 
-  'villa dominga', 'mora', 'los nogales', 'sunchales', 'san cristobal', 'san cristóbal', 'esperanza', 
-  'frontera', 'josefina', 'lehmann', 'humberto', 'ramona', 'tacural', 'vila', 'susana', 'ataliva', 
-  'presidente roca', 'bella italia', 'angelica', 'angélica', 'aurelia', 'maria juana', 'maría juana', 
-  'clucellas', 'san vicente', 'zenon pereyra', 'zenón pereyra', 'castellanos'
-];
-
-const PROVINCIAL_KEYWORDS = [
-  'santa fe', 'rosario', 'reconquista', 'venado tuerto', 'san lorenzo', 'casilda', 'san justo'
-];
-
 export const isSimilarTitle = (title1: string, title2: string): boolean => {
   const normalize = (str: string) => str.toLowerCase().replace(/[^\w\s]/gi, '').split(/\s+/).filter(w => w.length > 3);
   const words1 = normalize(title1);
   const words2 = normalize(title2);
   const intersection = words1.filter(w => words2.includes(w));
   return intersection.length >= 3; 
-};
-
-import { getSourceRegion } from '../config/newsSourceRegions';
-
-export const detectExplicitLocality = (title: string, summary: string): string | null => {
-  const combinedText = `${title} ${summary}`;
-  
-  if (detectPersonEntities(combinedText)) {
-    return null;
-  }
-
-  if (hasExactWordMatch(combinedText, INTERNATIONAL_INDICATORS)) {
-    return null;
-  }
-
-  const cleanText = removeAccents(combinedText).toLowerCase();
-  
-  const localities = [
-    { key: 'santa clara de saguier', label: 'Santa Clara de Saguier' },
-    { key: 'santa clara', label: 'Santa Clara de Saguier' },
-    { key: 'humberto primo', label: 'Humberto Primo' },
-    { key: 'humberto', label: 'Humberto Primo' },
-    { key: 'bella italia', label: 'Bella Italia' },
-    { key: 'san cristóbal', label: 'San Cristóbal' },
-    { key: 'san cristobal', label: 'San Cristóbal' },
-    { key: 'san vicente', label: 'San Vicente' },
-    { key: 'presidente roca', label: 'Presidente Roca' },
-    { key: 'zenón pereyra', label: 'Zenón Pereyra' },
-    { key: 'zenon pereyra', label: 'Zenón Pereyra' },
-    { key: 'colonia aldao', label: 'Colonia Aldao' },
-    { key: 'san guillermo', label: 'San Guillermo' },
-    { key: 'moisés ville', label: 'Moisés Ville' },
-    { key: 'moises ville', label: 'Moisés Ville' },
-    { key: 'rafaela', label: 'Rafaela' },
-    { key: 'sunchales', label: 'Sunchales' },
-    { key: 'esperanza', label: 'Esperanza' },
-    { key: 'susana', label: 'Susana' },
-    { key: 'lehmann', label: 'Lehmann' },
-    { key: 'ataliva', label: 'Ataliva' },
-    { key: 'tacural', label: 'Tacural' },
-    { key: 'ramona', label: 'Ramona' },
-    { key: 'virginia', label: 'Virginia' },
-    { key: 'pilar', label: 'Pilar' },
-    { key: 'aurelia', label: 'Aurelia' },
-    { key: 'angélica', label: 'Angélica' },
-    { key: 'angelica', label: 'Angélica' },
-    { key: 'clucellas', label: 'Plaza Clucellas' },
-    { key: 'maría juana', label: 'María Juana' },
-    { key: 'maria juana', label: 'María Juana' },
-    { key: 'egusquiza', label: 'Egusquiza' },
-    { key: 'vila', label: 'Vila' },
-    { key: 'arrufó', label: 'Arrufó' },
-    { key: 'arrufo', label: 'Arrufó' },
-    { key: 'ceres', label: 'Ceres' },
-    { key: 'hersilia', label: 'Hersilia' },
-    { key: 'suardi', label: 'Suardi' },
-    { key: 'monigotes', label: 'Monigotes' },
-    { key: 'palacios', label: 'Palacios' }
-  ];
-
-  for (const loc of localities) {
-    const cleanKey = removeAccents(loc.key).toLowerCase();
-    const escapedKey = cleanKey.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const regex = new RegExp(`\\b${escapedKey}\\b`, 'i');
-    if (regex.test(cleanText)) {
-      if (loc.key === 'esperanza') {
-        const invalidEsperanza = [
-          /\bla esperanza\b/i,
-          /\besperanza de vida\b/i,
-          /\bsin esperanza\b/i,
-          /\bcon la esperanza\b/i,
-          /\bperder la esperanza\b/i,
-          /\bfe y esperanza\b/i,
-          /\btengo esperanza\b/i
-        ];
-        if (invalidEsperanza.some(pat => pat.test(cleanText))) {
-          continue;
-        }
-      }
-      
-      if (loc.key === 'italia') {
-        const isBarrioItalia = /\bbarrio italia\b/i.test(cleanText);
-        if (!isBarrioItalia) {
-          continue;
-        }
-      }
-
-      return loc.label;
-    }
-  }
-  return null;
 };
 
 export const calculateEditorialScore = (
@@ -196,11 +81,14 @@ export const calculateEditorialScore = (
     reasons.push('-15: Temas de prioridad baja');
   }
 
-  // 2. Geographic Prioritization
-  if (hasMatch(LOCAL_KEYWORDS)) {
+  // 2. Geographic Prioritization based on static category
+  if (category === 'local') {
     score += 30;
-    reasons.push('+30: Cobertura principal local/regional');
-  } else if (hasMatch(PROVINCIAL_KEYWORDS)) {
+    reasons.push('+30: Cobertura principal local');
+  } else if (category === 'regional') {
+    score += 20;
+    reasons.push('+20: Cobertura regional');
+  } else if (category === 'provincial') {
     score += 15;
     reasons.push('+15: Cobertura provincial');
   } else if (category === 'national') {
@@ -209,24 +97,6 @@ export const calculateEditorialScore = (
   } else if (category === 'international') {
     score -= 20;
     reasons.push('-20: Cobertura internacional');
-  }
-
-  // 3. International News Filter
-  if (category === 'international') {
-    const extraordinaryKeywords = [
-      'guerra', 'invasión', 'invasion', 'ataque', 'misil', 'misiles', 'terrorismo', 
-      'atentado', 'terremoto', 'sismo', 'tsunami', 'pandemia', 'epidemia', 
-      'catástrofe', 'catastrofe', 'accidente aéreo', 'accidente aereo', 
-      'accidente ferroviario', 'explosión masiva', 'explosion masiva', 
-      'golpe de estado', 'muerte de líder', 'muerte de lider'
-    ];
-
-    if (!hasMatch(extraordinaryKeywords)) {
-      score -= 100;
-      reasons.push('-100: Noticia internacional común sin relevancia extraordinaria');
-    } else {
-      reasons.push('Noticia internacional con relevancia extraordinaria');
-    }
   }
 
   return { score, reasons };
@@ -269,7 +139,7 @@ export const classifyAlert = (title: string, summary: string, category: RadarCat
     'corte total de ruta', 'corte masivo', 'búsqueda', 'busqueda', 'evacuación', 'evacuacion'
   ];
 
-  if (category === 'local') {
+  if (category === 'local' || category === 'regional') {
     if (hasWord(EMERGENCY_CRITICAL)) return 'critical';
     if (hasWord(EMERGENCY_URGENT)) return 'urgent';
     return null;
@@ -321,84 +191,47 @@ export const classifyAlert = (title: string, summary: string, category: RadarCat
   return 'normal';
 };
 
-export const detectTrueCategory = (title: string, summary: string, source: string, defaultCategory: RadarCategory): { category: RadarCategory; reason: string } => {
-  const combined = `${title} ${summary}`;
-  const clean = removeAccents(combined).toLowerCase();
-
-  // FASE 3: detectPersonEntities
-  if (detectPersonEntities(combined)) {
-    const reason = 'Entidad persona detectada';
-    console.log(`[RECHAZADA] Título: "${title}" | Motivo: ${reason}`);
-    return { category: 'national', reason };
-  }
-
-  // FASE 3 & 4: Check international indicators first
-  if (hasExactWordMatch(combined, INTERNATIONAL_INDICATORS)) {
-    const reason = 'Coincidencia con indicador internacional';
-    console.log(`[CLASIFICADOR] Título: "${title}" | Territorio: international | Motivo: ${reason}`);
-    return { category: 'international', reason };
-  }
-
-  // Exact local check from FASE 2
-  let hasLocalGeo = false;
-  let matchedKeyword = '';
-
-  for (const kw of LOCAL_KEYWORDS) {
-    const cleanKw = removeAccents(kw).toLowerCase();
-    const escapedKw = cleanKw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const regex = new RegExp(`\\b${escapedKw}\\b`, 'i');
-    if (regex.test(clean)) {
-      if (cleanKw === 'esperanza') {
-        const invalidEsperanza = [
-          /\bla esperanza\b/i,
-          /\besperanza de vida\b/i,
-          /\bsin esperanza\b/i,
-          /\bcon la esperanza\b/i,
-          /\bperder la esperanza\b/i,
-          /\bfe y esperanza\b/i,
-          /\btengo esperanza\b/i
-        ];
-        if (invalidEsperanza.some(pat => pat.test(clean))) {
-          continue;
-        }
-      }
-      
-      if (cleanKw === 'italia') {
-        const isBarrioItalia = /\bbarrio italia\b/i.test(clean);
-        if (!isBarrioItalia) {
-          continue;
-        }
-      }
-
-      hasLocalGeo = true;
-      matchedKeyword = kw;
-      break;
+export const detectTrueCategory = (
+  _title: string, 
+  _summary: string, 
+  source: string, 
+  defaultCategory: RadarCategory,
+  itemUrl?: string
+): { category: RadarCategory; reason: string; priority: number; region: string } => {
+  if (itemUrl) {
+    const domain = getDomainFromUrl(itemUrl);
+    const matched = EDITORIAL_SOURCES.find(s => domain === s.domain || domain.endsWith('.' + s.domain));
+    if (matched) {
+      const reason = 'Fuente configurada manualmente';
+      console.log(`[MANUAL] Fuente configurada manualmente: "${matched.name}" (Dominio: "${domain}") | Territorio: ${matched.category}`);
+      return { 
+        category: matched.category, 
+        reason,
+        priority: matched.priority,
+        region: matched.region
+      };
     }
   }
 
-  if (hasLocalGeo) {
-    const reason = `Coincidencia exacta: "${matchedKeyword}"`;
-    console.log(`[CLASIFICADOR] Título: "${title}" | Territorio: local | Localidad: ${matchedKeyword} | Motivo: Coincidencia exacta`);
-    return { category: 'local', reason };
-  }
+  const finalCategory = defaultCategory || 'national';
+  const reason = `Clasificación fija por defaultCategory de la fuente (${source})`;
+  console.log(`[MANUAL - FALLBACK] Fuente: "${source}" | Territorio: ${finalCategory}`);
+  
+  const region = finalCategory;
+  const priority = finalCategory === 'local' ? 100 : finalCategory === 'regional' ? 80 : finalCategory === 'provincial' ? 50 : finalCategory === 'national' ? 30 : 10;
 
-  if (hasExactWordMatch(combined, PROVINCIAL_KEYWORDS)) {
-    const reason = 'Coincidencia provincial';
-    console.log(`[CLASIFICADOR] Título: "${title}" | Territorio: provincial | Motivo: ${reason}`);
-    return { category: 'provincial', reason };
-  }
-
-  const sourceRegion = getSourceRegion(source);
-  const finalTerritory = sourceRegion || defaultCategory || 'national';
-  const reason = `Fallback por origen de fuente (${source})`;
-  console.log(`[CLASIFICADOR] Título: "${title}" | Territorio: ${finalTerritory} | Motivo: ${reason}`);
-  return { category: finalTerritory as RadarCategory, reason };
+  return { 
+    category: finalCategory, 
+    reason,
+    priority,
+    region
+  };
 };
 
 export const rssService = {
-  fetchNews: async (): Promise<{ items: NewsRadarItem[]; alerts: { title: string; severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string; classificationReason?: string }[]; diagnostics: RssDiagnostic[] }> => {
+  fetchNews: async (): Promise<{ items: NewsRadarItem[]; alerts: { title: string; severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string; classificationReason?: string; priority?: number }[]; diagnostics: RssDiagnostic[] }> => {
     const allItems: NewsRadarItem[] = [];
-    const alerts: { title: string; severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string; classificationReason?: string }[] = [];
+    const alerts: { title: string; severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string; classificationReason?: string; priority?: number }[] = [];
     const diagnostics: RssDiagnostic[] = [];
 
     const promises = RSS_FEEDS.map(async (feed) => {
@@ -443,6 +276,7 @@ export const rssService = {
             editorialScore: number;
             reasons: string[];
             classificationReason: string;
+            priority?: number;
           }[] = [];
 
           data.items.forEach((item: any) => {
@@ -492,11 +326,10 @@ export const rssService = {
               return;
             }
 
-            const { category: smartCategory, reason: classificationReason } = detectTrueCategory(item.title, cleanSummary, feed.name, feed.defaultCategory);
+            const { category: smartCategory, reason: classificationReason, priority: priorityVal, region: regionDetectada } = detectTrueCategory(item.title, cleanSummary, feed.name, feed.defaultCategory, item.link);
             
             // Calculate score and reasons
             const { score, reasons } = calculateEditorialScore(item.title, cleanSummary, smartCategory, feed.name);
-            const regionDetectada = detectExplicitLocality(item.title, cleanSummary);
 
             scoredItems.push({
               item,
@@ -506,7 +339,8 @@ export const rssService = {
               regionDetectada,
               editorialScore: score,
               reasons,
-              classificationReason
+              classificationReason,
+              priority: priorityVal
             });
           });
 
@@ -539,7 +373,8 @@ export const rssService = {
                 publishedAt: x.parsedDate.toISOString(),
                 category: x.smartCategory,
                 region: x.regionDetectada || undefined,
-                classificationReason: x.classificationReason
+                classificationReason: x.classificationReason,
+                priority: x.priority
               });
             }
 
@@ -551,7 +386,9 @@ export const rssService = {
               date: x.parsedDate.toISOString(),
               category: x.smartCategory,
               editorialScore: x.editorialScore,
-              url: x.item.link
+              url: x.item.link,
+              region: x.regionDetectada || undefined,
+              priority: x.priority
             });
             addedItems++;
           });

@@ -206,7 +206,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 sourceUrl: newAlert.sourceUrl,
                 publishedAt: newAlert.publishedAt,
                 category: newAlert.category,
-                region: newAlert.region
+                region: newAlert.region,
+                classificationReason: newAlert.classificationReason,
+                priority: newAlert.priority
               });
             }
           });

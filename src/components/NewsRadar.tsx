@@ -9,15 +9,16 @@ import type { RadarCategory, NewsRadarItem } from '../types';
 
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { aiService } from '../services/aiService';
-import { isSimilarTitle, detectPersonEntities, removeAccents, hasExactWordMatch } from '../services/rssService';
+import { isSimilarTitle } from '../services/rssService';
 import { TextAutocompleteModal } from './TextAutocompleteModal';
 
 
-type RadarMainTab = 'all' | 'local' | 'provincial' | 'national' | 'international' | 'trends';
+type RadarMainTab = 'all' | 'local' | 'regional' | 'provincial' | 'national' | 'international' | 'trends';
 
 const CATEGORY_CONFIG: Record<RadarCategory, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   national: { label: 'Nacional', icon: Globe, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
   provincial: { label: 'Provincial', icon: MapPin, color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+  regional: { label: 'Regional', icon: MapPin, color: '#f97316', bg: 'rgba(249,115,22,0.1)' },
   local: { label: 'Local', icon: Newspaper, color: '#eab308', bg: 'rgba(234,179,8,0.1)' },
   international: { label: 'Internacional', icon: Globe, color: '#a855f7', bg: 'rgba(168,85,247,0.1)' }
 };
@@ -122,10 +123,11 @@ export const NewsRadar: React.FC = () => {
 
   // Compute counters for each category based on all uncovered items
   const countLocal = newItems.filter(i => i.category === 'local').length;
+  const countRegional = newItems.filter(i => i.category === 'regional').length;
   const countProvincial = newItems.filter(i => i.category === 'provincial').length;
   const countNational = newItems.filter(i => i.category === 'national').length;
   const countInternational = newItems.filter(i => i.category === 'international').length;
-  const countTotal = countLocal + countProvincial + countNational + countInternational;
+  const countTotal = countLocal + countRegional + countProvincial + countNational + countInternational;
 
   // Filter items based on active tab
   const tabItems = React.useMemo(() => {
@@ -134,114 +136,11 @@ export const NewsRadar: React.FC = () => {
     return newItems.filter(item => item.category === mainTab);
   }, [newItems, mainTab]);
 
-  // Geographical Priority — exact-word based, full coverage territory
-  const getGeoPriority = (item: NewsRadarItem): number => {
-    const combined = `${item.title} ${item.summary}`;
-    
-    // First, check for person entities (same as backend classifier)
-    if (detectPersonEntities(combined)) {
-      return item.category === 'international' ? 6 : 5;
-    }
-
-    const clean = removeAccents(combined).toLowerCase();
-
-    // Check international indicators (same as backend classifier)
-    const INTERNATIONAL_INDICATORS = [
-      'iran', 'israel', 'ucrania', 'segunda guerra mundial', 'bbc', 'dw', 'guerra', 'naciones unidas',
-      'estados unidos', 'ee.uu.', 'eeuu', 'ee uu', 'francia', 'alemania', 'rusia', 'china', 'roma',
-      'madrid', 'españa', 'espana', 'brasil', 'chile', 'uruguay', 'paraguay', 'bolivia', 'peru', 'perú',
-      'colombia', 'venezuela', 'europa', 'asia', 'oriente medio', 'gaza', 'palestina', 'biden', 'putin', 'netanyahu',
-      'londres', 'reino unido', 'uk', 'parís', 'paris', 'tokio', 'japon', 'japón', 'italia', 'vaticano'
-    ];
-    if (hasExactWordMatch(combined, INTERNATIONAL_INDICATORS)) {
-      // If it contains "italia", check if it's "barrio italia"
-      const hasItaliaOnly = clean.includes('italia') && !/\bbarrio italia\b/i.test(clean);
-      if (hasItaliaOnly || hasExactWordMatch(combined, INTERNATIONAL_INDICATORS.filter(x => x !== 'italia'))) {
-        return 6;
-      }
-    }
-
-    const hasWord = (words: string[]) => words.some(w => {
-      const cleanW = removeAccents(w).toLowerCase();
-      const escaped = cleanW.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      const regex = new RegExp(`\\b${escaped}\\b`, 'i');
-      if (regex.test(clean)) {
-        if (cleanW === 'esperanza') {
-          const invalidEsperanza = [
-            /\bla esperanza\b/i,
-            /\besperanza de vida\b/i,
-            /\bsin esperanza\b/i,
-            /\bcon la esperanza\b/i,
-            /\bperder la esperanza\b/i,
-            /\bfe y esperanza\b/i,
-            /\btengo esperanza\b/i
-          ];
-          if (invalidEsperanza.some(pat => pat.test(clean))) {
-            return false;
-          }
-        }
-        if (cleanW === 'italia') {
-          return /\bbarrio italia\b/i.test(clean);
-        }
-        return true;
-      }
-      return false;
-    });
-
-    // P1: Rafaela (máxima prioridad absoluta)
-    if (hasWord(['rafaela', 'castellanos'])) return 1;
-
-    // P2: Ciudades principales de cobertura
-    if (hasWord(['san cristobal', 'san cristóbal', 'sunchales', 'esperanza'])) return 2;
-
-    // P3: Resto del área de cobertura
-    if (hasWord([
-      'lehmann', 'ataliva', 'tacural', 'ramona', 'humberto primo', 'humberto',
-      'bella italia', 'san vicente', 'virginia', 'pilar', 'aurelia',
-      'angelica', 'angélica', 'clucellas', 'maria juana', 'maría juana',
-      'egusquiza', 'presidente roca', 'zenon pereyra', 'zenón pereyra',
-      'colonia aldao', 'arrufo', 'arrufó', 'ceres', 'hersilia', 'suardi',
-      'san guillermo', 'monigotes', 'palacios', 'moises ville', 'moisés ville',
-      'susana', 'vila', 'frontera'
-    ])) return 3;
-
-    // P4: Provincia de Santa Fe
-    if (hasWord(['santa fe', 'rosario', 'reconquista', 'venado tuerto', 'san lorenzo', 'casilda', 'san justo'])
-        || item.category === 'provincial') return 4;
-
-    // P5: Nacional
-    if (item.category === 'national') return 5;
-
-    // P6: Internacional
-    return 6;
-  };
-
-  const getGeoLocationText = (item: NewsRadarItem) => {
-    const prio = getGeoPriority(item);
-    if (prio === 1) return 'Rafaela';
-    if (prio === 2) return 'San Cristóbal / Sunchales / Esperanza';
-    if (prio === 3) return 'Área de cobertura local';
-    if (prio === 4) return 'Provincia de Santa Fe';
-    if (prio === 5) return 'Nacional';
-    return 'Internacional';
-  };
-
-  // Sort and Interleave feed
+  // Sort and Interleave feed strictly chronologically
   const processedFeed = React.useMemo(() => {
-    // 1. Sort geographically and chronologically
     const sorted = [...tabItems].sort((a, b) => {
       const timeA = new Date(a.date).getTime();
       const timeB = new Date(b.date).getTime();
-      
-      // Within 30 min window: geographic priority always wins
-      if (Math.abs(timeA - timeB) <= 30 * 60 * 1000) {
-        const prioA = getGeoPriority(a);
-        const prioB = getGeoPriority(b);
-        if (prioA !== prioB) {
-          return prioA - prioB;
-        }
-      }
-      
       return timeB - timeA; // Most recent first
     });
 
@@ -256,12 +155,10 @@ export const NewsRadar: React.FC = () => {
       let indexToPull = 0;
       
       if (lastSource && consecutiveCount >= 3) {
-        // Find the next item from a different source
         const diffIndex = remaining.findIndex(item => item.source !== lastSource);
         if (diffIndex !== -1) {
           indexToPull = diffIndex;
         } else {
-          // Fallback if no other sources left
           indexToPull = 0;
         }
       }
@@ -375,7 +272,7 @@ export const NewsRadar: React.FC = () => {
     const isGenerating = generatingId === item.id;
     const isSending = sendingId === item.id;
     const timeFormatted = formatFriendlyTime(item.date);
-    const geoText = getGeoLocationText(item);
+    const geoText = item.region ? (item.region.charAt(0).toUpperCase() + item.region.slice(1)) : (item.category.charAt(0).toUpperCase() + item.category.slice(1));
     
     return (
       <div 
@@ -516,7 +413,7 @@ export const NewsRadar: React.FC = () => {
       }}
     >
       <span>
-        {tab === 'all' ? '📰' : tab === 'local' || tab === 'provincial' || tab === 'national' ? '📍' : tab === 'international' ? '🌎' : '🔥'}
+        {tab === 'all' ? '📰' : tab === 'local' || tab === 'regional' || tab === 'provincial' || tab === 'national' ? '📍' : tab === 'international' ? '🌎' : '🔥'}
       </span>
       {label}
       {count !== undefined && (
@@ -589,6 +486,7 @@ export const NewsRadar: React.FC = () => {
             <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '0.1rem' }}>
               <TabButton tab="all" label="Todas" count={countTotal} color="#3b82f6" />
               <TabButton tab="local" label="Locales" count={countLocal} color="#eab308" />
+              <TabButton tab="regional" label="Regionales" count={countRegional} color="#f97316" />
               <TabButton tab="provincial" label="Provinciales" count={countProvincial} color="#22c55e" />
               <TabButton tab="national" label="Nacionales" count={countNational} color="#3b82f6" />
               <TabButton tab="international" label="Internacionales" count={countInternational} color="#a855f7" />
@@ -686,12 +584,11 @@ export const NewsRadar: React.FC = () => {
               </div>
               <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {(() => {
-                  // Alertas locales críticas y urgentes - monitoreo editorial (máximo 10)
+                  // Alertas críticas y urgentes de cualquier categoría - monitoreo editorial (máximo 10)
                   const activeSidebarAlerts = alerts
                     .filter(a =>
                       a.status === 'active' &&
                       !closedAlertIds.has(a.id) &&
-                      a.category === 'local' &&
                       (a.severity === 'critical' || a.severity === 'urgent' || a.severity === 'high')
                     )
                     .sort((a, b) => {
@@ -701,16 +598,16 @@ export const NewsRadar: React.FC = () => {
                       const orderB = severityOrder[b.severity as keyof typeof severityOrder] ?? 99;
                       if (orderA !== orderB) return orderA - orderB;
 
-                      // 2. Cercanía territorial
-                      const getProximityPriority = (region?: string): number => {
-                        if (!region) return 3;
-                        const name = region.toLowerCase();
-                        if (name.includes('rafaela') || name.includes('castellanos')) return 1;
-                        if (name.includes('sunchales') || name.includes('san cristobal') || name.includes('san cristóbal') || name.includes('esperanza')) return 2;
-                        return 3;
+                      // 2. Cercanía territorial (según la categoría de la fuente)
+                      const getProximityPriority = (category?: string): number => {
+                        if (category === 'local') return 1;
+                        if (category === 'regional') return 2;
+                        if (category === 'provincial') return 3;
+                        if (category === 'national') return 4;
+                        return 5; // international
                       };
-                      const prioA = getProximityPriority(a.region);
-                      const prioB = getProximityPriority(b.region);
+                      const prioA = getProximityPriority(a.category);
+                      const prioB = getProximityPriority(b.category);
                       if (prioA !== prioB) return prioA - prioB;
 
                       // 3. Fecha de publicación/detección (más reciente primero)

@@ -42,11 +42,13 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   // ============================================
   // LOCALES & REGIONALES (Amarillo)
   // ============================================
-  { id: 'rafaela_noticias', name: 'Rafaela Noticias', url: 'https://www.rafaelanoticias.com/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'rafaela_noticias', name: 'Rafaela Noticias', url: 'https://www.rafaelanoticias.com/', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'castellanos', name: 'Diario Castellanos', url: 'https://diariocastellanos.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
-  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://www.rafaelainforma.com/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
-  { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://www.radiorafaela.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
-  { id: 'laopinion', name: 'La Opinión de Rafaela', url: 'https://www.diariolaopinion.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://www.rafaelainforma.com/feed/', defaultCategory: 'local', connectionType: 'rss_direct' },
+  { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://radiorafaelaapiv3.eleco.com.ar/feed-category/locales', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
+  { id: 'laopinion', name: 'La Opinión de Rafaela', url: 'https://www.diariolaopinion.com.ar/', defaultCategory: 'local', connectionType: 'rss_direct' },
+  { id: 'minuto_rafaela', name: 'Minuto Rafaela', url: 'https://minutorafaela.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
+  { id: 'adn979', name: 'ADN 97.9', url: 'https://adn979.com/', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'movil_quique', name: 'Móvil Quique', url: 'https://movilquique.com/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
   { id: 'rafaela_online', name: 'Rafaela Online', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'lt28', name: 'LT28 Radio Rafaela', url: '', defaultCategory: 'local', connectionType: 'pending' },
@@ -54,22 +56,22 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   { id: 'unraf', name: 'Universidad Nacional de Rafaela (UNRaf)', url: '', defaultCategory: 'local', connectionType: 'pending' },
 
   { id: 'sunchales_hoy', name: 'Sunchales Hoy', url: 'https://sunchaleshoy.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
-  { id: 'eco_sunchales', name: 'El Eco de Sunchales', url: 'https://elecodesunchales.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'eco_sunchales', name: 'El Eco de Sunchales', url: 'https://elecodesunchales.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'portal_tacural', name: 'Portal de Tacural', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'portal_lehmann', name: 'Portal de Lehmann', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'portal_humberto', name: 'Portal de Humberto Primo', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'portal_san_vicente', name: 'Portal de San Vicente', url: '', defaultCategory: 'local', connectionType: 'pending' },
-  { id: 'esperanza_dia', name: 'Esperanza Día por Día', url: 'https://www.esperanzadiapordia.com.ar/feed/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'esperanza_dia', name: 'Esperanza Día por Día', url: 'https://www.esperanzadiapordia.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'edicion_uno', name: 'Edición Uno Esperanza', url: '', defaultCategory: 'local', connectionType: 'pending' },
-  { id: 'reconquista_hoy', name: 'Reconquista Hoy', url: 'https://www.reconquistahoy.com/rss/', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'reconquista_hoy', name: 'Reconquista Hoy', url: 'https://www.reconquistahoy.com/rss/', defaultCategory: 'regional', connectionType: 'edge_function' },
   { id: 'avellaneda_hoy', name: 'Avellaneda Hoy', url: '', defaultCategory: 'local', connectionType: 'pending' },
 
   // ============================================
   // ORGANISMOS Y DATOS OFICIALES (Asignados por ámbito geográfico)
   // ============================================
-  { id: 'muni_rafaela', name: 'Municipalidad de Rafaela', url: 'https://www.rafaela.gob.ar/rss', defaultCategory: 'local', connectionType: 'edge_function' },
+  { id: 'muni_rafaela', name: 'Municipalidad de Rafaela', url: 'https://www.rafaela.gob.ar/rss', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'concejo_rafaela', name: 'Concejo Municipal de Rafaela', url: '', defaultCategory: 'local', connectionType: 'pending' },
-  { id: 'gob_santa_fe', name: 'Gobierno de Santa Fe', url: 'https://www.santafe.gov.ar/rss', defaultCategory: 'provincial', connectionType: 'edge_function' },
+  { id: 'gob_santa_fe', name: 'Gobierno de Santa Fe', url: 'https://www.santafe.gov.ar/rss', defaultCategory: 'provincial', connectionType: 'rss_direct' },
   
   { id: 'gob_nacional', name: 'Gobierno Nacional', url: '', defaultCategory: 'national', connectionType: 'pending' },
   { id: 'casa_rosada', name: 'Casa Rosada', url: 'https://www.casarosada.gob.ar/?format=feed', defaultCategory: 'national', connectionType: 'edge_function' },

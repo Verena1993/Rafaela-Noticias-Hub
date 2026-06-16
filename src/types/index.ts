@@ -77,8 +77,7 @@ export interface Coverage {
   attachments?: string[];
 }
 
-// Radar de Noticias — architecture ready for external APIs and AI integration
-export type RadarCategory = 'national' | 'provincial' | 'local' | 'international';
+export type RadarCategory = 'national' | 'provincial' | 'regional' | 'local' | 'international';
 
 export interface NewsRadarItem {
   id: string;
@@ -96,6 +95,8 @@ export interface NewsRadarItem {
   socialPlatform?: 'tiktok' | 'instagram' | 'x' | 'youtube' | 'local';
   editorialScore?: number;
   motivoClasificacion?: string;
+  region?: string;
+  priority?: number;
 }
 
 export type ConnectionType = 'rss_direct' | 'rss2json_proxy' | 'edge_function' | 'google_news' | 'social_api' | 'pending';
@@ -184,6 +185,7 @@ export interface Alert {
   category?: string;
   region?: string;
   classificationReason?: string;
+  priority?: number;
 }
 
 export interface Activity {
