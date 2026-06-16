@@ -17,29 +17,34 @@ export const hasExactWordMatch = (text: string, keywords: string[]): boolean => 
   });
 };
 
-const FOREIGN_KEYWORDS = [
-  'españa', 'espana', 'méxico', 'mexico', 'brasil', 'brazil', 'chile', 'uruguay', 
-  'paraguay', 'bolivia', 'perú', 'peru', 'colombia', 'estados unidos', 'ee.uu.', 'eeuu', 'ee uu', 
-  'francia', 'italia', 'alemania', 'reino unido', 'china', 'japon', 'japón', 'venezuela', 
-  'ecuador', 'canadá', 'canada', 'portugal', 'rusia', 'ucrania', 'india', 'bangladesh',
-  'israel', 'palestina', 'gaza', 'irán', 'iran', 'irak', 'siria', 'turquía', 'turquia', 
-  'egipto', 'australia', 'reino de caceres', 'cáceres', 'caceres', 'badajoz', 'madrid', 
-  'barcelona', 'roma', 'parís', 'paris', 'londres', 'nueva york', 'tokio', 'washington', 
-  'pekín', 'pekin', 'moscú', 'moscu', 'cuba', 'honduras', 'guatemala', 'el salvador', 
-  'nicaragua', 'costa rica', 'panamá', 'panama', 'marruecos', 'sudáfrica', 'sudafrica', 
-  'suiza', 'suecia', 'noruega', 'finlandia', 'dinamarca', 'grecia', 'bélgica', 'belgica', 
-  'holanda', 'países bajos', 'paises bajos', 'vaticano', 'austria', 'polonia'
+export const detectPersonEntities = (text: string): boolean => {
+  const clean = removeAccents(text).toLowerCase();
+  const patterns = [
+    /\bpilar sordo\b/i,
+    /\besperanza gomez\b/i,
+    /\bsan martin\b/i,
+    /\bbelgrano\b/i,
+    /\bmoreno\b/i,
+    /\bcristobal colon\b/i,
+    /\bsan cristobal colon\b/i
+  ];
+  return patterns.some(p => p.test(clean));
+};
+
+const INTERNATIONAL_INDICATORS = [
+  'iran', 'israel', 'ucrania', 'segunda guerra mundial', 'bbc', 'dw', 'guerra', 'naciones unidas',
+  'estados unidos', 'ee.uu.', 'eeuu', 'ee uu', 'francia', 'alemania', 'rusia', 'china', 'roma',
+  'madrid', 'españa', 'espana', 'brasil', 'chile', 'uruguay', 'paraguay', 'bolivia', 'peru', 'perú',
+  'colombia', 'venezuela', 'europa', 'asia', 'oriente medio', 'gaza', 'palestina', 'biden', 'putin', 'netanyahu',
+  'londres', 'reino unido', 'uk', 'parís', 'paris', 'tokio', 'japon', 'japón', 'italia', 'vaticano'
 ];
 
 const LOCAL_KEYWORDS = [
-  'rafaela', 'san cristóbal', 'san cristobal', 'sunchales', 'esperanza', 'susana', 
-  'lehmann', 'ataliva', 'tacural', 'ramona', 'humberto primo', 'humberto', 'bella italia', 
-  'san vicente', 'frontera', 'josefina', 'virginia', 'pilar', 'aurelia', 
-  'santa clara de saguier', 'santa clara', 'angélica', 'angelica', 'clucellas', 
-  'plaza clucellas', 'maría juana', 'maria juana', 'egusquiza', 'presidente roca', 
-  'vila', 'zenón pereyra', 'zenon pereyra', 'colonia aldao', 'arrufó', 'arrufo', 
-  'ceres', 'hersilia', 'suardi', 'san guillermo', 'monigotes', 'palacios', 
-  'moisés ville', 'moises ville'
+  'rafaela', 'barrio alberdi', 'barranquitas', 'villa rosas', 'italia', '9 de julio', 'mosconi', 
+  'villa dominga', 'mora', 'los nogales', 'sunchales', 'san cristobal', 'san cristóbal', 'esperanza', 
+  'frontera', 'josefina', 'lehmann', 'humberto', 'ramona', 'tacural', 'vila', 'susana', 'ataliva', 
+  'presidente roca', 'bella italia', 'angelica', 'angélica', 'aurelia', 'maria juana', 'maría juana', 
+  'clucellas', 'san vicente', 'zenon pereyra', 'zenón pereyra', 'castellanos'
 ];
 
 const PROVINCIAL_KEYWORDS = [
@@ -59,15 +64,16 @@ import { getSourceRegion } from '../config/newsSourceRegions';
 export const detectExplicitLocality = (title: string, summary: string): string | null => {
   const combinedText = `${title} ${summary}`;
   
-  // Exclude foreign countries/localities immediately
-  if (hasExactWordMatch(combinedText, FOREIGN_KEYWORDS)) {
+  if (detectPersonEntities(combinedText)) {
+    return null;
+  }
+
+  if (hasExactWordMatch(combinedText, INTERNATIONAL_INDICATORS)) {
     return null;
   }
 
   const cleanText = removeAccents(combinedText).toLowerCase();
   
-  // Use the same LOCAL_KEYWORDS list to check for specific localities
-  // We can order it by length descending to match longer multi-word names first
   const localities = [
     { key: 'santa clara de saguier', label: 'Santa Clara de Saguier' },
     { key: 'santa clara', label: 'Santa Clara de Saguier' },
@@ -116,6 +122,28 @@ export const detectExplicitLocality = (title: string, summary: string): string |
     const escapedKey = cleanKey.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     const regex = new RegExp(`\\b${escapedKey}\\b`, 'i');
     if (regex.test(cleanText)) {
+      if (loc.key === 'esperanza') {
+        const invalidEsperanza = [
+          /\bla esperanza\b/i,
+          /\besperanza de vida\b/i,
+          /\bsin esperanza\b/i,
+          /\bcon la esperanza\b/i,
+          /\bperder la esperanza\b/i,
+          /\bfe y esperanza\b/i,
+          /\btengo esperanza\b/i
+        ];
+        if (invalidEsperanza.some(pat => pat.test(cleanText))) {
+          continue;
+        }
+      }
+      
+      if (loc.key === 'italia') {
+        const isBarrioItalia = /\bbarrio italia\b/i.test(cleanText);
+        if (!isBarrioItalia) {
+          continue;
+        }
+      }
+
       return loc.label;
     }
   }
@@ -204,7 +232,7 @@ export const calculateEditorialScore = (
   return { score, reasons };
 };
 
-export const classifyAlert = (title: string, summary: string, category: RadarCategory): 'critical' | 'high' | null => {
+export const classifyAlert = (title: string, summary: string, category: RadarCategory): 'critical' | 'urgent' | 'high' | 'medium' | 'normal' | null => {
   const text = `${title} ${summary}`;
   const hasWord = (kws: string[]) => hasExactWordMatch(text, kws);
 
@@ -223,7 +251,6 @@ export const classifyAlert = (title: string, summary: string, category: RadarCat
   ];
   if (hasWord(NEVER_ALERT)) return null;
 
-  // ── EMERGENCY KEYWORDS (shared across levels) ────────────────────────────
   const EMERGENCY_CRITICAL = [
     'incendio', 'explosión', 'explosion', 'homicidio', 'femicidio',
     'asesinato', 'mataron', 'tiroteo', 'balacera', 'secuestro',
@@ -234,24 +261,20 @@ export const classifyAlert = (title: string, summary: string, category: RadarCat
     'accidente fatal', 'choque fatal', 'falleció', 'fallecio',
     'víctima fatal', 'victima fatal', 'cuerpo sin vida', 'policía asesinado', 'policia asesinado'
   ];
-  const EMERGENCY_HIGH = [
+
+  const EMERGENCY_URGENT = [
     'accidente grave', 'choque grave', 'choque múltiple', 'choque multiple',
     'incendio importante', 'heridos graves', 'entradera violenta',
     'robo a mano armada', 'robo violento', 'emergencia climática', 'emergencia climatica',
     'corte total de ruta', 'corte masivo', 'búsqueda', 'busqueda', 'evacuación', 'evacuacion'
   ];
 
-  // ── LOCAL ────────────────────────────────────────────────────────────────
-  // Must mention a local locality AND an emergency keyword
   if (category === 'local') {
-    const hasCritical = hasWord(EMERGENCY_CRITICAL);
-    const hasHigh = hasWord(EMERGENCY_HIGH);
-    if (hasCritical) return 'critical';
-    if (hasHigh) return 'high';
-    return null; // Local news without emergency → not an alert
+    if (hasWord(EMERGENCY_CRITICAL)) return 'critical';
+    if (hasWord(EMERGENCY_URGENT)) return 'urgent';
+    return null;
   }
 
-  // ── PROVINCIAL ────────────────────────────────────────────────────────────
   if (category === 'provincial') {
     const PROVINCIAL_CRITICAL = [
       'homicidio', 'femicidio', 'asesinato', 'mataron', 'tiroteo', 'balacera',
@@ -266,10 +289,9 @@ export const classifyAlert = (title: string, summary: string, category: RadarCat
       'accidente grave múltiple', 'varias víctimas', 'varias victimas'
     ];
     if (hasWord(PROVINCIAL_HIGH)) return 'high';
-    return null;
+    return 'normal';
   }
 
-  // ── NATIONAL ─────────────────────────────────────────────────────────────
   if (category === 'national') {
     const NATIONAL_CRITICAL = [
       'atentado', 'tragedia masiva', 'accidente masivo', 'crisis institucional',
@@ -279,10 +301,9 @@ export const classifyAlert = (title: string, summary: string, category: RadarCat
       'desastre nacional', 'emergencia nacional'
     ];
     if (hasWord(NATIONAL_CRITICAL)) return 'critical';
-    return null;
+    return 'normal';
   }
 
-  // ── INTERNATIONAL ─────────────────────────────────────────────────────────
   if (category === 'international') {
     const INTL_CRITICAL = [
       'guerra', 'invasión', 'invasion', 'atentado masivo', 'terrorismo',
@@ -294,261 +315,270 @@ export const classifyAlert = (title: string, summary: string, category: RadarCat
       'golpe de estado'
     ];
     if (hasWord(INTL_CRITICAL)) return 'critical';
-    return null;
+    return 'normal';
   }
 
-  return null;
+  return 'normal';
 };
 
-// Smart Categorization Engine
-const detectTrueCategory = (title: string, summary: string, source: string, defaultCategory: RadarCategory): RadarCategory => {
-  const text = `${title} ${summary}`;
-  
-  // 1. Check for foreign mentions first to avoid false local classifications
-  const hasForeignMention = hasExactWordMatch(text, FOREIGN_KEYWORDS);
+export const detectTrueCategory = (title: string, summary: string, source: string, defaultCategory: RadarCategory): { category: RadarCategory; reason: string } => {
+  const combined = `${title} ${summary}`;
+  const clean = removeAccents(combined).toLowerCase();
 
-  // 2. Check local/provincial keywords using exact word match
-  const mentionsLocal = hasExactWordMatch(text, LOCAL_KEYWORDS);
-  const mentionsProvincial = hasExactWordMatch(text, PROVINCIAL_KEYWORDS);
+  // FASE 3: detectPersonEntities
+  if (detectPersonEntities(combined)) {
+    const reason = 'Entidad persona detectada';
+    console.log(`[RECHAZADA] Título: "${title}" | Motivo: ${reason}`);
+    return { category: 'national', reason };
+  }
 
-  // 3. International keywords checklist (direct indicator of international news)
-  const INTERNATIONAL_KEYWORDS = [
-    'india', 'bangladesh', 'estados unidos', 'china', 'brasil', 'méxico', 'mexico', 
-    'francia', 'españa', 'espana', 'europa', 'onu', 'otan', 'rusia', 'ucrania', 
-    'israel', 'irán', 'iran', 'ee.uu.', 'eeuu', 'ee uu', 'onu', 'otan', 'nato',
-    'bernardo silva', 'bruno fernandes'
-  ];
-  const mentionsInternational = hasExactWordMatch(text, INTERNATIONAL_KEYWORDS);
+  // FASE 3 & 4: Check international indicators first
+  if (hasExactWordMatch(combined, INTERNATIONAL_INDICATORS)) {
+    const reason = 'Coincidencia con indicador internacional';
+    console.log(`[CLASIFICADOR] Título: "${title}" | Territorio: international | Motivo: ${reason}`);
+    return { category: 'international', reason };
+  }
+
+  // Exact local check from FASE 2
+  let hasLocalGeo = false;
+  let matchedKeyword = '';
+
+  for (const kw of LOCAL_KEYWORDS) {
+    const cleanKw = removeAccents(kw).toLowerCase();
+    const escapedKw = cleanKw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const regex = new RegExp(`\\b${escapedKw}\\b`, 'i');
+    if (regex.test(clean)) {
+      if (cleanKw === 'esperanza') {
+        const invalidEsperanza = [
+          /\bla esperanza\b/i,
+          /\besperanza de vida\b/i,
+          /\bsin esperanza\b/i,
+          /\bcon la esperanza\b/i,
+          /\bperder la esperanza\b/i,
+          /\bfe y esperanza\b/i,
+          /\btengo esperanza\b/i
+        ];
+        if (invalidEsperanza.some(pat => pat.test(clean))) {
+          continue;
+        }
+      }
+      
+      if (cleanKw === 'italia') {
+        const isBarrioItalia = /\bbarrio italia\b/i.test(clean);
+        if (!isBarrioItalia) {
+          continue;
+        }
+      }
+
+      hasLocalGeo = true;
+      matchedKeyword = kw;
+      break;
+    }
+  }
+
+  if (hasLocalGeo) {
+    const reason = `Coincidencia exacta: "${matchedKeyword}"`;
+    console.log(`[CLASIFICADOR] Título: "${title}" | Territorio: local | Localidad: ${matchedKeyword} | Motivo: Coincidencia exacta`);
+    return { category: 'local', reason };
+  }
+
+  if (hasExactWordMatch(combined, PROVINCIAL_KEYWORDS)) {
+    const reason = 'Coincidencia provincial';
+    console.log(`[CLASIFICADOR] Título: "${title}" | Territorio: provincial | Motivo: ${reason}`);
+    return { category: 'provincial', reason };
+  }
 
   const sourceRegion = getSourceRegion(source);
-
-  // Ambiguity / confidence check:
-  // If it mentions both local keywords and foreign keywords/international markers,
-  // it is highly ambiguous. In this case, we MUST classify as international or national, never local.
-  const isAmbiguous = mentionsLocal && (hasForeignMention || mentionsInternational);
-
-  // If there's a foreign mention or international mention and NO explicit local mention, it is definitely international.
-  // If it's ambiguous, classify as international or national.
-  if (hasForeignMention || mentionsInternational || isAmbiguous) {
-    if (hasForeignMention || mentionsInternational) {
-      return 'international';
-    }
-    return 'national';
-  }
-
-  // Precedence logic for local/provincial classification
-  if (mentionsLocal) {
-    return 'local';
-  }
-
-  if (mentionsProvincial) {
-    return 'provincial';
-  }
-
-  // Check local qualification constraint
-  const qualifiesAsLocal = sourceRegion === 'local' || mentionsLocal;
-
-  // Fallback default categorization by source
-  if (sourceRegion === 'local' && qualifiesAsLocal) {
-    return 'local';
-  }
-
-  if (sourceRegion === 'provincial') {
-    return 'provincial';
-  }
-
-  if (sourceRegion === 'national') {
-    return 'national';
-  }
-
-  if (sourceRegion === 'international') {
-    return 'international';
-  }
-
-  return defaultCategory || 'national';
+  const finalTerritory = sourceRegion || defaultCategory || 'national';
+  const reason = `Fallback por origen de fuente (${source})`;
+  console.log(`[CLASIFICADOR] Título: "${title}" | Territorio: ${finalTerritory} | Motivo: ${reason}`);
+  return { category: finalTerritory as RadarCategory, reason };
 };
 
 export const rssService = {
-  fetchNews: async (): Promise<{ items: NewsRadarItem[]; alerts: { title: string; severity: 'critical' | 'high'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string }[]; diagnostics: RssDiagnostic[] }> => {
+  fetchNews: async (): Promise<{ items: NewsRadarItem[]; alerts: { title: string; severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string; classificationReason?: string }[]; diagnostics: RssDiagnostic[] }> => {
     const allItems: NewsRadarItem[] = [];
-    const alerts: { title: string; severity: 'critical' | 'high'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string }[] = [];
+    const alerts: { title: string; severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string; classificationReason?: string }[] = [];
     const diagnostics: RssDiagnostic[] = [];
 
-    const results: any[] = [];
-    const batchSize = 10;
-    for (let i = 0; i < RSS_FEEDS.length; i += batchSize) {
-      const batch = RSS_FEEDS.slice(i, i + batchSize);
-      const batchPromises = batch.map(async (feed) => {
-        const diag: RssDiagnostic = {
-          id: feed.id,
-          name: feed.name,
-          url: feed.url || 'URL NO CONFIGURADA',
-          status: feed.connectionType === 'pending' ? 'PENDING' : 'OK',
-          itemCount: 0,
-          lastChecked: new Date().toISOString(),
-          connectionType: feed.connectionType,
-          responseTimeMs: 0
-        };
+    const promises = RSS_FEEDS.map(async (feed) => {
+      const diag: RssDiagnostic = {
+        id: feed.id,
+        name: feed.name,
+        url: feed.url || 'URL NO CONFIGURADA',
+        status: feed.connectionType === 'pending' ? 'PENDING' : 'OK',
+        itemCount: 0,
+        lastChecked: new Date().toISOString(),
+        connectionType: feed.connectionType,
+        responseTimeMs: 0
+      };
 
-        if (feed.connectionType === 'pending') {
-          diag.message = 'Pendiente de configuración';
-          return { items: [], diag };
-        }
+      if (feed.connectionType === 'pending') {
+        diag.message = 'Pendiente de configuración';
+        return { items: [], diag };
+      }
 
-        const feedItems: NewsRadarItem[] = [];
+      const feedItems: NewsRadarItem[] = [];
 
-        try {
-          const { data, methodUsed, responseTimeMs } = await supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
-          
-          diag.connectionType = methodUsed as ConnectionType;
-          diag.responseTimeMs = responseTimeMs;
-          let addedItems = 0;
-          
-          if (data && data.items && Array.isArray(data.items)) {
-            const scoredItems: {
-              item: any;
-              cleanSummary: string;
-              parsedDate: Date;
-              smartCategory: RadarCategory;
-              regionDetectada: string | null;
-              editorialScore: number;
-              reasons: string[];
-            }[] = [];
+      try {
+        const fetchPromise = supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
+        
+        const timeoutPromise = new Promise<{ data: any; methodUsed: ConnectionType | string; responseTimeMs: number }>((_, reject) => {
+          setTimeout(() => reject(new Error("Tiempo límite excedido para este feed (8s)")), 8000);
+        });
 
-            data.items.forEach((item: any) => {
-              const cleanSummary = (item.description || item.content || '').replace(/<[^>]+>/g, '').trim();
-              
-              // Validate date
-              const rawDate = item.pubDate || item.date;
-              if (!rawDate) {
-                console.log({
-                  titulo: item.title,
-                  fuente: feed.name,
-                  fecha: 'Ninguna',
-                  categoria: 'n/a',
-                  region: 'n/a',
-                  editorialScore: 0,
-                  motivoClasificacion: 'Descartada: Sin fecha'
-                });
-                return;
-              }
+        const { data, methodUsed, responseTimeMs } = await Promise.race([fetchPromise, timeoutPromise]);
+        
+        diag.connectionType = methodUsed as ConnectionType;
+        diag.responseTimeMs = responseTimeMs;
+        let addedItems = 0;
+        
+        if (data && data.items && Array.isArray(data.items)) {
+          const scoredItems: {
+            item: any;
+            cleanSummary: string;
+            parsedDate: Date;
+            smartCategory: RadarCategory;
+            regionDetectada: string | null;
+            editorialScore: number;
+            reasons: string[];
+            classificationReason: string;
+          }[] = [];
 
-              const parsedDate = new Date(rawDate);
-              if (isNaN(parsedDate.getTime())) {
-                console.log({
-                  titulo: item.title,
-                  fuente: feed.name,
-                  fecha: rawDate,
-                  categoria: 'n/a',
-                  region: 'n/a',
-                  editorialScore: 0,
-                  motivoClasificacion: 'Descartada: Fecha inválida'
-                });
-                return;
-              }
-
-              const now = new Date();
-              const diffMs = parsedDate.getTime() - now.getTime();
-              if (diffMs > 24 * 60 * 60 * 1000) {
-                console.log({
-                  titulo: item.title,
-                  fuente: feed.name,
-                  fecha: rawDate,
-                  categoria: 'n/a',
-                  region: 'n/a',
-                  editorialScore: 0,
-                  motivoClasificacion: 'Descartada: Fecha futura > 24hs'
-                });
-                return;
-              }
-
-              const smartCategory = detectTrueCategory(item.title, cleanSummary, feed.name, feed.defaultCategory);
-              
-              // Calculate score and reasons
-              const { score, reasons } = calculateEditorialScore(item.title, cleanSummary, smartCategory, feed.name);
-              const regionDetectada = detectExplicitLocality(item.title, cleanSummary);
-
-              scoredItems.push({
-                item,
-                cleanSummary,
-                parsedDate,
-                smartCategory,
-                regionDetectada,
-                editorialScore: score,
-                reasons
+          data.items.forEach((item: any) => {
+            const cleanSummary = (item.description || item.content || '').replace(/<[^>]+>/g, '').trim();
+            
+            // Validate date
+            const rawDate = item.pubDate || item.date;
+            if (!rawDate) {
+              console.log({
+                titulo: item.title,
+                fuente: feed.name,
+                fecha: 'Ninguna',
+                categoria: 'n/a',
+                region: 'n/a',
+                editorialScore: 0,
+                motivoClasificacion: 'Descartada: Sin fecha'
               });
+              return;
+            }
+
+            const parsedDate = new Date(rawDate);
+            if (isNaN(parsedDate.getTime())) {
+              console.log({
+                titulo: item.title,
+                fuente: feed.name,
+                fecha: rawDate,
+                categoria: 'n/a',
+                region: 'n/a',
+                editorialScore: 0,
+                motivoClasificacion: 'Descartada: Fecha inválida'
+              });
+              return;
+            }
+
+            const now = new Date();
+            const diffMs = parsedDate.getTime() - now.getTime();
+            if (diffMs > 24 * 60 * 60 * 1000) {
+              console.log({
+                titulo: item.title,
+                fuente: feed.name,
+                fecha: rawDate,
+                categoria: 'n/a',
+                region: 'n/a',
+                editorialScore: 0,
+                motivoClasificacion: 'Descartada: Fecha futura > 24hs'
+              });
+              return;
+            }
+
+            const { category: smartCategory, reason: classificationReason } = detectTrueCategory(item.title, cleanSummary, feed.name, feed.defaultCategory);
+            
+            // Calculate score and reasons
+            const { score, reasons } = calculateEditorialScore(item.title, cleanSummary, smartCategory, feed.name);
+            const regionDetectada = detectExplicitLocality(item.title, cleanSummary);
+
+            scoredItems.push({
+              item,
+              cleanSummary,
+              parsedDate,
+              smartCategory,
+              regionDetectada,
+              editorialScore: score,
+              reasons,
+              classificationReason
+            });
+          });
+
+          // Sort scoredItems by editorialScore descending
+          scoredItems.sort((a, b) => b.editorialScore - a.editorialScore);
+
+          // Select top 3 and log them
+          const selected = scoredItems.slice(0, 3);
+          const discarded = scoredItems.slice(3);
+
+          selected.forEach(x => {
+            console.log({
+              titulo: x.item.title,
+              fuente: feed.name,
+              fecha: x.item.pubDate || x.item.date,
+              categoria: x.smartCategory,
+              region: x.regionDetectada || 'Ninguna',
+              editorialScore: x.editorialScore,
+              motivoClasificacion: `SELECCIONADA (Top 3 del medio). Detalles: ${x.reasons.join(', ')}`
             });
 
-            // Sort scoredItems by editorialScore descending
-            scoredItems.sort((a, b) => b.editorialScore - a.editorialScore);
-
-            // Select top 3 and log them
-            const selected = scoredItems.slice(0, 3);
-            const discarded = scoredItems.slice(3);
-
-            selected.forEach(x => {
-              console.log({
-                titulo: x.item.title,
-                fuente: feed.name,
-                fecha: x.item.pubDate || x.item.date,
-                categoria: x.smartCategory,
-                region: x.regionDetectada || 'Ninguna',
-                editorialScore: x.editorialScore,
-                motivoClasificacion: `SELECCIONADA (Top 3 del medio). Detalles: ${x.reasons.join(', ')}`
-              });
-
-              // Process alerts (only for selected news)
-              const classification = classifyAlert(x.item.title, x.cleanSummary, x.smartCategory);
-              if (classification) {
-                alerts.push({
-                  title: x.item.title,
-                  severity: classification,
-                  sourceName: feed.name,
-                  sourceUrl: x.item.link || '',
-                  publishedAt: x.parsedDate.toISOString(),
-                  category: x.smartCategory,
-                  region: x.regionDetectada || undefined
-                });
-              }
-
-              feedItems.push({
-                id: `rss_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            // Process alerts (only for selected news)
+            const classification = classifyAlert(x.item.title, x.cleanSummary, x.smartCategory);
+            if (classification) {
+              alerts.push({
                 title: x.item.title,
-                summary: x.cleanSummary.substring(0, 200) + '...',
-                source: feed.name,
-                date: x.parsedDate.toISOString(),
+                severity: classification,
+                sourceName: feed.name,
+                sourceUrl: x.item.link || '',
+                publishedAt: x.parsedDate.toISOString(),
                 category: x.smartCategory,
-                editorialScore: x.editorialScore,
-                url: x.item.link
+                region: x.regionDetectada || undefined,
+                classificationReason: x.classificationReason
               });
-              addedItems++;
-            });
+            }
 
-            discarded.forEach(x => {
-              console.log({
-                titulo: x.item.title,
-                fuente: feed.name,
-                fecha: x.item.pubDate || x.item.date,
-                categoria: x.smartCategory,
-                region: x.regionDetectada || 'Ninguna',
-                editorialScore: x.editorialScore,
-                motivoClasificacion: `DESCARTADA (Superada por otros 3 del medio). Detalles: ${x.reasons.join(', ')}`
-              });
+            feedItems.push({
+              id: `rss_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+              title: x.item.title,
+              summary: x.cleanSummary.substring(0, 200) + '...',
+              source: feed.name,
+              date: x.parsedDate.toISOString(),
+              category: x.smartCategory,
+              editorialScore: x.editorialScore,
+              url: x.item.link
             });
-          }
-          
-          diag.itemCount = addedItems;
-        } catch (error: any) {
-          diag.status = 'ERROR';
-          diag.message = error.message || 'No se pudo conectar';
+            addedItems++;
+          });
+
+          discarded.forEach(x => {
+            console.log({
+              titulo: x.item.title,
+              fuente: feed.name,
+              fecha: x.item.pubDate || x.item.date,
+              categoria: x.smartCategory,
+              region: x.regionDetectada || 'Ninguna',
+              editorialScore: x.editorialScore,
+              motivoClasificacion: `DESCARTADA (Superada por otros 3 del medio). Detalles: ${x.reasons.join(', ')}`
+            });
+          });
         }
+        
+        diag.itemCount = addedItems;
+      } catch (error: any) {
+        diag.status = 'ERROR';
+        diag.message = error.message || 'No se pudo conectar';
+      }
 
-        return { items: feedItems, diag };
-      });
+      return { items: feedItems, diag };
+    });
 
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
-    }
+    const results = await Promise.all(promises);
 
     for (const result of results) {
       diagnostics.push(result.diag);

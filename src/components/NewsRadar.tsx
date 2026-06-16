@@ -9,7 +9,7 @@ import type { RadarCategory, NewsRadarItem } from '../types';
 
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { aiService } from '../services/aiService';
-import { isSimilarTitle } from '../services/rssService';
+import { isSimilarTitle, detectPersonEntities, removeAccents, hasExactWordMatch } from '../services/rssService';
 import { TextAutocompleteModal } from './TextAutocompleteModal';
 
 
@@ -22,7 +22,7 @@ const CATEGORY_CONFIG: Record<RadarCategory, { label: string; icon: React.Elemen
   international: { label: 'Internacional', icon: Globe, color: '#a855f7', bg: 'rgba(168,85,247,0.1)' }
 };
 
-const ALERT_KEYWORDS = ['accidente', 'choque', 'incendio', 'robo', 'allanamiento', 'homicidio', 'tormenta', 'evacuacion', 'evacuación', 'corte'];
+
 
 export const NewsRadar: React.FC = () => {
   const { 
@@ -116,10 +116,6 @@ export const NewsRadar: React.FC = () => {
     return inProposals || inCoverages;
   };
 
-  const isAlert = (title: string) => {
-    const lower = title.toLowerCase();
-    return ALERT_KEYWORDS.some(kw => lower.includes(kw));
-  };
 
   // Pure filtering: ONLY work with items that are NOT covered.
   const newItems = newsRadarItems.filter(i => !checkAlreadyCovered(i));
@@ -140,10 +136,56 @@ export const NewsRadar: React.FC = () => {
 
   // Geographical Priority — exact-word based, full coverage territory
   const getGeoPriority = (item: NewsRadarItem): number => {
-    const combined = `${item.source} ${item.title} ${item.summary}`.toLowerCase();
+    const combined = `${item.title} ${item.summary}`;
+    
+    // First, check for person entities (same as backend classifier)
+    if (detectPersonEntities(combined)) {
+      return item.category === 'international' ? 6 : 5;
+    }
+
+    const clean = removeAccents(combined).toLowerCase();
+
+    // Check international indicators (same as backend classifier)
+    const INTERNATIONAL_INDICATORS = [
+      'iran', 'israel', 'ucrania', 'segunda guerra mundial', 'bbc', 'dw', 'guerra', 'naciones unidas',
+      'estados unidos', 'ee.uu.', 'eeuu', 'ee uu', 'francia', 'alemania', 'rusia', 'china', 'roma',
+      'madrid', 'españa', 'espana', 'brasil', 'chile', 'uruguay', 'paraguay', 'bolivia', 'peru', 'perú',
+      'colombia', 'venezuela', 'europa', 'asia', 'oriente medio', 'gaza', 'palestina', 'biden', 'putin', 'netanyahu',
+      'londres', 'reino unido', 'uk', 'parís', 'paris', 'tokio', 'japon', 'japón', 'italia', 'vaticano'
+    ];
+    if (hasExactWordMatch(combined, INTERNATIONAL_INDICATORS)) {
+      // If it contains "italia", check if it's "barrio italia"
+      const hasItaliaOnly = clean.includes('italia') && !/\bbarrio italia\b/i.test(clean);
+      if (hasItaliaOnly || hasExactWordMatch(combined, INTERNATIONAL_INDICATORS.filter(x => x !== 'italia'))) {
+        return 6;
+      }
+    }
+
     const hasWord = (words: string[]) => words.some(w => {
-      const escaped = w.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-      return new RegExp(`\\b${escaped}\\b`).test(combined);
+      const cleanW = removeAccents(w).toLowerCase();
+      const escaped = cleanW.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+      if (regex.test(clean)) {
+        if (cleanW === 'esperanza') {
+          const invalidEsperanza = [
+            /\bla esperanza\b/i,
+            /\besperanza de vida\b/i,
+            /\bsin esperanza\b/i,
+            /\bcon la esperanza\b/i,
+            /\bperder la esperanza\b/i,
+            /\bfe y esperanza\b/i,
+            /\btengo esperanza\b/i
+          ];
+          if (invalidEsperanza.some(pat => pat.test(clean))) {
+            return false;
+          }
+        }
+        if (cleanW === 'italia') {
+          return /\bbarrio italia\b/i.test(clean);
+        }
+        return true;
+      }
+      return false;
     });
 
     // P1: Rafaela (máxima prioridad absoluta)
@@ -332,7 +374,6 @@ export const NewsRadar: React.FC = () => {
     const isExpanded = expandedId === item.id;
     const isGenerating = generatingId === item.id;
     const isSending = sendingId === item.id;
-    const alertFlag = isAlert(item.title);
     const timeFormatted = formatFriendlyTime(item.date);
     const geoText = getGeoLocationText(item);
     
@@ -341,7 +382,7 @@ export const NewsRadar: React.FC = () => {
         key={item.id} 
         className="card"
         style={{
-          borderLeft: alertFlag ? '4px solid #ef4444' : `4px solid ${catConfig.color}`,
+          borderLeft: `4px solid ${catConfig.color}`,
           transition: 'all 0.2s',
           position: 'relative',
           marginBottom: '0.75rem',
@@ -353,10 +394,10 @@ export const NewsRadar: React.FC = () => {
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
           <div style={{
             width: '36px', height: '36px', borderRadius: 'var(--radius-md)',
-            backgroundColor: alertFlag ? 'rgba(239,68,68,0.1)' : catConfig.bg,
+            backgroundColor: catConfig.bg,
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
           }}>
-            {alertFlag ? <AlertTriangle size={18} style={{ color: '#ef4444' }} /> : <CatIcon size={18} style={{ color: catConfig.color }} />}
+            <CatIcon size={18} style={{ color: catConfig.color }} />
           </div>
           
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -364,12 +405,6 @@ export const NewsRadar: React.FC = () => {
               <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                 {timeFormatted}
               </span>
-              
-              {alertFlag && (
-                <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', color: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', padding: '0.1rem 0.4rem', borderRadius: 'var(--radius-full)', display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
-                  <AlertTriangle size={10} /> Alerta
-                </span>
-              )}
 
               <span style={{
                 fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase',
@@ -647,84 +682,165 @@ export const NewsRadar: React.FC = () => {
                 gap: '0.5rem'
               }}>
                 <AlertTriangle size={16} />
-                ALERTAS RECIENTES
+                MONITOREO EDITORIAL
               </div>
               <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {(() => {
+                  // Alertas locales críticas y urgentes - monitoreo editorial (máximo 10)
                   const activeSidebarAlerts = alerts
-                    .filter(a => a.status === 'active' && !closedAlertIds.has(a.id))
+                    .filter(a =>
+                      a.status === 'active' &&
+                      !closedAlertIds.has(a.id) &&
+                      a.category === 'local' &&
+                      (a.severity === 'critical' || a.severity === 'urgent' || a.severity === 'high')
+                    )
                     .sort((a, b) => {
-                      const severityOrder = { critical: 0, high: 1, medium: 2 };
-                      const orderA = severityOrder[a.severity] ?? 99;
-                      const orderB = severityOrder[b.severity] ?? 99;
-                      return orderA - orderB;
+                      // 1. Gravedad
+                      const severityOrder = { critical: 0, urgent: 1, high: 2, medium: 3, normal: 4 };
+                      const orderA = severityOrder[a.severity as keyof typeof severityOrder] ?? 99;
+                      const orderB = severityOrder[b.severity as keyof typeof severityOrder] ?? 99;
+                      if (orderA !== orderB) return orderA - orderB;
+
+                      // 2. Cercanía territorial
+                      const getProximityPriority = (region?: string): number => {
+                        if (!region) return 3;
+                        const name = region.toLowerCase();
+                        if (name.includes('rafaela') || name.includes('castellanos')) return 1;
+                        if (name.includes('sunchales') || name.includes('san cristobal') || name.includes('san cristóbal') || name.includes('esperanza')) return 2;
+                        return 3;
+                      };
+                      const prioA = getProximityPriority(a.region);
+                      const prioB = getProximityPriority(b.region);
+                      if (prioA !== prioB) return prioA - prioB;
+
+                      // 3. Fecha de publicación/detección (más reciente primero)
+                      const timeA = new Date(a.publishedAt || a.timestamp).getTime();
+                      const timeB = new Date(b.publishedAt || b.timestamp).getTime();
+                      return timeB - timeA;
                     });
 
                   if (activeSidebarAlerts.length === 0) {
-                    return <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Sin alertas de redacción activas.</span>;
+                    return (
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Sin alertas locales críticas o urgentes activas.
+                      </span>
+                    );
                   }
 
-                  return activeSidebarAlerts.slice(0, 5).map(alert => {
-                    let badgeColor = '#ef4444';
-                    let badgeBg = 'rgba(239,68,68,0.1)';
-                    let badgeLabel = '🔴 Crítica';
-                    
-                    if (alert.severity === 'high') {
-                      badgeColor = '#f97316';
-                      badgeBg = 'rgba(249,115,22,0.1)';
-                      badgeLabel = '🟠 Alta';
-                    } else if (alert.severity === 'medium') {
-                      badgeColor = '#eab308';
-                      badgeBg = 'rgba(234,179,8,0.1)';
-                      badgeLabel = '🟡 Media';
-                    }
+                  return activeSidebarAlerts.slice(0, 10).map(alert => {
+                    const isCritical = alert.severity === 'critical';
+                    const badgeColor = isCritical ? '#ef4444' : '#f97316';
+                    const badgeBg = isCritical ? 'rgba(239,68,68,0.1)' : 'rgba(249,115,22,0.1)';
+                    const badgeLabel = isCritical ? '🔴 CRÍTICA' : '🟠 URGENTE';
 
                     return (
-                      <div key={alert.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.75rem', paddingTop: '0.25rem' }}>
-                        <span style={{ 
-                          fontSize: '0.65rem', 
-                          fontWeight: 700, 
-                          color: badgeColor, 
-                          backgroundColor: badgeBg, 
-                          padding: '0.1rem 0.4rem', 
-                          borderRadius: 'var(--radius-sm)', 
-                          display: 'inline-block', 
-                          marginBottom: '0.2rem' 
+                      <div
+                        key={alert.id}
+                        style={{
+                          borderLeft: `3px solid ${badgeColor}`,
+                          paddingLeft: '0.6rem',
+                          paddingBottom: '0.75rem',
+                          paddingTop: '0.35rem',
+                          marginBottom: '0.5rem',
+                          borderBottom: '1px solid var(--border-color)'
+                        }}
+                      >
+                        {/* Badge de severidad */}
+                        <span style={{
+                          fontSize: '0.6rem',
+                          fontWeight: 800,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.05em',
+                          color: badgeColor,
+                          backgroundColor: badgeBg,
+                          padding: '0.1rem 0.4rem',
+                          borderRadius: 'var(--radius-sm)',
+                          display: 'inline-block',
+                          marginBottom: '0.3rem'
                         }}>
                           {badgeLabel}
                         </span>
-                        <h5 style={{ margin: '0 0 0.35rem 0', fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+
+                        {/* Título */}
+                        <h5 style={{
+                          margin: '0 0 0.4rem 0',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          color: 'var(--text-primary)',
+                          lineHeight: 1.35
+                        }}>
                           {alert.title.replace('[RADAR] ', '')}
                         </h5>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.15rem', fontSize: '0.7rem', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
-                          {alert.sourceName && <span><strong>Fuente:</strong> {alert.sourceName}</span>}
-                          {alert.publishedAt && <span><strong>Publicado:</strong> {new Date(alert.publishedAt).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs</span>}
-                          {alert.region && <span><strong>Región:</strong> {alert.region}</span>}
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem' }}>
-                          {alert.sourceUrl && (
-                            <a 
-                              href={alert.sourceUrl} 
-                              target="_blank" 
-                              rel="noreferrer" 
-                              style={{ 
-                                fontSize: '0.7rem', 
-                                color: 'var(--primary)', 
-                                textDecoration: 'underline',
-                                fontWeight: 600,
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.15rem'
-                              }}
-                            >
-                              <ExternalLink size={10} />
-                              Ver fuente
-                            </a>
+
+                        {/* Trazabilidad completa */}
+                        <div style={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '0.2rem',
+                          fontSize: '0.68rem',
+                          color: 'var(--text-secondary)',
+                          marginBottom: '0.4rem'
+                        }}>
+                          {alert.sourceName && (
+                            <span>
+                              <strong>Fuente:</strong> {alert.sourceName}
+                            </span>
                           )}
-                          <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>
-                            {new Date(alert.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })} hs
-                          </span>
+                          {alert.region && (
+                            <span>
+                              <strong>Región:</strong> {alert.region}
+                            </span>
+                          )}
+                          {alert.publishedAt && (
+                            <span>
+                              <strong>Publicada:</strong>{' '}
+                              {new Date(alert.publishedAt).toLocaleString('es-AR', {
+                                day: '2-digit', month: '2-digit', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              })} hs
+                            </span>
+                          )}
+                          {alert.timestamp && (
+                            <span>
+                              <strong>Detectada:</strong>{' '}
+                              {new Date(alert.timestamp).toLocaleString('es-AR', {
+                                day: '2-digit', month: '2-digit', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              })} hs
+                            </span>
+                          )}
+                          {alert.category && (
+                            <span>
+                              <strong>Territorio:</strong> <span style={{ textTransform: 'capitalize' }}>{alert.category}</span>
+                            </span>
+                          )}
+                          {alert.classificationReason && (
+                            <span>
+                              <strong>Motivo:</strong> {alert.classificationReason}
+                            </span>
+                          )}
                         </div>
+
+                        {/* Enlace a la fuente original */}
+                        {alert.sourceUrl && (
+                          <a
+                            href={alert.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{
+                              fontSize: '0.68rem',
+                              color: 'var(--primary)',
+                              textDecoration: 'underline',
+                              fontWeight: 600,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.15rem'
+                            }}
+                          >
+                            <ExternalLink size={10} />
+                            Ver noticia original
+                          </a>
+                        )}
                       </div>
                     );
                   });

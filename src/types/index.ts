@@ -174,7 +174,7 @@ export interface Alert {
   id: string;
   title: string;
   timestamp: string;
-  severity: 'critical' | 'high' | 'medium';
+  severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal';
   status: 'active' | 'followed_up';
   assigneeId?: string;
   coverageId?: string;
@@ -183,6 +183,7 @@ export interface Alert {
   publishedAt?: string;
   category?: string;
   region?: string;
+  classificationReason?: string;
 }
 
 export interface Activity {

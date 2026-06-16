@@ -102,7 +102,13 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [alerts, setAlerts] = useState<Alert[]>(() => {
     const saved = localStorage.getItem('hub_alerts');
-    return saved ? JSON.parse(saved) : INITIAL_ALERTS;
+    if (saved) {
+      // Filtrar alertas demo/hardcodeadas heredadas del localStorage
+      const LEGACY_DEMO_IDS = ['a1', 'a2'];
+      const parsed = JSON.parse(saved) as Alert[];
+      return parsed.filter(a => !LEGACY_DEMO_IDS.includes(a.id));
+    }
+    return INITIAL_ALERTS;
   });
 
   const [closedAlertIds, setClosedAlertIds] = useState<Set<string>>(() => {
@@ -173,13 +179,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { rssService } = await import('../services/rssService');
       
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("El análisis de fuentes excedió el tiempo límite (35s).")), 35000)
-      );
-
-      const fetchPromise = rssService.fetchNews();
-
-      const result = await Promise.race([fetchPromise, timeoutPromise]) as any;
+      const result = await rssService.fetchNews();
       const { items, alerts: newAlerts, diagnostics } = result;
 
       if (items.length > 0) {

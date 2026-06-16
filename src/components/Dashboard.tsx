@@ -119,14 +119,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
     return a.priorityIndex - b.priorityIndex;
   });
 
-  // Filter alerts: only critical + high, active, not closed
+  // Alertas locales operativas: solo categoría 'local', critical o urgent (o high), activas
   const activeAlerts = useMemo(() => {
     return alerts
-      .filter(a => a.status === 'active' && !closedAlertIds.has(a.id) && (a.severity === 'critical' || a.severity === 'high'))
+      .filter(a =>
+        a.status === 'active' &&
+        !closedAlertIds.has(a.id) &&
+        (a.severity === 'critical' || a.severity === 'urgent' || a.severity === 'high') &&
+        a.category === 'local' // Solo alertas locales en el Dashboard
+      )
       .sort((a, b) => {
-        const severityOrder = { critical: 0, high: 1, medium: 2 };
-        const orderA = severityOrder[a.severity] ?? 99;
-        const orderB = severityOrder[b.severity] ?? 99;
+        const severityOrder = { critical: 0, urgent: 1, high: 2, medium: 3, normal: 4 };
+        const orderA = severityOrder[a.severity as keyof typeof severityOrder] ?? 99;
+        const orderB = severityOrder[b.severity as keyof typeof severityOrder] ?? 99;
         return orderA - orderB;
       });
   }, [alerts, closedAlertIds]);
@@ -326,7 +331,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
           }} onClick={() => setAlertsExpanded(prev => !prev)}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.9rem' }}>
               <AlertTriangle size={18} style={{ color: 'var(--danger-text)' }} />
-              <span>ALERTAS DE REDACCIÓN ({activeAlerts.length})</span>
+              <span>ALERTAS LOCALES — MOVILIZACIÓN ({activeAlerts.length})</span>
             </div>
             <button 
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.8rem', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}
@@ -340,19 +345,54 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
               {activeAlerts.map(alert => (
                 <div key={alert.id} className={`urgent-banner severity-${alert.severity}`} style={{ margin: 0, position: 'relative' }}>
                   <span className={`urgent-badge badge-${alert.severity}`}>
-                    {alert.severity === 'critical' ? '🔴 Crítica' : alert.severity === 'high' ? '🟠 Alta' : '🟡 Media'}
+                    {alert.severity === 'critical' ? '🔴 Crítica' : alert.severity === 'urgent' ? '🟠 Urgente' : alert.severity === 'high' ? '🟠 Alta' : '🟡 Media'}
                   </span>
                   <div className="urgent-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                     <h4 className="urgent-title" style={{ paddingRight: '2.5rem', margin: 0, fontWeight: 700, fontSize: '0.92rem' }}>{alert.title}</h4>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
                       {alert.sourceName && <span><strong>Fuente:</strong> {alert.sourceName}</span>}
-                      {alert.publishedAt && <span><strong>Publicado:</strong> {new Date(alert.publishedAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })} hs</span>}
-                      {alert.category && <span><strong>Categoría:</strong> <span style={{ textTransform: 'capitalize' }}>{alert.category}</span></span>}
-                      {alert.region && <span><strong>Región:</strong> {alert.region}</span>}
+                      {alert.sourceUrl && (
+                        <span>
+                          <strong>URL original:</strong>{' '}
+                          <a href={alert.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', textDecoration: 'underline' }}>
+                            {alert.sourceUrl.substring(0, 35)}...
+                          </a>
+                        </span>
+                      )}
+                      {alert.publishedAt && (
+                        <span>
+                          <strong>Publicado:</strong>{' '}
+                          {new Date(alert.publishedAt).toLocaleString('es-AR', {
+                            day: '2-digit', month: '2-digit', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit'
+                          })} hs
+                        </span>
+                      )}
+                      {alert.category && (
+                        <span>
+                          <strong>Territorio:</strong>{' '}
+                          <span style={{ textTransform: 'capitalize' }}>{alert.category}</span>
+                        </span>
+                      )}
+                      {alert.region && (
+                        <span>
+                          <strong>Región:</strong> {alert.region}
+                        </span>
+                      )}
+                      {alert.classificationReason && (
+                        <span>
+                          <strong>Motivo:</strong> {alert.classificationReason}
+                        </span>
+                      )}
                     </div>
                     <div className="urgent-time" style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                       <Clock size={10} style={{ display: 'inline', marginRight: '3px', verticalAlign: 'middle' }} />
-                      Detectado: {new Date(alert.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+                      Detectado:{' '}
+                      {new Date(alert.timestamp).toLocaleString('es-AR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric',
+                        hour: '2-digit', minute: '2-digit'
+                      })}{' '}
+                      hs
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>

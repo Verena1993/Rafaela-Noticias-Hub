@@ -145,12 +145,6 @@ export const supabaseRadarGateway = {
         const res = await fetch(`/rss-local-proxy?url=${encodeURIComponent(url)}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         
-        // Fast fail: if the target returned 404 or 403, we know it's dead or Cloudflare-blocked.
-        // Bypasses other proxies to prevent cascading timeouts.
-        if (res.status === 404 || res.status === 403) {
-          throw new Error(`Upstream returned status ${res.status} (dead or blocked)`);
-        }
-
         if (res.ok) {
           const xmlText = await res.text();
           const parsedItems = parseRssXml(xmlText);
@@ -162,12 +156,10 @@ export const supabaseRadarGateway = {
             };
           }
         }
+        // If 403/404 or empty: fall through to other proxies (don't abort the chain)
       } catch (e: any) {
-        // If it was a dead URL or blocked status, re-throw to abort immediately and skip other proxies!
-        if (e.message?.includes('dead or blocked')) {
-          throw e;
-        }
-        // For other network/connection errors, proceed to standard fallback chain
+        // For any error, proceed to standard fallback chain (edge function, rss2json, etc.)
+        console.warn(`Local proxy failed for ${url}: ${e.message}`);
       }
     }
 

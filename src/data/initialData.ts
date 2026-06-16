@@ -331,8 +331,8 @@ export const INITIAL_TASKS: Task[] = [
 ];
 
 export const INITIAL_ALERTS: Alert[] = [
-  { id: 'a1', title: '¡Urgente! Incendio de vivienda en Barrio Alberdi. Bomberos en camino.', timestamp: '2026-06-04T08:15:00', severity: 'critical', status: 'active', sourceName: 'Diario Castellanos', sourceUrl: 'https://diariocastellanos.com.ar', publishedAt: '2026-06-04T08:10:00', category: 'local', region: 'Rafaela' },
-  { id: 'a2', title: 'Alerta vial: Corte total en Av. Santa Fe por reclamo vecinal.', timestamp: '2026-06-04T08:25:00', severity: 'high', status: 'active', sourceName: 'Radio Rafaela', sourceUrl: 'https://radiorafaela.com.ar', publishedAt: '2026-06-04T08:20:00', category: 'local', region: 'Rafaela' }
+  // Solo alertas reales generadas por el sistema RSS.
+  // NO agregar datos de ejemplo aquí.
 ];
 
 export const INITIAL_EVENTS: CalendarEvent[] = [
@@ -439,7 +439,7 @@ export const INITIAL_EVENTS: CalendarEvent[] = [
 export const INITIAL_NOTIFICATIONS: Notification[] = [
   { id: 'n1', title: 'Nueva Cobertura Asignada', message: 'Se te asignó en: Grave choque múltiple en la Ruta Nacional 34.', timestamp: '2026-06-04T07:20:00', read: false, type: 'coverage', linkId: 'c1' },
   { id: 'n2', title: 'Nuevo Comentario', message: 'Mariano Editor te mencionó en un comentario de la cobertura.', timestamp: '2026-06-04T07:51:00', read: false, type: 'comment', linkId: 'c1' },
-  { id: 'n3', title: 'Alerta Crítica', message: '¡Urgente! Incendio de vivienda en Barrio Alberdi.', timestamp: '2026-06-04T08:15:00', read: false, type: 'alert' }
+  // Notificación de alerta demo eliminada — solo alertas reales del Radar
 ];
 
 export const INITIAL_PROPOSALS: Proposal[] = [
