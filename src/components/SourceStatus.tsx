@@ -151,7 +151,7 @@ export const SourceStatus: React.FC<SourceStatusProps> = ({ diagnostics, onRefre
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-tertiary)' }}>
-                    {['Medio', 'URL RSS', 'Estado', 'Últ. actualización', 'Noticias', 'Respuesta', 'Conexión', 'Error detectado'].map(col => (
+                    {['Medio', 'URL RSS', 'Estado', 'Motivo', 'Últ. actualización', 'Noticias', 'Respuesta', 'Conexión', 'Error detectado'].map(col => (
                       <th key={col} style={{
                         padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 700,
                         color: 'var(--text-secondary)', fontSize: '0.7rem',
@@ -219,6 +219,25 @@ export const SourceStatus: React.FC<SourceStatusProps> = ({ diagnostics, onRefre
                           }}>
                             {badge.icon} {badge.label}
                           </span>
+                        </td>
+
+                        {/* Motivo */}
+                        <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 700 }}>
+                          {isPending ? (
+                            <span style={{ color: '#6b7280' }}>Pendiente</span>
+                          ) : diag?.reason ? (
+                            <span style={{
+                              color: diag.reason === 'Activa' 
+                                ? '#22c55e' 
+                                : diag.reason === 'Sin artículos detectados' 
+                                ? '#f59e0b'
+                                : '#ef4444'
+                            }}>
+                              {diag.reason}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
                         </td>
 
                          {/* Última actualización */}

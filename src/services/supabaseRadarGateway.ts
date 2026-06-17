@@ -53,7 +53,7 @@ const scrapeLaOpinion = (html: string): any[] => {
       link = 'https://www.diariolaopinion.com.ar' + link;
     }
     const title = decodeHtmlEntities(linkTitleMatch[2].replace(/<[^>]+>/g, '').trim());
-    if (title.length < 10) continue;
+    if (title.length < 10 || /^(https?:\/\/|www\.)/i.test(title)) continue;
 
     let description = '';
     const bajadaMatch = articleHtml.match(/class="bajada"[^>]*>\s*<span[^>]*>([\s\S]*?)<\/span>/i) ||
@@ -84,7 +84,7 @@ const scrapeLaOpinion = (html: string): any[] => {
       let link = backupMatch[1];
       if (link.startsWith('/')) link = 'https://www.diariolaopinion.com.ar' + link;
       const title = decodeHtmlEntities(backupMatch[2].trim());
-      if (title.length >= 10 && !items.some(x => x.link === link)) {
+      if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
         items.push({
           title,
           link,
@@ -116,7 +116,7 @@ const scrapeRafaelaInforma = (xmlOrHtml: string): any[] => {
       const rawTitle = slug.replace(/-/g, ' ').replace(/%[0-9a-f]{2}/gi, '');
       const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
 
-      if (title.length >= 10 && !items.some(x => x.link === url)) {
+      if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === url)) {
         items.push({
           title: title.trim(),
           link: url,
@@ -153,7 +153,7 @@ const scrapeRafaelaInforma = (xmlOrHtml: string): any[] => {
       link = 'https://rafaelainforma.com' + link;
     }
     const title = decodeHtmlEntities(titleMatch[2].replace(/<[^>]+>/g, '').trim());
-    if (title.length < 10 || items.some(x => x.link === link)) continue;
+    if (title.length < 10 || /^(https?:\/\/|www\.)/i.test(title) || items.some(x => x.link === link)) continue;
 
     // Extract date from <span class="fecha">DD/MM/YYYY</span>
     let pubDate = new Date().toISOString();
@@ -181,6 +181,114 @@ const scrapeRafaelaInforma = (xmlOrHtml: string): any[] => {
   return items;
 };
 
+const scrapeRadioRafaela = (html: string): any[] => {
+  const items: any[] = [];
+  let match;
+
+  // 1. Primary/Hero Note
+  const primaryRegex = /class="[^"]*PrimaryNote_PrimaryNoteLink[^"]*"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<h\d[^>]*class="[^"]*PrimaryNote_PrimaryNoteTitle[^"]*"[^>]*>([\s\S]*?)<\/h\d>/gi;
+  while ((match = primaryRegex.exec(html)) !== null) {
+    let link = match[1];
+    if (link.startsWith('/')) link = 'https://radiorafaela.com.ar' + link;
+    const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim());
+    if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
+      items.push({
+        title,
+        link,
+        pubDate: new Date().toISOString(),
+        description: title,
+        content: title,
+        author: 'Radio Rafaela'
+      });
+    }
+  }
+
+  // 2. Secondary Notes
+  const secondaryRegex = /<a[^>]*href="([^"]+)"[^>]*aria-label="([^"]+)"[^>]*class="[^"]*SecondaryNotes_SecondaryNotesLink[^"]*"/gi;
+  while ((match = secondaryRegex.exec(html)) !== null) {
+    let link = match[1];
+    if (link.startsWith('/')) link = 'https://radiorafaela.com.ar' + link;
+    const title = decodeHtmlEntities(match[2].replace(/&quot;/g, '"').trim());
+    if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
+      items.push({
+        title,
+        link,
+        pubDate: new Date().toISOString(),
+        description: title,
+        content: title,
+        author: 'Radio Rafaela'
+      });
+    }
+  }
+
+  // 3. General Notes / standard list
+  const generalRegex = /<a[^>]*href="([^"]+)"[^>]*class="[^"]*Note_NoteTitleLink[^"]*"[^>]*>\s*<h\d[^>]*class="[^"]*Note_NoteTitle[^"]*"[^>]*>([\s\S]*?)<\/h\d>/gi;
+  while ((match = generalRegex.exec(html)) !== null) {
+    let link = match[1];
+    if (link.startsWith('/')) link = 'https://radiorafaela.com.ar' + link;
+    const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim());
+    if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
+      items.push({
+        title,
+        link,
+        pubDate: new Date().toISOString(),
+        description: title,
+        content: title,
+        author: 'Radio Rafaela'
+      });
+    }
+  }
+
+  return items;
+};
+
+const scrapeDiarioCastellanos = (html: string): any[] => {
+  const items: any[] = [];
+  const titleRegex = /<(?:h[1-6]|div|span)[^>]*class="[^"]*(?:tdb_module_title|tdb-module-title|td-module-title|entry-title)[^"]*"[^>]*>\s*(?:<style[\s\S]*?<\/style>\s*)*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = titleRegex.exec(html)) !== null) {
+    let link = match[1];
+    const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim());
+    if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
+      let pubDate = new Date().toISOString();
+      const dateMatch = link.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
+      if (dateMatch) {
+        pubDate = new Date(`${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}T12:00:00Z`).toISOString();
+      }
+      items.push({
+        title,
+        link,
+        pubDate,
+        description: title,
+        content: title,
+        author: 'Diario Castellanos'
+      });
+    }
+  }
+  return items;
+};
+
+const scrapeMinutoRafaela = (html: string): any[] => {
+  const items: any[] = [];
+  const titleRegex = /<h\d[^>]*class="[^"]*thumb-info-inner[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = titleRegex.exec(html)) !== null) {
+    let link = match[1];
+    const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim());
+    if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
+      items.push({
+        title,
+        link,
+        pubDate: new Date().toISOString(),
+        description: title,
+        content: title,
+        author: 'Minuto Rafaela'
+      });
+    }
+  }
+  return items;
+};
+
 const scrapeAdn979 = (html: string): any[] => {
   const items: any[] = [];
   const h3Regex = /<h3[^>]*>([\s\S]*?)<\/h3>/gi;
@@ -194,7 +302,7 @@ const scrapeAdn979 = (html: string): any[] => {
         link = 'https://adn979.com' + link;
       }
       const title = decodeHtmlEntities(linkMatch[2].replace(/<[^>]+>/g, '').trim());
-      if (title.length >= 10 && !items.some(x => x.link === link)) {
+      if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
         items.push({
           title,
           link,
@@ -222,6 +330,15 @@ const parseRssXml = (xmlText: string, targetUrl?: string): any[] => {
     }
     if (targetUrl.includes('rafaelainforma.com')) {
       return scrapeRafaelaInforma(xmlText);
+    }
+    if (targetUrl.includes('radiorafaela.com.ar')) {
+      return scrapeRadioRafaela(xmlText);
+    }
+    if (targetUrl.includes('diariocastellanos.com.ar')) {
+      return scrapeDiarioCastellanos(xmlText);
+    }
+    if (targetUrl.includes('minutorafaela.com.ar')) {
+      return scrapeMinutoRafaela(xmlText);
     }
     if (targetUrl.includes('adn979.com')) {
       return scrapeAdn979(xmlText);
@@ -363,6 +480,8 @@ export const supabaseRadarGateway = {
       window.location.hostname === '127.0.0.1' || 
       window.location.hostname.startsWith('192.168.'));
 
+    const errors: string[] = [];
+
     // Attempt 0: Local Dev RSS Proxy (High Priority fallback for local development)
     if (isLocal) {
       try {
@@ -382,9 +501,14 @@ export const supabaseRadarGateway = {
               methodUsed: preferredType === 'html_scraping' ? 'html_scraping' : 'local_proxy',
               responseTimeMs: Math.round(performance.now() - start)
             };
+          } else {
+            errors.push(`local_proxy: No items parsed`);
           }
+        } else {
+          errors.push(`local_proxy: Status ${res.status}`);
         }
       } catch (e: any) {
+        errors.push(`local_proxy: ${e.message}`);
         console.warn(`Local proxy failed for ${url}: ${e.message}`);
       }
     }
@@ -399,8 +523,12 @@ export const supabaseRadarGateway = {
         const data = await res.json();
         if (data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
           return { data, methodUsed: 'google_news', responseTimeMs: Math.round(performance.now() - start) };
+        } else {
+          errors.push(`google_news: Status ${data.status} or 0 items`);
         }
-      } catch (e) {}
+      } catch (e: any) {
+        errors.push(`google_news: ${e.message}`);
+      }
     }
 
     // Special handling for html_scraping preferred type
@@ -419,9 +547,14 @@ export const supabaseRadarGateway = {
               methodUsed: 'html_scraping',
               responseTimeMs: Math.round(performance.now() - start)
             };
+          } else {
+            errors.push(`html_scraping_direct: No items parsed`);
           }
+        } else {
+          errors.push(`html_scraping_direct: Status ${directRes.status}`);
         }
-      } catch (directErr) {
+      } catch (directErr: any) {
+        errors.push(`html_scraping_direct: ${directErr.message}`);
         console.warn(`Direct fetch failed for scraping ${url}:`, directErr);
       }
     }
@@ -442,9 +575,14 @@ export const supabaseRadarGateway = {
               methodUsed: 'rss_direct',
               responseTimeMs: Math.round(performance.now() - start)
             };
+          } else {
+            errors.push(`rss_direct: No items parsed`);
           }
+        } else {
+          errors.push(`rss_direct: Status ${directRes.status}`);
         }
-      } catch (directErr) {
+      } catch (directErr: any) {
+        errors.push(`rss_direct: ${directErr.message}`);
         console.warn(`Direct fetch failed first for ${url}:`, directErr);
       }
     }
@@ -468,8 +606,12 @@ export const supabaseRadarGateway = {
 
       if (!error && data && data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
         return { data, methodUsed: preferredType === 'html_scraping' ? 'html_scraping' : 'edge_function', responseTimeMs: Math.round(performance.now() - start) };
+      } else {
+        errors.push(`edge_function: ${error ? error.message : '0 items'}`);
       }
-    } catch (e) {}
+    } catch (e: any) {
+      errors.push(`edge_function: ${e.message}`);
+    }
 
     // Try Attempt 2: rss2json_proxy
     if (preferredType !== 'html_scraping') {
@@ -482,8 +624,12 @@ export const supabaseRadarGateway = {
         
         if (data.status === 'ok' && Array.isArray(data.items) && data.items.length > 0) {
           return { data, methodUsed: 'rss2json_proxy', responseTimeMs: Math.round(performance.now() - start) };
+        } else {
+          errors.push(`rss2json_proxy: Status ${data.status} or 0 items`);
         }
-      } catch (e) {}
+      } catch (e: any) {
+        errors.push(`rss2json_proxy: ${e.message}`);
+      }
     }
 
     // Try Attempt 3: AllOrigins proxy with client-side XML parser
@@ -501,9 +647,15 @@ export const supabaseRadarGateway = {
             methodUsed: preferredType === 'html_scraping' ? 'html_scraping' : 'allorigins_proxy',
             responseTimeMs: Math.round(performance.now() - start)
           };
+        } else {
+          errors.push(`allorigins: No items parsed`);
         }
+      } else {
+        errors.push(`allorigins: Status ${res.status}`);
       }
-    } catch (e) {}
+    } catch (e: any) {
+      errors.push(`allorigins: ${e.message}`);
+    }
 
     // Try Attempt 4: Corsproxy.io with client-side XML parser
     try {
@@ -520,9 +672,15 @@ export const supabaseRadarGateway = {
             methodUsed: preferredType === 'html_scraping' ? 'html_scraping' : 'corsproxy_proxy',
             responseTimeMs: Math.round(performance.now() - start)
           };
+        } else {
+          errors.push(`corsproxy: No items parsed`);
         }
+      } else {
+        errors.push(`corsproxy: Status ${res.status}`);
       }
-    } catch (e) {}
+    } catch (e: any) {
+      errors.push(`corsproxy: ${e.message}`);
+    }
 
     // Try Attempt 5: Direct fetch (as absolute last resort)
     try {
@@ -539,9 +697,32 @@ export const supabaseRadarGateway = {
             methodUsed: preferredType === 'html_scraping' ? 'html_scraping' : 'rss_direct',
             responseTimeMs: Math.round(performance.now() - start)
           };
+        } else {
+          errors.push(`rss_direct_last: No items parsed`);
         }
+      } else {
+        errors.push(`rss_direct_last: Status ${directRes.status}`);
       }
-    } catch (directErr) {}
+    } catch (directErr: any) {
+      errors.push(`rss_direct_last: ${directErr.message}`);
+    }
+
+    // Classify errors based on aggregated messages
+    const errStr = errors.join(' | ').toLowerCase();
+    if (errStr.includes('403') || errStr.includes('cloudflare') || errStr.includes('forbidden') || errStr.includes('just a moment')) {
+      throw new Error('403 Cloudflare');
+    } else if (errStr.includes('404') || errStr.includes('not found') || errStr.includes('feed inexistente')) {
+      throw new Error('404 Feed inexistente');
+    } else if (errStr.includes('timeout') || errStr.includes('tiempo límite') || errStr.includes('aborted') || errStr.includes('exceeded')) {
+      throw new Error('Timeout');
+    } else if (errStr.includes('parser') || errStr.includes('parsing') || errStr.includes('no items parsed')) {
+      // If we got OK responses but no items were parsed:
+      if (preferredType === 'html_scraping') {
+        throw new Error('Selector HTML inválido');
+      } else {
+        throw new Error('RSS vacío');
+      }
+    }
 
     throw new Error('No se pudo obtener el feed desde ninguna fuente de proxy.');
   }

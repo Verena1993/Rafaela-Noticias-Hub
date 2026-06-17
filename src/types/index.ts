@@ -109,6 +109,7 @@ export interface RssDiagnostic {
   status: 'OK' | 'ERROR' | 'PENDING';
   itemCount: number;
   message?: string;
+  reason?: string;
   lastChecked: string;
   connectionType: ConnectionType;
   responseTimeMs?: number;

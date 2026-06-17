@@ -6,6 +6,7 @@ export interface RssFeedConfig {
   url: string;
   defaultCategory: RadarCategory;
   connectionType: ConnectionType;
+  rssFallbackUrl?: string;
 }
 
 export const RSS_FEEDS: RssFeedConfig[] = [
@@ -39,12 +40,12 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   { id: 'telefesantafe', name: 'Telefe Santa Fe', url: 'https://santafe.mitelefe.com/rss', defaultCategory: 'provincial', connectionType: 'edge_function' },
   { id: 'radioeme', name: 'Radio EME', url: 'https://www.radioeme.com/feed/', defaultCategory: 'provincial', connectionType: 'edge_function' },
 
-  { id: 'castellanos', name: 'Diario Castellanos', url: 'https://diariocastellanos.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
-  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://rafaelainforma.com/sitemap.xml', defaultCategory: 'local', connectionType: 'html_scraping' },
-  { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://radiorafaelaapiv3.eleco.com.ar/feed-category/locales', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
-  { id: 'laopinion', name: 'La Opinión de Rafaela', url: 'https://www.diariolaopinion.com.ar/', defaultCategory: 'local', connectionType: 'rss_direct' },
-  { id: 'minuto_rafaela', name: 'Minuto Rafaela', url: 'https://minutorafaela.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
-  { id: 'adn979', name: 'ADN 97.9', url: 'https://adn979.com/', defaultCategory: 'local', connectionType: 'html_scraping' },
+  { id: 'castellanos', name: 'Diario Castellanos', url: 'https://diariocastellanos.com.ar/', defaultCategory: 'local', connectionType: 'html_scraping', rssFallbackUrl: 'https://diariocastellanos.com.ar/feed/' },
+  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://rafaelainforma.com/', defaultCategory: 'local', connectionType: 'html_scraping', rssFallbackUrl: 'https://news.google.com/rss/search?q=site:rafaelainforma.com+when:7d&hl=es-419&gl=AR&ceid=AR:es-419' },
+  { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://radiorafaela.com.ar/', defaultCategory: 'local', connectionType: 'html_scraping', rssFallbackUrl: 'https://radiorafaelaapiv3.eleco.com.ar/feed-category/locales' },
+  { id: 'laopinion', name: 'La Opinión de Rafaela', url: 'https://www.diariolaopinion.com.ar/', defaultCategory: 'local', connectionType: 'html_scraping', rssFallbackUrl: 'https://www.diariolaopinion.com.ar/feed/' },
+  { id: 'minuto_rafaela', name: 'Minuto Rafaela', url: 'https://minutorafaela.com.ar/', defaultCategory: 'local', connectionType: 'html_scraping', rssFallbackUrl: 'https://minutorafaela.com.ar/feed/' },
+  { id: 'adn979', name: 'ADN 97.9', url: 'https://adn979.com/', defaultCategory: 'local', connectionType: 'html_scraping', rssFallbackUrl: 'https://adn979.com/feed/' },
   { id: 'movil_quique', name: 'Móvil Quique', url: 'https://movilquique.com/feed/', defaultCategory: 'regional', connectionType: 'edge_function' },
   { id: 'rafaela_online', name: 'Rafaela Online', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'lt28', name: 'LT28 Radio Rafaela', url: '', defaultCategory: 'local', connectionType: 'pending' },
@@ -68,7 +69,7 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   { id: 'muni_rafaela', name: 'Municipalidad de Rafaela', url: 'https://www.rafaela.gob.ar/rss', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'concejo_rafaela', name: 'Concejo Municipal de Rafaela', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'gob_santa_fe', name: 'Gobierno de Santa Fe', url: 'https://www.santafe.gov.ar/rss', defaultCategory: 'provincial', connectionType: 'rss_direct' },
-  
+
   { id: 'gob_nacional', name: 'Gobierno Nacional', url: '', defaultCategory: 'national', connectionType: 'pending' },
   { id: 'casa_rosada', name: 'Casa Rosada', url: 'https://www.casarosada.gob.ar/?format=feed', defaultCategory: 'national', connectionType: 'edge_function' },
   { id: 'min_economia', name: 'Ministerio de Economía', url: '', defaultCategory: 'national', connectionType: 'pending' },

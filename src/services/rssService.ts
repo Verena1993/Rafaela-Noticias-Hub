@@ -237,6 +237,11 @@ export const isValidJournalisticArticle = (item: any): boolean => {
     return false;
   }
 
+  // Nunca usar una URL como título
+  if (/^(https?:\/\/|www\.)/i.test(title)) {
+    return false;
+  }
+
   // Descartar títulos puramente numéricos o genéricos/de navegación
   if (/^\d+$/.test(title)) {
     return false;
@@ -324,6 +329,7 @@ export const rssService = {
         url: feed.url || 'URL NO CONFIGURADA',
         status: feed.connectionType === 'pending' ? 'PENDING' : 'OK',
         itemCount: 0,
+        reason: feed.connectionType === 'pending' ? 'Pendiente' : undefined,
         lastChecked: new Date().toISOString(),
         connectionType: feed.connectionType,
         responseTimeMs: 0
@@ -331,47 +337,91 @@ export const rssService = {
 
       if (feed.connectionType === 'pending') {
         diag.message = 'Pendiente de configuración';
+        diag.reason = 'Pendiente';
         return { items: [], diag };
       }
 
       const feedItems: NewsRadarItem[] = [];
 
       try {
-        let fetchPromise = supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
-        
-        const timeoutPromise = new Promise<{ data: any; methodUsed: ConnectionType | string; responseTimeMs: number }>((_, reject) => {
-          setTimeout(() => reject(new Error("Tiempo límite excedido para este feed (15s)")), 15000);
-        });
+        let coverItems: any[] = [];
+        let fallbackItems: any[] = [];
+        let coverError: any = null;
+        let coverStatus = 'OK';
+        let methodUsed: ConnectionType = feed.connectionType;
+        let responseTimeMs = 0;
 
-        let fetchResult;
-        try {
-          fetchResult = await Promise.race([fetchPromise, timeoutPromise]);
-        } catch (firstErr: any) {
-          if (feed.id === 'laopinion') {
-            console.log("Diario La Opinión RSS falló, intentando fallback de scraping HTML...");
-            fetchResult = await supabaseRadarGateway.fetchFromSupabaseGateway('https://www.diariolaopinion.com.ar/', 'html_scraping');
-          } else {
-            throw firstErr;
+        if (feed.connectionType === 'html_scraping') {
+          try {
+            const fetchResult = await supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, 'html_scraping');
+            responseTimeMs = fetchResult.responseTimeMs;
+            methodUsed = fetchResult.methodUsed as ConnectionType;
+            if (fetchResult.data && Array.isArray(fetchResult.data.items)) {
+              coverItems = fetchResult.data.items;
+            }
+          } catch (err: any) {
+            coverError = err;
+            coverStatus = 'ERROR';
           }
         }
 
-        let data = fetchResult.data;
-        let methodUsed = fetchResult.methodUsed;
-        let responseTimeMs = fetchResult.responseTimeMs;
-
-        if (feed.id === 'laopinion' && (!data || !data.items || data.items.length === 0)) {
-          console.log("Diario La Opinión RSS no retornó items, intentando fallback de scraping HTML...");
-          const fallbackResult = await supabaseRadarGateway.fetchFromSupabaseGateway('https://www.diariolaopinion.com.ar/', 'html_scraping');
-          data = fallbackResult.data;
-          methodUsed = fallbackResult.methodUsed;
-          responseTimeMs = fallbackResult.responseTimeMs;
+        // Fetch fallback RSS if we need more items
+        if ((coverItems.length < 3 || coverStatus === 'ERROR') && feed.rssFallbackUrl) {
+          try {
+            const fallbackType = feed.rssFallbackUrl.includes('google.com') ? 'google_news' : 'rss2json_proxy';
+            const fetchResult = await supabaseRadarGateway.fetchFromSupabaseGateway(feed.rssFallbackUrl, fallbackType);
+            if (coverItems.length === 0) {
+              methodUsed = fetchResult.methodUsed as ConnectionType;
+              responseTimeMs = fetchResult.responseTimeMs;
+            } else {
+              responseTimeMs += fetchResult.responseTimeMs;
+            }
+            if (fetchResult.data && Array.isArray(fetchResult.data.items)) {
+              fallbackItems = fetchResult.data.items;
+            }
+          } catch (errFallback: any) {
+            if (coverItems.length === 0 && coverStatus === 'ERROR') {
+              throw coverError || errFallback;
+            }
+          }
+        } else if (coverStatus === 'ERROR') {
+          throw coverError;
         }
-        
+
+        // For non-scraping channels (like standard national RSS)
+        if (feed.connectionType !== 'html_scraping') {
+          const fetchResult = await supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
+          methodUsed = fetchResult.methodUsed as ConnectionType;
+          responseTimeMs = fetchResult.responseTimeMs;
+          if (fetchResult.data && Array.isArray(fetchResult.data.items)) {
+            coverItems = fetchResult.data.items;
+          }
+        }
+
         diag.connectionType = methodUsed as ConnectionType;
         diag.responseTimeMs = responseTimeMs;
         let addedItems = 0;
-        
-        if (data && data.items && Array.isArray(data.items)) {
+
+        // Deduplicate and combine
+        const combinedRawItems: { item: any; sourceTag: 'portada' | 'rss' }[] = [];
+
+        coverItems.forEach(item => {
+          combinedRawItems.push({ item, sourceTag: 'portada' });
+        });
+
+        fallbackItems.forEach(item => {
+          const isDuplicate = coverItems.some(coverItem => {
+            const sameUrl = (coverItem.link && item.link && coverItem.link.trim() === item.link.trim());
+            const sameTitle = isSimilarTitle(coverItem.title || '', item.title || '');
+            return sameUrl || sameTitle;
+          });
+
+          if (!isDuplicate) {
+            combinedRawItems.push({ item, sourceTag: 'rss' });
+          }
+        });
+
+        if (combinedRawItems.length > 0) {
           const scoredItems: {
             item: any;
             cleanSummary: string;
@@ -383,11 +433,12 @@ export const rssService = {
             classificationReason: string;
             priority: number;
             detectedAt: string;
+            sourceTag: 'portada' | 'rss';
           }[] = [];
 
           const detectedAt = new Date().toISOString();
 
-          data.items.forEach((item: any) => {
+          combinedRawItems.forEach(({ item, sourceTag }) => {
             if (!isValidJournalisticArticle(item)) {
               console.log(`[DESCARTADA: Artículo inválido] ${item.title || 'Sin título'} | ${feed.name}`);
               return;
@@ -441,28 +492,38 @@ export const rssService = {
               reasons,
               classificationReason: `Categoría fija del medio: ${feed.defaultCategory}`,
               priority: priorityVal,
-              detectedAt: itemDetectedAt
+              detectedAt: itemDetectedAt,
+              sourceTag
             });
           });
 
-          // Prioritize featured/portada/principales news, then fall back to chronological
+          // Custom sorting: Portada HTML items first preserving original order, then RSS chronologically
           scoredItems.sort((a, b) => {
-            const testStrA = (a.item.title || '') + ' ' + (a.item.description || '') + ' ' + (a.item.link || '') + ' ' + (a.item.categories?.join(' ') || '');
-            const testStrB = (b.item.title || '') + ' ' + (b.item.description || '') + ' ' + (b.item.link || '') + ' ' + (b.item.categories?.join(' ') || '');
-            const isFeaturedA = /portada|destacad|principal/i.test(testStrA);
-            const isFeaturedB = /portada|destacad|principal/i.test(testStrB);
-            
-            if (isFeaturedA && !isFeaturedB) return -1;
-            if (!isFeaturedA && isFeaturedB) return 1;
-            
-            return b.parsedDate.getTime() - a.parsedDate.getTime();
+            if (a.sourceTag === 'portada' && b.sourceTag === 'rss') return -1;
+            if (a.sourceTag === 'rss' && b.sourceTag === 'portada') return 1;
+
+            if (a.sourceTag === 'portada') {
+              return combinedRawItems.findIndex(x => x.item.link === a.item.link) - 
+                     combinedRawItems.findIndex(x => x.item.link === b.item.link);
+            } else {
+              return b.parsedDate.getTime() - a.parsedDate.getTime();
+            }
           });
 
           // Select top 3 most recent and log them
           const selected = scoredItems.slice(0, 3);
           const discarded = scoredItems.slice(3);
 
+          let portadaCount = 0;
+          let rssCount = 0;
+
           selected.forEach(x => {
+            if (x.sourceTag === 'portada') {
+              portadaCount++;
+            } else {
+              rssCount++;
+            }
+
             console.log({
               titulo: x.item.title,
               fuente: feed.name,
@@ -521,12 +582,47 @@ export const rssService = {
               motivoClasificacion: `DESCARTADA (Superada por otros 3 del medio). Detalles: ${x.reasons.join(', ')}`
             });
           });
+
+          if (addedItems > 0) {
+            if (feed.connectionType === 'html_scraping') {
+              let reasonStr = '';
+              if (portadaCount > 0 && rssCount > 0) {
+                reasonStr = `Portada HTML (${portadaCount}) + RSS Fallback (${rssCount})`;
+              } else if (portadaCount > 0) {
+                reasonStr = `Portada HTML (${portadaCount})`;
+              } else {
+                reasonStr = `RSS Fallback (${rssCount})`;
+              }
+              diag.reason = reasonStr;
+            } else {
+              diag.reason = 'Activa';
+            }
+          } else {
+            diag.reason = feed.connectionType === 'html_scraping' ? 'Selector HTML inválido' : 'RSS vacío';
+          }
+        } else {
+          diag.reason = feed.connectionType === 'html_scraping' ? 'Selector HTML inválido' : 'RSS vacío';
         }
         
         diag.itemCount = addedItems;
       } catch (error: any) {
         diag.status = 'ERROR';
         diag.message = error.message || 'No se pudo conectar';
+        
+        const errMsg = (error.message || '').toLowerCase();
+        if (errMsg.includes('403') || errMsg.includes('cloudflare') || errMsg.includes('forbidden') || errMsg.includes('just a moment')) {
+          diag.reason = '403 Cloudflare';
+        } else if (errMsg.includes('404') || errMsg.includes('not found') || errMsg.includes('feed inexistente')) {
+          diag.reason = '404 Feed inexistente';
+        } else if (errMsg.includes('timeout') || errMsg.includes('tiempo límite') || errMsg.includes('aborted') || errMsg.includes('exceeded')) {
+          diag.reason = 'Timeout';
+        } else if (errMsg.includes('selector') || errMsg.includes('html inválido')) {
+          diag.reason = 'Selector HTML inválido';
+        } else if (errMsg.includes('parsing') || errMsg.includes('xml') || errMsg.includes('json') || errMsg.includes('rss vacío')) {
+          diag.reason = 'Error de parsing';
+        } else {
+          diag.reason = error.message || 'Error desconocido';
+        }
       }
 
       return { items: feedItems, diag };
