@@ -272,12 +272,15 @@ export const rssService = {
             cleanSummary: string;
             parsedDate: Date;
             smartCategory: RadarCategory;
-            regionDetectada: string | null;
+            regionDetectada: string;
             editorialScore: number;
             reasons: string[];
             classificationReason: string;
-            priority?: number;
+            priority: number;
+            detectedAt: string;
           }[] = [];
+
+          const detectedAt = new Date().toISOString();
 
           data.items.forEach((item: any) => {
             const cleanSummary = (item.description || item.content || '').replace(/<[^>]+>/g, '').trim();
@@ -285,50 +288,31 @@ export const rssService = {
             // Validate date
             const rawDate = item.pubDate || item.date;
             if (!rawDate) {
-              console.log({
-                titulo: item.title,
-                fuente: feed.name,
-                fecha: 'Ninguna',
-                categoria: 'n/a',
-                region: 'n/a',
-                editorialScore: 0,
-                motivoClasificacion: 'Descartada: Sin fecha'
-              });
+              console.log(`[DESCARTADA: Sin fecha] ${item.title} | ${feed.name}`);
               return;
             }
 
             const parsedDate = new Date(rawDate);
             if (isNaN(parsedDate.getTime())) {
-              console.log({
-                titulo: item.title,
-                fuente: feed.name,
-                fecha: rawDate,
-                categoria: 'n/a',
-                region: 'n/a',
-                editorialScore: 0,
-                motivoClasificacion: 'Descartada: Fecha inválida'
-              });
+              console.log(`[DESCARTADA: Fecha inválida] ${item.title} | ${feed.name} | fecha: ${rawDate}`);
               return;
             }
 
             const now = new Date();
             const diffMs = parsedDate.getTime() - now.getTime();
             if (diffMs > 24 * 60 * 60 * 1000) {
-              console.log({
-                titulo: item.title,
-                fuente: feed.name,
-                fecha: rawDate,
-                categoria: 'n/a',
-                region: 'n/a',
-                editorialScore: 0,
-                motivoClasificacion: 'Descartada: Fecha futura > 24hs'
-              });
+              console.log(`[DESCARTADA: Fecha futura >24hs] ${item.title} | ${feed.name}`);
               return;
             }
 
-            const { category: smartCategory, reason: classificationReason, priority: priorityVal, region: regionDetectada } = detectTrueCategory(item.title, cleanSummary, feed.name, feed.defaultCategory, item.link);
-            
-            // Calculate score and reasons
+            // Category is ALWAYS the feed's fixed defaultCategory — no content-based reclassification
+            const smartCategory: RadarCategory = feed.defaultCategory;
+            const priorityVal = smartCategory === 'local' ? 100
+              : smartCategory === 'regional' ? 80
+              : smartCategory === 'provincial' ? 50
+              : smartCategory === 'national' ? 30 : 10;
+
+            // Score is kept only for logging, does NOT affect selection
             const { score, reasons } = calculateEditorialScore(item.title, cleanSummary, smartCategory, feed.name);
 
             scoredItems.push({
@@ -336,18 +320,19 @@ export const rssService = {
               cleanSummary,
               parsedDate,
               smartCategory,
-              regionDetectada,
+              regionDetectada: smartCategory,
               editorialScore: score,
               reasons,
-              classificationReason,
-              priority: priorityVal
+              classificationReason: `Categoría fija del medio: ${feed.defaultCategory}`,
+              priority: priorityVal,
+              detectedAt
             });
           });
 
-          // Sort scoredItems by editorialScore descending
-          scoredItems.sort((a, b) => b.editorialScore - a.editorialScore);
+          // Sort by publication date descending — most recent 3 first
+          scoredItems.sort((a, b) => b.parsedDate.getTime() - a.parsedDate.getTime());
 
-          // Select top 3 and log them
+          // Select top 3 most recent and log them
           const selected = scoredItems.slice(0, 3);
           const discarded = scoredItems.slice(3);
 
@@ -381,13 +366,14 @@ export const rssService = {
             feedItems.push({
               id: `rss_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
               title: x.item.title,
-              summary: x.cleanSummary.substring(0, 200) + '...',
+              summary: x.cleanSummary ? (x.cleanSummary.length > 200 ? x.cleanSummary.substring(0, 200) + '...' : x.cleanSummary) : '',
               source: feed.name,
               date: x.parsedDate.toISOString(),
+              detectedAt: x.detectedAt,
               category: x.smartCategory,
               editorialScore: x.editorialScore,
               url: x.item.link,
-              region: x.regionDetectada || undefined,
+              region: x.regionDetectada,
               priority: x.priority
             });
             addedItems++;

@@ -107,106 +107,7 @@ const scrapeRafaelaNoticias = (html: string): any[] => {
   return items;
 };
 
-export const generateMockArticles = (targetUrl: string): any[] => {
-  const items: any[] = [];
-  const baseDate = new Date();
-  
-  if (targetUrl.includes('rafaelainforma.com')) {
-    const titles = [
-      "Rafaela Informa: Obras de pavimentación avanzan a buen ritmo en el norte de la ciudad",
-      "Rafaela Informa: El Concejo Municipal debatió nuevas medidas de seguridad vecinal",
-      "Rafaela Informa: Invitan a participar de la nueva agenda cultural de Rafaela"
-    ];
-    titles.forEach((t, i) => {
-      items.push({
-        title: t,
-        link: "https://www.rafaelainforma.com/mock-post-" + i,
-        pubDate: new Date(baseDate.getTime() - i * 3600 * 1000).toISOString(),
-        description: t + " - Detalle de la nota publicada en Rafaela Informa.",
-        content: t,
-        author: "Rafaela Informa"
-      });
-    });
-  } else if (targetUrl.includes('adn979.com')) {
-    const titles = [
-      "ADN 97.9: Entrevista exclusiva con el intendente sobre los nuevos proyectos de infraestructura",
-      "ADN 97.9: Operativos de control de tránsito en accesos a la ciudad dejan saldo positivo",
-      "ADN 97.9: Convocan a colecta solidaria de abrigo en Rafaela"
-    ];
-    titles.forEach((t, i) => {
-      items.push({
-        title: t,
-        link: "https://adn979.com/mock-post-" + i,
-        pubDate: new Date(baseDate.getTime() - i * 3600 * 1000).toISOString(),
-        description: t + " - Cobertura especial y audio de ADN 97.9.",
-        content: t,
-        author: "ADN 97.9"
-      });
-    });
-  } else if (targetUrl.includes('elecodesunchales.com.ar')) {
-    const titles = [
-      "El Eco de Sunchales: PDI detiene a dos sospechosos por robos en la zona céntrica",
-      "El Eco de Sunchales: Cooperativa local anuncia importantes inversiones tecnológicas"
-    ];
-    titles.forEach((t, i) => {
-      items.push({
-        title: t,
-        link: "https://elecodesunchales.com.ar/mock-post-" + i,
-        pubDate: new Date(baseDate.getTime() - i * 3600 * 1000).toISOString(),
-        description: t + " - Informe de El Eco de Sunchales.",
-        content: t,
-        author: "El Eco de Sunchales"
-      });
-    });
-  } else if (targetUrl.includes('esperanzadiapordia.com.ar')) {
-    const titles = [
-      "Esperanza Día por Día: Exitosa convocatoria en la Feria de Emprendedores locales",
-      "Esperanza Día por Día: Refuerzan los controles sanitarios preventivos en la región"
-    ];
-    titles.forEach((t, i) => {
-      items.push({
-        title: t,
-        link: "https://www.esperanzadiapordia.com.ar/mock-post-" + i,
-        pubDate: new Date(baseDate.getTime() - i * 3600 * 1000).toISOString(),
-        description: t + " - Nota del portal Esperanza Día por Día.",
-        content: t,
-        author: "Esperanza Día por Día"
-      });
-    });
-  } else if (targetUrl.includes('rafaela.gob.ar')) {
-    const titles = [
-      "Municipalidad de Rafaela: Se habilitó el nuevo sistema digital para trámites de licencias de conducir",
-      "Municipalidad de Rafaela: Campaña ambiental de recolección de residuos electrónicos"
-    ];
-    titles.forEach((t, i) => {
-      items.push({
-        title: t,
-        link: "https://www.rafaela.gob.ar/mock-post-" + i,
-        pubDate: new Date(baseDate.getTime() - i * 3600 * 1000).toISOString(),
-        description: t + " - Comunicado oficial de la Municipalidad.",
-        content: t,
-        author: "Municipalidad de Rafaela"
-      });
-    });
-  } else if (targetUrl.includes('santafe.gov.ar')) {
-    const titles = [
-      "Gobierno de Santa Fe: Provincia destinará aportes millonarios para obras escolares regionales",
-      "Gobierno de Santa Fe: Plan de becas estudiantiles abre inscripciones para el segundo semestre"
-    ];
-    titles.forEach((t, i) => {
-      items.push({
-        title: t,
-        link: "https://www.santafe.gov.ar/mock-post-" + i,
-        pubDate: new Date(baseDate.getTime() - i * 3600 * 1000).toISOString(),
-        description: t + " - Detalle de gestión del Gobierno Provincial.",
-        content: t,
-        author: "Gobierno de Santa Fe"
-      });
-    });
-  }
 
-  return items;
-};
 
 /**
  * Parses RSS or Atom XML string into a normalized items array.
@@ -220,10 +121,9 @@ const parseRssXml = (xmlText: string, targetUrl?: string): any[] => {
     if (targetUrl.includes('rafaelanoticias.com')) {
       return scrapeRafaelaNoticias(xmlText);
     }
+    // If the response is an HTML page (e.g. Cloudflare challenge), return empty — no mock fallback
     if (xmlText.includes('Just a moment...') || xmlText.trim().startsWith('<!DOCTYPE html>')) {
-      if (targetUrl.includes('rafaelainforma.com') || targetUrl.includes('adn979.com') || targetUrl.includes('elecodesunchales.com.ar') || targetUrl.includes('esperanzadiapordia.com.ar') || targetUrl.includes('rafaela.gob.ar') || targetUrl.includes('santafe.gov.ar')) {
-        return generateMockArticles(targetUrl);
-      }
+      return [];
     }
   }
 
@@ -511,16 +411,6 @@ export const supabaseRadarGateway = {
       }
     } catch (directErr) {}
 
-    // If all attempts failed, but the URL corresponds to a critical feed, return mock articles
-    if (url.includes('rafaelainforma.com') || url.includes('adn979.com') || url.includes('elecodesunchales.com.ar') || url.includes('esperanzadiapordia.com.ar') || url.includes('rafaela.gob.ar') || url.includes('santafe.gov.ar')) {
-      const parsedItems = generateMockArticles(url);
-      return {
-        data: { status: 'ok', items: parsedItems },
-        methodUsed: 'mock_fallback',
-        responseTimeMs: Math.round(performance.now() - start)
-      };
-    }
-
-    throw new Error('No se pudo obtener ni procesar el feed de noticias desde ninguna fuente de proxy.');
+    throw new Error('No se pudo obtener el feed desde ninguna fuente de proxy.');
   }
 };

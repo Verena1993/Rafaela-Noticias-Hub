@@ -84,7 +84,8 @@ export interface NewsRadarItem {
   title: string;
   summary: string;
   source: string;
-  date: string; // ISO date string
+  date: string; // ISO date string (pubDate original del RSS)
+  detectedAt?: string; // ISO date string — momento en que el sistema detectó la noticia
   category: RadarCategory;
   url?: string; // Original article URL (for future API integration)
   tags?: string[];
