@@ -9,7 +9,7 @@ import type { RadarCategory, NewsRadarItem } from '../types';
 
 import { aiService } from '../services/aiService';
 import { isSimilarTitle } from '../services/rssService';
-import { TextAutocompleteModal } from './TextAutocompleteModal';
+// import { TextAutocompleteModal } from './TextAutocompleteModal';
 import { SourceStatus } from './SourceStatus';
 
 type RadarMainTab = 'all' | 'local' | 'regional' | 'provincial' | 'national' | 'international' | 'trends' | 'sources';
@@ -29,7 +29,6 @@ export const NewsRadar: React.FC = () => {
     newsRadarItems, 
     updateNewsRadarItem, 
     addProposal, 
-    addCoverage,
     fetchLiveRadarNews, 
     loadingRadar, 
     radarError, 
@@ -46,6 +45,7 @@ export const NewsRadar: React.FC = () => {
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentIds, setSentIds] = useState<Set<string>>(new Set());
 
+  /* Comentado temporalmente para evitar advertencias de variables no usadas
   const [showAutocompleteModal, setShowAutocompleteModal] = useState(false);
 
   const handleAutocompleteConfirm = (data: {
@@ -103,6 +103,7 @@ export const NewsRadar: React.FC = () => {
       alert('¡Propuesta creada exitosamente desde texto!');
     }
   };
+  */
 
   const checkAlreadyCovered = (item: NewsRadarItem) => {
     if (item.sentToEditor || sentIds.has(item.id)) return true;
@@ -435,6 +436,7 @@ export const NewsRadar: React.FC = () => {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {/* Ocultado temporalmente
           <button 
             className="btn btn-secondary" 
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
@@ -442,6 +444,7 @@ export const NewsRadar: React.FC = () => {
           >
             <span>📋</span> Crear desde texto
           </button>
+          */}
           <button 
             className="btn btn-primary" 
             style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', opacity: loadingRadar ? 0.7 : 1 }}
@@ -729,6 +732,7 @@ export const NewsRadar: React.FC = () => {
         </div>
       )}
 
+      {/* Desactivado temporalmente
       {showAutocompleteModal && (
         <TextAutocompleteModal
           isOpen={showAutocompleteModal}
@@ -737,6 +741,7 @@ export const NewsRadar: React.FC = () => {
           showDestinationSelect={true}
         />
       )}
+      */}
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
     </div>
   );
