@@ -279,6 +279,38 @@ export const isValidJournalisticArticle = (item: any): boolean => {
   return true;
 };
 
+export const parseRobustDate = (rawDate: string, connectionType?: ConnectionType): Date => {
+  if (!rawDate) return new Date();
+  
+  let dateStr = rawDate.trim();
+
+  // 1. Handle rss2json date format: "YYYY-MM-DD HH:mm:ss" or similar space-separated formats from proxy
+  if (connectionType === 'rss2json_proxy' || connectionType === 'google_news') {
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(dateStr)) {
+      // rss2json returns UTC dates but drops the timezone suffix. Append 'Z' to treat as UTC.
+      return new Date(dateStr + ' Z');
+    }
+  }
+
+  // 2. Check if the string has a timezone indicator.
+  // Timezone indicators: 'Z', 'GMT', 'UTC', '+XX:XX', '-XX:XX', '+XXXX', '-XXXX'
+  const hasTimezone = /Z|GMT|UTC|[+-]\d{2}:?\d{2}$/i.test(dateStr);
+
+  if (!hasTimezone) {
+    // If it has no timezone, and it's a local/regional/provincial feed, it's Argentine time (UTC-3).
+    // Append '-03:00' to it.
+    if (/T\d{2}:\d{2}/.test(dateStr) || /\s\d{2}:\d{2}/.test(dateStr)) {
+      return new Date(dateStr + '-03:00');
+    }
+  }
+
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) {
+    return new Date();
+  }
+  return d;
+};
+
 export const rssService = {
   fetchNews: async (): Promise<{ items: NewsRadarItem[]; alerts: { title: string; severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string; classificationReason?: string; priority?: number }[]; diagnostics: RssDiagnostic[] }> => {
     const allItems: NewsRadarItem[] = [];
@@ -370,7 +402,7 @@ export const rssService = {
               return;
             }
 
-            const parsedDate = new Date(rawDate);
+            const parsedDate = parseRobustDate(rawDate, feed.connectionType);
             if (isNaN(parsedDate.getTime())) {
               console.log(`[DESCARTADA: Fecha inválida] ${item.title} | ${feed.name} | fecha: ${rawDate}`);
               return;
@@ -393,6 +425,12 @@ export const rssService = {
             // Score is kept only for logging, does NOT affect selection
             const { score, reasons } = calculateEditorialScore(item.title, cleanSummary, smartCategory, feed.name);
 
+            // Chronological safety guard: detectedAt can never be before parsedDate
+            let itemDetectedAt = detectedAt;
+            if (parsedDate.getTime() > new Date(detectedAt).getTime()) {
+              itemDetectedAt = parsedDate.toISOString();
+            }
+
             scoredItems.push({
               item,
               cleanSummary,
@@ -403,7 +441,7 @@ export const rssService = {
               reasons,
               classificationReason: `Categoría fija del medio: ${feed.defaultCategory}`,
               priority: priorityVal,
-              detectedAt
+              detectedAt: itemDetectedAt
             });
           });
 
