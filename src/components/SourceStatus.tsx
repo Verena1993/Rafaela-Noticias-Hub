@@ -18,15 +18,16 @@ const CATEGORY_LABELS: Record<string, { label: string; color: string; bg: string
 };
 
 const CONNECTION_LABELS: Record<string, string> = {
-  rss_direct:     'Directo RSS',
-  rss2json_proxy: 'rss2json',
-  edge_function:  'Edge Function',
-  google_news:    'Google News',
-  social_api:     'Social API',
-  pending:        'Pendiente',
-  local_proxy:    'Proxy local',
-  allorigins_proxy: 'AllOrigins',
-  corsproxy_proxy:  'CORSProxy.io',
+  rss_direct:       'RSS Directo',
+  rss2json_proxy:   'RSS',
+  edge_function:    'RSS',
+  google_news:      'RSS',
+  social_api:       'API',
+  pending:          'Pendiente',
+  local_proxy:      'RSS',
+  allorigins_proxy: 'RSS',
+  corsproxy_proxy:  'RSS',
+  html_scraping:    'HTML Scraping'
 };
 
 const getStatusBadge = (diag: RssDiagnostic | undefined, isPending: boolean) => {
@@ -150,7 +151,7 @@ export const SourceStatus: React.FC<SourceStatusProps> = ({ diagnostics, onRefre
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
                 <thead>
                   <tr style={{ background: 'var(--bg-tertiary)' }}>
-                    {['Medio', 'URL RSS', 'Estado', 'Noticias', 'Últ. actualización', 'Conexión', 'Error'].map(col => (
+                    {['Medio', 'URL RSS', 'Estado', 'Últ. actualización', 'Noticias', 'Respuesta', 'Conexión', 'Error detectado'].map(col => (
                       <th key={col} style={{
                         padding: '0.5rem 0.75rem', textAlign: 'left', fontWeight: 700,
                         color: 'var(--text-secondary)', fontSize: '0.7rem',
@@ -220,6 +221,11 @@ export const SourceStatus: React.FC<SourceStatusProps> = ({ diagnostics, onRefre
                           </span>
                         </td>
 
+                         {/* Última actualización */}
+                        <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
+                          {isPending ? '—' : diag ? formatTs(diag.lastChecked) : '—'}
+                        </td>
+
                         {/* Noticias obtenidas */}
                         <td style={{ padding: '0.6rem 0.75rem', textAlign: 'center', fontWeight: 700 }}>
                           {isPending ? (
@@ -233,9 +239,9 @@ export const SourceStatus: React.FC<SourceStatusProps> = ({ diagnostics, onRefre
                           )}
                         </td>
 
-                        {/* Última actualización */}
-                        <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap', color: 'var(--text-secondary)' }}>
-                          {diag ? formatTs(diag.lastChecked) : '—'}
+                        {/* Tiempo de respuesta */}
+                        <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                          {isPending ? '—' : diag?.responseTimeMs ? `${diag.responseTimeMs} ms` : '—'}
                         </td>
 
                         {/* Tipo de conexión */}

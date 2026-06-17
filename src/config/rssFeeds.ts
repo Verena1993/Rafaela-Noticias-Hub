@@ -40,11 +40,11 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   { id: 'radioeme', name: 'Radio EME', url: 'https://www.radioeme.com/feed/', defaultCategory: 'provincial', connectionType: 'edge_function' },
 
   { id: 'castellanos', name: 'Diario Castellanos', url: 'https://diariocastellanos.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
-  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://www.rafaelainforma.com/feed/', defaultCategory: 'local', connectionType: 'rss_direct' },
+  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://www.rafaelainforma.com/', defaultCategory: 'local', connectionType: 'html_scraping' },
   { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://radiorafaelaapiv3.eleco.com.ar/feed-category/locales', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
   { id: 'laopinion', name: 'La Opinión de Rafaela', url: 'https://www.diariolaopinion.com.ar/', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'minuto_rafaela', name: 'Minuto Rafaela', url: 'https://minutorafaela.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
-  { id: 'adn979', name: 'ADN 97.9', url: 'https://adn979.com/', defaultCategory: 'local', connectionType: 'rss_direct' },
+  { id: 'adn979', name: 'ADN 97.9', url: 'https://adn979.com/', defaultCategory: 'local', connectionType: 'html_scraping' },
   { id: 'movil_quique', name: 'Móvil Quique', url: 'https://movilquique.com/feed/', defaultCategory: 'regional', connectionType: 'edge_function' },
   { id: 'rafaela_online', name: 'Rafaela Online', url: '', defaultCategory: 'local', connectionType: 'pending' },
   { id: 'lt28', name: 'LT28 Radio Rafaela', url: '', defaultCategory: 'local', connectionType: 'pending' },

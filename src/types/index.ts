@@ -100,7 +100,7 @@ export interface NewsRadarItem {
   priority?: number;
 }
 
-export type ConnectionType = 'rss_direct' | 'rss2json_proxy' | 'edge_function' | 'google_news' | 'social_api' | 'pending';
+export type ConnectionType = 'rss_direct' | 'rss2json_proxy' | 'edge_function' | 'google_news' | 'social_api' | 'pending' | 'html_scraping';
 
 export interface RssDiagnostic {
   id: string;

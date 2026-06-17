@@ -305,13 +305,35 @@ export const rssService = {
       const feedItems: NewsRadarItem[] = [];
 
       try {
-        const fetchPromise = supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
+        let fetchPromise = supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
         
         const timeoutPromise = new Promise<{ data: any; methodUsed: ConnectionType | string; responseTimeMs: number }>((_, reject) => {
           setTimeout(() => reject(new Error("Tiempo límite excedido para este feed (8s)")), 8000);
         });
 
-        const { data, methodUsed, responseTimeMs } = await Promise.race([fetchPromise, timeoutPromise]);
+        let fetchResult;
+        try {
+          fetchResult = await Promise.race([fetchPromise, timeoutPromise]);
+        } catch (firstErr: any) {
+          if (feed.id === 'laopinion') {
+            console.log("Diario La Opinión RSS falló, intentando fallback de scraping HTML...");
+            fetchResult = await supabaseRadarGateway.fetchFromSupabaseGateway('https://www.diariolaopinion.com.ar/', 'html_scraping');
+          } else {
+            throw firstErr;
+          }
+        }
+
+        let data = fetchResult.data;
+        let methodUsed = fetchResult.methodUsed;
+        let responseTimeMs = fetchResult.responseTimeMs;
+
+        if (feed.id === 'laopinion' && (!data || !data.items || data.items.length === 0)) {
+          console.log("Diario La Opinión RSS no retornó items, intentando fallback de scraping HTML...");
+          const fallbackResult = await supabaseRadarGateway.fetchFromSupabaseGateway('https://www.diariolaopinion.com.ar/', 'html_scraping');
+          data = fallbackResult.data;
+          methodUsed = fallbackResult.methodUsed;
+          responseTimeMs = fallbackResult.responseTimeMs;
+        }
         
         diag.connectionType = methodUsed as ConnectionType;
         diag.responseTimeMs = responseTimeMs;
@@ -385,8 +407,18 @@ export const rssService = {
             });
           });
 
-          // Sort by publication date descending — most recent 3 first
-          scoredItems.sort((a, b) => b.parsedDate.getTime() - a.parsedDate.getTime());
+          // Prioritize featured/portada/principales news, then fall back to chronological
+          scoredItems.sort((a, b) => {
+            const testStrA = (a.item.title || '') + ' ' + (a.item.description || '') + ' ' + (a.item.link || '') + ' ' + (a.item.categories?.join(' ') || '');
+            const testStrB = (b.item.title || '') + ' ' + (b.item.description || '') + ' ' + (b.item.link || '') + ' ' + (b.item.categories?.join(' ') || '');
+            const isFeaturedA = /portada|destacad|principal/i.test(testStrA);
+            const isFeaturedB = /portada|destacad|principal/i.test(testStrB);
+            
+            if (isFeaturedA && !isFeaturedB) return -1;
+            if (!isFeaturedA && isFeaturedB) return 1;
+            
+            return b.parsedDate.getTime() - a.parsedDate.getTime();
+          });
 
           // Select top 3 most recent and log them
           const selected = scoredItems.slice(0, 3);
