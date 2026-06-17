@@ -99,30 +99,84 @@ const scrapeLaOpinion = (html: string): any[] => {
   return items;
 };
 
-const scrapeRafaelaInforma = (html: string): any[] => {
+const scrapeRafaelaInforma = (xmlOrHtml: string): any[] => {
   const items: any[] = [];
-  const h3Regex = /<h3[^>]*>([\s\S]*?)<\/h3>/gi;
-  let match;
-  while ((match = h3Regex.exec(html)) !== null) {
-    const h3Content = match[1];
-    const linkMatch = h3Content.match(/<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
-    if (linkMatch) {
-      let link = linkMatch[1];
-      if (link.startsWith('/')) {
-        link = 'https://www.rafaelainforma.com' + link;
-      }
-      const title = decodeHtmlEntities(linkMatch[2].replace(/<[^>]+>/g, '').trim());
-      if (title.length >= 10 && !items.some(x => x.link === link)) {
+
+  // --- Strategy 1: Parse sitemap.xml ---
+  // Sitemap format: <url><loc>https://rafaelainforma.com/contenido/ID/slug</loc></url>
+  if (xmlOrHtml.includes('<urlset') || xmlOrHtml.includes('<loc>')) {
+    const locRegex = /<loc>(https?:\/\/[^<]*\/contenido\/(\d+)\/([^<]+))<\/loc>/gi;
+    let match;
+    while ((match = locRegex.exec(xmlOrHtml)) !== null && items.length < 10) {
+      const url = match[1];
+      const id = parseInt(match[2], 10);
+      const slug = match[3];
+
+      // Convert slug to readable title: replace hyphens with spaces, capitalize first letter
+      const rawTitle = slug.replace(/-/g, ' ').replace(/%[0-9a-f]{2}/gi, '');
+      const title = rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1);
+
+      if (title.length >= 10 && !items.some(x => x.link === url)) {
         items.push({
-          title,
-          link,
+          title: title.trim(),
+          link: url,
           pubDate: new Date().toISOString(),
-          description: title,
-          content: title,
-          author: 'Rafaela Informa'
+          description: title.trim(),
+          content: title.trim(),
+          author: 'Rafaela Informa',
+          _sitemapId: id // Store ID for sorting by recency
         });
       }
     }
+
+    // Sort by ID descending (highest ID = most recent)
+    items.sort((a, b) => (b._sitemapId || 0) - (a._sitemapId || 0));
+    // Remove the helper field
+    items.forEach(item => delete item._sitemapId);
+
+    if (items.length > 0) return items;
+  }
+
+  // --- Strategy 2: Parse HTML portada (fallback if scraping worked) ---
+  // Articles have class="post post__noticia" and contain h2.post__titulo > a
+  const articleRegex = /<article[^>]*class="[^"]*post__noticia[^"]*"[^>]*>([\s\S]*?)<\/article>/gi;
+  let match2;
+  while ((match2 = articleRegex.exec(xmlOrHtml)) !== null) {
+    const articleHtml = match2[1];
+
+    // Extract link and title from <h2 class="post__titulo"><a href="...">title</a></h2>
+    const titleMatch = articleHtml.match(/<h2[^>]*class="[^"]*post__titulo[^"]*"[^>]*>[\s\S]*?<a href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
+    if (!titleMatch) continue;
+
+    let link = titleMatch[1];
+    if (link.startsWith('/')) {
+      link = 'https://rafaelainforma.com' + link;
+    }
+    const title = decodeHtmlEntities(titleMatch[2].replace(/<[^>]+>/g, '').trim());
+    if (title.length < 10 || items.some(x => x.link === link)) continue;
+
+    // Extract date from <span class="fecha">DD/MM/YYYY</span>
+    let pubDate = new Date().toISOString();
+    const dateMatch = articleHtml.match(/<span[^>]*class="fecha"[^>]*>(\d{2})\/(\d{2})\/(\d{4})<\/span>/i);
+    if (dateMatch) {
+      pubDate = new Date(`${dateMatch[3]}-${dateMatch[2]}-${dateMatch[1]}T12:00:00Z`).toISOString();
+    }
+
+    // Extract description/bajada from <div class="post__detalle">
+    let description = '';
+    const detailMatch = articleHtml.match(/<div[^>]*class="[^"]*post__detalle[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>/i);
+    if (detailMatch) {
+      description = decodeHtmlEntities(detailMatch[1].replace(/<[^>]+>/g, '').trim());
+    }
+
+    items.push({
+      title,
+      link,
+      pubDate,
+      description: description || title,
+      content: description || title,
+      author: 'Rafaela Informa'
+    });
   }
   return items;
 };
@@ -313,7 +367,9 @@ export const supabaseRadarGateway = {
     if (isLocal) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        // Use longer timeout for html_scraping since pages can be slow
+        const proxyTimeout = preferredType === 'html_scraping' ? 12000 : 5000;
+        const timeoutId = setTimeout(() => controller.abort(), proxyTimeout);
         const res = await fetch(`/rss-local-proxy?url=${encodeURIComponent(url)}`, { signal: controller.signal });
         clearTimeout(timeoutId);
         

@@ -308,7 +308,7 @@ export const rssService = {
         let fetchPromise = supabaseRadarGateway.fetchFromSupabaseGateway(feed.url, feed.connectionType);
         
         const timeoutPromise = new Promise<{ data: any; methodUsed: ConnectionType | string; responseTimeMs: number }>((_, reject) => {
-          setTimeout(() => reject(new Error("Tiempo límite excedido para este feed (8s)")), 8000);
+          setTimeout(() => reject(new Error("Tiempo límite excedido para este feed (15s)")), 15000);
         });
 
         let fetchResult;

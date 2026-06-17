@@ -40,7 +40,7 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   { id: 'radioeme', name: 'Radio EME', url: 'https://www.radioeme.com/feed/', defaultCategory: 'provincial', connectionType: 'edge_function' },
 
   { id: 'castellanos', name: 'Diario Castellanos', url: 'https://diariocastellanos.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
-  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://news.google.com/rss/search?q=site:rafaelainforma.com+when:7d&hl=es-419&gl=AR&ceid=AR:es-419', defaultCategory: 'local', connectionType: 'rss_direct' },
+  { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://rafaelainforma.com/sitemap.xml', defaultCategory: 'local', connectionType: 'html_scraping' },
   { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://radiorafaelaapiv3.eleco.com.ar/feed-category/locales', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
   { id: 'laopinion', name: 'La Opinión de Rafaela', url: 'https://www.diariolaopinion.com.ar/', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'minuto_rafaela', name: 'Minuto Rafaela', url: 'https://minutorafaela.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
