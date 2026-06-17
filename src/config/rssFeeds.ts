@@ -39,10 +39,6 @@ export const RSS_FEEDS: RssFeedConfig[] = [
   { id: 'telefesantafe', name: 'Telefe Santa Fe', url: 'https://santafe.mitelefe.com/rss', defaultCategory: 'provincial', connectionType: 'edge_function' },
   { id: 'radioeme', name: 'Radio EME', url: 'https://www.radioeme.com/feed/', defaultCategory: 'provincial', connectionType: 'edge_function' },
 
-  // ============================================
-  // LOCALES & REGIONALES (Amarillo)
-  // ============================================
-  { id: 'rafaela_noticias', name: 'Rafaela Noticias', url: 'https://www.rafaelanoticias.com/', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'castellanos', name: 'Diario Castellanos', url: 'https://diariocastellanos.com.ar/feed/', defaultCategory: 'local', connectionType: 'rss2json_proxy' },
   { id: 'rafaelainforma', name: 'Rafaela Informa', url: 'https://www.rafaelainforma.com/feed/', defaultCategory: 'local', connectionType: 'rss_direct' },
   { id: 'radiorafaela', name: 'Radio Rafaela', url: 'https://radiorafaelaapiv3.eleco.com.ar/feed-category/locales', defaultCategory: 'local', connectionType: 'rss2json_proxy' },

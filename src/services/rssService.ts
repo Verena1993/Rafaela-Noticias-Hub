@@ -228,6 +228,57 @@ export const detectTrueCategory = (
   };
 };
 
+export const isValidJournalisticArticle = (item: any): boolean => {
+  const title = (item.title || '').trim();
+  const url = (item.link || item.url || '').trim();
+
+  // 1. Título periodístico válido
+  if (!title || title.length < 10) {
+    return false;
+  }
+
+  // Descartar títulos puramente numéricos o genéricos/de navegación
+  if (/^\d+$/.test(title)) {
+    return false;
+  }
+
+  const genericTitles = [
+    'home', 'inicio', 'portada', 'contacto', 'about us', 'sobre nosotros', 
+    'sin titulo', 'no title', 'error', '404', 'rss feed', 'suscripción', 'suscripcion',
+    'ingresar', 'login', 'register', 'registrarse'
+  ];
+  if (genericTitles.includes(title.toLowerCase())) {
+    return false;
+  }
+
+  // Títulos que contienen prefijos de taxonomías
+  if (
+    title.startsWith('Categoría:') || 
+    title.startsWith('Etiqueta:') || 
+    title.startsWith('Archivo:') || 
+    title.startsWith('Tag:') ||
+    title.startsWith('Category:')
+  ) {
+    return false;
+  }
+
+  // 2. URLs inválidas (páginas de archivo, categorías, etiquetas, legales, admin, rss)
+  if (url) {
+    const invalidUrlPatterns = [
+      /\/category\//i, /\/tag\//i, /\/author\//i, /\/archivo\//i,
+      /\/contacto/i, /\/about/i, /\/sobre-nosotros/i, /\/politica-de-privacidad/i,
+      /\/terms/i, /\/condiciones/i, /\/wp-admin/i, /\/wp-content/i,
+      /page\/\d+/i, /\?cat=\d+/i, /\?author=\d+/i, /\?p=\d+/i,
+      /\/search\?/i, /\.xml$/i, /\/feed$/i, /\/rss$/i
+    ];
+    if (invalidUrlPatterns.some(pattern => pattern.test(url))) {
+      return false;
+    }
+  }
+
+  return true;
+};
+
 export const rssService = {
   fetchNews: async (): Promise<{ items: NewsRadarItem[]; alerts: { title: string; severity: 'critical' | 'urgent' | 'high' | 'medium' | 'normal'; sourceName?: string; sourceUrl?: string; publishedAt?: string; category?: string; region?: string; classificationReason?: string; priority?: number }[]; diagnostics: RssDiagnostic[] }> => {
     const allItems: NewsRadarItem[] = [];
@@ -283,6 +334,11 @@ export const rssService = {
           const detectedAt = new Date().toISOString();
 
           data.items.forEach((item: any) => {
+            if (!isValidJournalisticArticle(item)) {
+              console.log(`[DESCARTADA: Artículo inválido] ${item.title || 'Sin título'} | ${feed.name}`);
+              return;
+            }
+
             const cleanSummary = (item.description || item.content || '').replace(/<[^>]+>/g, '').trim();
             
             // Validate date
