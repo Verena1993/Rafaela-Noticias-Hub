@@ -7,13 +7,12 @@ import {
 } from 'lucide-react';
 import type { RadarCategory, NewsRadarItem } from '../types';
 
-import { formatFriendlyDate } from '../utils/dateUtils';
 import { aiService } from '../services/aiService';
 import { isSimilarTitle } from '../services/rssService';
 import { TextAutocompleteModal } from './TextAutocompleteModal';
+import { SourceStatus } from './SourceStatus';
 
-
-type RadarMainTab = 'all' | 'local' | 'regional' | 'provincial' | 'national' | 'international' | 'trends';
+type RadarMainTab = 'all' | 'local' | 'regional' | 'provincial' | 'national' | 'international' | 'trends' | 'sources';
 
 const CATEGORY_CONFIG: Record<RadarCategory, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   national: { label: 'Nacional', icon: Globe, color: '#3b82f6', bg: 'rgba(59,130,246,0.1)' },
@@ -37,7 +36,8 @@ export const NewsRadar: React.FC = () => {
     coverages, 
     proposals,
     alerts,
-    closedAlertIds
+    closedAlertIds,
+    rssDiagnostics
   } = useHub();
   
   const [mainTab, setMainTab] = useState<RadarMainTab>('all');
@@ -177,37 +177,7 @@ export const NewsRadar: React.FC = () => {
     return result;
   }, [tabItems]);
 
-  // Split feed into temporal blocks
-  const temporalBlocks = React.useMemo(() => {
-    const now = Date.now();
-    
-    const blocks = {
-      '30min': { label: '⏱️ Últimos 30 minutos', items: [] as NewsRadarItem[] },
-      '1hour': { label: '⏱️ Última hora', items: [] as NewsRadarItem[] },
-      '3hours': { label: '⏱️ Últimas 3 horas', items: [] as NewsRadarItem[] },
-      '6hours': { label: '⏱️ Últimas 6 horas', items: [] as NewsRadarItem[] },
-      'day': { label: '📅 Del día', items: [] as NewsRadarItem[] }
-    };
-
-    processedFeed.forEach(item => {
-      const itemTime = new Date(item.date).getTime();
-      const diffMs = now - itemTime;
-      
-      if (diffMs <= 30 * 60 * 1000) {
-        blocks['30min'].items.push(item);
-      } else if (diffMs <= 60 * 60 * 1000) {
-        blocks['1hour'].items.push(item);
-      } else if (diffMs <= 3 * 60 * 60 * 1000) {
-        blocks['3hours'].items.push(item);
-      } else if (diffMs <= 6 * 60 * 60 * 1000) {
-        blocks['6hours'].items.push(item);
-      } else {
-        blocks['day'].items.push(item);
-      }
-    });
-
-    return Object.entries(blocks).filter(([_, b]) => b.items.length > 0);
-  }, [processedFeed]);
+  // processedFeed is already sorted by date descending — rendered as flat list
 
   const handleGenerateDraft = async (item: NewsRadarItem) => {
     setGeneratingId(item.id);
@@ -253,16 +223,28 @@ export const NewsRadar: React.FC = () => {
     }
   };
 
-  const formatFriendlyTime = (dateStr: string) => {
-    const d = new Date(dateStr);
-    const hours = String(d.getHours()).padStart(2, '0');
-    const minutes = String(d.getMinutes()).padStart(2, '0');
-    return `${hours}:${minutes}`;
+  // Format date+time in Argentina timezone (UTC-3)
+  const formatArgentina = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        day: '2-digit', month: '2-digit', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      }).replace(',', '');
+    } catch { return dateStr; }
   };
 
-  const formatDateLabel = (dateStr: string) => {
-    return formatFriendlyDate(dateStr);
+  const formatFriendlyTime = (dateStr: string) => {
+    if (!dateStr) return '';
+    try {
+      return new Date(dateStr).toLocaleString('es-AR', {
+        timeZone: 'America/Argentina/Buenos_Aires',
+        hour: '2-digit', minute: '2-digit', hour12: false
+      });
+    } catch { return ''; }
   };
+
 
   // Render a single Radar Card (Linear, chronologically sorted)
   const renderItemCard = (item: NewsRadarItem) => {
@@ -272,7 +254,7 @@ export const NewsRadar: React.FC = () => {
     const isGenerating = generatingId === item.id;
     const isSending = sendingId === item.id;
     const timeFormatted = formatFriendlyTime(item.date);
-    const geoText = item.region ? (item.region.charAt(0).toUpperCase() + item.region.slice(1)) : (item.category.charAt(0).toUpperCase() + item.category.slice(1));
+
     
     return (
       <div 
@@ -298,7 +280,7 @@ export const NewsRadar: React.FC = () => {
           </div>
           
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginBottom: '0.35rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'monospace' }}>
                 {timeFormatted}
               </span>
@@ -311,17 +293,20 @@ export const NewsRadar: React.FC = () => {
                 {catConfig.label}
               </span>
 
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '0.2rem' }}>
-                📍 {geoText}
-              </span>
-              
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                 • {item.source}
               </span>
+            </div>
 
-              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                ({formatDateLabel(item.date)})
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.4rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                📅 <strong>Publicado:</strong> {formatArgentina(item.date)}
               </span>
+              {item.detectedAt && item.detectedAt !== item.date && (
+                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                  🔍 <strong>Detectado:</strong> {formatArgentina(item.detectedAt)}
+                </span>
+              )}
             </div>
 
             <h3 style={{ fontSize: '0.95rem', fontWeight: 700, margin: '0 0 0.4rem 0', lineHeight: 1.4, color: 'var(--text-primary)' }}>
@@ -491,10 +476,13 @@ export const NewsRadar: React.FC = () => {
               <TabButton tab="national" label="Nacionales" count={countNational} color="#3b82f6" />
               <TabButton tab="international" label="Internacionales" count={countInternational} color="#a855f7" />
               <TabButton tab="trends" label="Tendencias" color="#ec4899" />
+              <TabButton tab="sources" label="Estado de Fuentes" color="#6366f1" />
             </div>
 
             {/* List of News / Placeholder */}
-            {mainTab === 'trends' ? (
+            {mainTab === 'sources' ? (
+              <SourceStatus diagnostics={rssDiagnostics} onRefresh={fetchLiveRadarNews} loading={loadingRadar} />
+            ) : mainTab === 'trends' ? (
               <div style={{ 
                 padding: '3rem 2rem', 
                 textAlign: 'center', 
@@ -510,24 +498,8 @@ export const NewsRadar: React.FC = () => {
                 <h3 style={{ fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
                   Monitoreo Social de Tendencias
                 </h3>
-                <p style={{ 
-                  fontSize: '0.9rem', 
-                  color: 'var(--text-secondary)', 
-                  maxWidth: '500px', 
-                  lineHeight: 1.5,
-                  margin: 0,
-                  fontWeight: 600
-                }}>
+                <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', maxWidth: '500px', lineHeight: 1.5, margin: 0 }}>
                   Próximamente: integración con Instagram, TikTok, Google Trends y otras fuentes sociales.
-                </p>
-                <p style={{ 
-                  fontSize: '0.78rem', 
-                  color: 'var(--text-muted)', 
-                  maxWidth: '450px', 
-                  lineHeight: 1.4,
-                  margin: 0
-                }}>
-                  Este módulo independiente está reservado para una futura implementación de monitoreo social y detección de conversaciones relevantes para Rafaela Noticias.
                 </p>
               </div>
             ) : processedFeed.length === 0 ? (
@@ -535,26 +507,8 @@ export const NewsRadar: React.FC = () => {
                 No hay noticias en esta categoría geográfica.
               </div>
             ) : (
-              <div>
-                {temporalBlocks.map(([key, block]) => (
-                  <div key={key} style={{ marginBottom: '2rem' }}>
-                    <h3 style={{
-                      fontSize: '0.85rem',
-                      fontWeight: 800,
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      borderBottom: '1px dashed var(--border-color)',
-                      paddingBottom: '0.4rem',
-                      marginBottom: '0.75rem'
-                    }}>
-                      {block.label}
-                    </h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                      {block.items.map(renderItemCard)}
-                    </div>
-                  </div>
-                ))}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {processedFeed.map(renderItemCard)}
               </div>
             )}
           </div>
@@ -584,33 +538,27 @@ export const NewsRadar: React.FC = () => {
               </div>
               <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 {(() => {
-                  // Alertas críticas y urgentes de cualquier categoría - monitoreo editorial (máximo 10)
+                  // Solo alertas de medios LOCALES y REGIONALES, con severidad crítica o urgente
                   const activeSidebarAlerts = alerts
                     .filter(a =>
                       a.status === 'active' &&
                       !closedAlertIds.has(a.id) &&
-                      (a.severity === 'critical' || a.severity === 'urgent' || a.severity === 'high')
+                      (a.category === 'local' || a.category === 'regional') &&
+                      (a.severity === 'critical' || a.severity === 'urgent')
                     )
                     .sort((a, b) => {
-                      // 1. Gravedad
+                      // 1. Gravedad: crítica antes que urgente
                       const severityOrder = { critical: 0, urgent: 1, high: 2, medium: 3, normal: 4 };
                       const orderA = severityOrder[a.severity as keyof typeof severityOrder] ?? 99;
                       const orderB = severityOrder[b.severity as keyof typeof severityOrder] ?? 99;
                       if (orderA !== orderB) return orderA - orderB;
 
-                      // 2. Cercanía territorial (según la categoría de la fuente)
-                      const getProximityPriority = (category?: string): number => {
-                        if (category === 'local') return 1;
-                        if (category === 'regional') return 2;
-                        if (category === 'provincial') return 3;
-                        if (category === 'national') return 4;
-                        return 5; // international
-                      };
-                      const prioA = getProximityPriority(a.category);
-                      const prioB = getProximityPriority(b.category);
+                      // 2. Locales antes que regionales
+                      const prioA = a.category === 'local' ? 1 : 2;
+                      const prioB = b.category === 'local' ? 1 : 2;
                       if (prioA !== prioB) return prioA - prioB;
 
-                      // 3. Fecha de publicación/detección (más reciente primero)
+                      // 3. Más reciente primero
                       const timeA = new Date(a.publishedAt || a.timestamp).getTime();
                       const timeB = new Date(b.publishedAt || b.timestamp).getTime();
                       return timeB - timeA;
