@@ -454,6 +454,25 @@ export const NewsRadar: React.FC = () => {
             <RefreshCw size={14} style={{ animation: loadingRadar ? 'spin 1s linear infinite' : 'none' }} />
             {loadingRadar ? 'Actualizando...' : 'Actualizar fuentes'}
           </button>
+          <button 
+            className="btn btn-secondary" 
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.4rem', 
+              fontSize: '0.75rem', 
+              padding: '0.35rem 0.7rem',
+              backgroundColor: mainTab === 'sources' ? 'var(--bg-tertiary)' : 'var(--bg-secondary)',
+              border: '1px solid var(--border-color)',
+              color: 'var(--text-primary)',
+              lineHeight: 1.2,
+              fontWeight: 600,
+              height: '35px'
+            }}
+            onClick={() => setMainTab(mainTab === 'sources' ? 'all' : 'sources')}
+          >
+            <span>⚙️</span> {mainTab === 'sources' ? 'Volver al Radar' : 'Estado de Fuentes'}
+          </button>
         </div>
       </div>
 
@@ -479,7 +498,6 @@ export const NewsRadar: React.FC = () => {
               <TabButton tab="national" label="Nacionales" count={countNational} color="#3b82f6" />
               <TabButton tab="international" label="Internacionales" count={countInternational} color="#a855f7" />
               <TabButton tab="trends" label="Tendencias" color="#ec4899" />
-              <TabButton tab="sources" label="Estado de Fuentes" color="#6366f1" />
             </div>
 
             {/* List of News / Placeholder */}
