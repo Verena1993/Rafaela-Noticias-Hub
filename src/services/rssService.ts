@@ -435,11 +435,16 @@ export const rssService = {
               motivoClasificacion: `SELECCIONADA (Top 3 del medio). Detalles: ${x.reasons.join(', ')}`
             });
 
+            let cleanTitle = x.item.title;
+            if (feed.id === 'rafaelainforma') {
+              cleanTitle = cleanTitle.replace(/\s*-\s*Rafaela\s*Informa$/i, '').trim();
+            }
+
             // Process alerts (only for selected news)
-            const classification = classifyAlert(x.item.title, x.cleanSummary, x.smartCategory);
+            const classification = classifyAlert(cleanTitle, x.cleanSummary, x.smartCategory);
             if (classification) {
               alerts.push({
-                title: x.item.title,
+                title: cleanTitle,
                 severity: classification,
                 sourceName: feed.name,
                 sourceUrl: x.item.link || '',
@@ -453,7 +458,7 @@ export const rssService = {
 
             feedItems.push({
               id: `rss_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-              title: x.item.title,
+              title: cleanTitle,
               summary: x.cleanSummary ? (x.cleanSummary.length > 200 ? x.cleanSummary.substring(0, 200) + '...' : x.cleanSummary) : '',
               source: feed.name,
               date: x.parsedDate.toISOString(),
