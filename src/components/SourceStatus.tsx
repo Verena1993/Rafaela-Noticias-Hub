@@ -225,17 +225,20 @@ export const SourceStatus: React.FC<SourceStatusProps> = ({ diagnostics, onRefre
                         <td style={{ padding: '0.6rem 0.75rem', whiteSpace: 'nowrap', fontWeight: 700 }}>
                           {isPending ? (
                             <span style={{ color: '#6b7280' }}>Pendiente</span>
-                          ) : diag?.reason ? (
-                            <span style={{
-                              color: diag.reason === 'Activa' 
-                                ? '#22c55e' 
-                                : diag.reason === 'Sin artículos detectados' 
-                                ? '#f59e0b'
-                                : '#ef4444'
-                            }}>
-                              {diag.reason}
-                            </span>
-                          ) : (
+                          ) : diag?.reason ? (() => {
+                            const r = diag.reason;
+                            let color: string;
+                            if (r === 'Activa' || (r.startsWith('PORTADA (') && !r.includes('+ RSS'))) {
+                              color = '#22c55e';
+                            } else if (r.includes('+ RSS')) {
+                              color = '#f59e0b';
+                            } else if (r.startsWith('RSS FALLBACK')) {
+                              color = '#f97316';
+                            } else {
+                              color = '#ef4444';
+                            }
+                            return <span style={{ color }}>{r}</span>;
+                          })() : (
                             <span style={{ color: 'var(--text-muted)' }}>—</span>
                           )}
                         </td>

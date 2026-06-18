@@ -184,10 +184,12 @@ const scrapeRafaelaInforma = (xmlOrHtml: string): any[] => {
 const scrapeRadioRafaela = (html: string): any[] => {
   const items: any[] = [];
   let match;
+  let countA = 0, countB = 0, countC = 0;
 
   // 1. Primary/Hero Note
   const primaryRegex = /class="[^"]*PrimaryNote_PrimaryNoteLink[^"]*"[^>]*href="([^"]+)"[^>]*>[\s\S]*?<h\d[^>]*class="[^"]*PrimaryNote_PrimaryNoteTitle[^"]*"[^>]*>([\s\S]*?)<\/h\d>/gi;
   while ((match = primaryRegex.exec(html)) !== null) {
+    countA++;
     let link = match[1];
     if (link.startsWith('/')) link = 'https://radiorafaela.com.ar' + link;
     const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim());
@@ -206,6 +208,7 @@ const scrapeRadioRafaela = (html: string): any[] => {
   // 2. Secondary Notes
   const secondaryRegex = /<a[^>]*href="([^"]+)"[^>]*aria-label="([^"]+)"[^>]*class="[^"]*SecondaryNotes_SecondaryNotesLink[^"]*"/gi;
   while ((match = secondaryRegex.exec(html)) !== null) {
+    countB++;
     let link = match[1];
     if (link.startsWith('/')) link = 'https://radiorafaela.com.ar' + link;
     const title = decodeHtmlEntities(match[2].replace(/&quot;/g, '"').trim());
@@ -224,6 +227,7 @@ const scrapeRadioRafaela = (html: string): any[] => {
   // 3. General Notes / standard list
   const generalRegex = /<a[^>]*href="([^"]+)"[^>]*class="[^"]*Note_NoteTitleLink[^"]*"[^>]*>\s*<h\d[^>]*class="[^"]*Note_NoteTitle[^"]*"[^>]*>([\s\S]*?)<\/h\d>/gi;
   while ((match = generalRegex.exec(html)) !== null) {
+    countC++;
     let link = match[1];
     if (link.startsWith('/')) link = 'https://radiorafaela.com.ar' + link;
     const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim());
@@ -239,6 +243,7 @@ const scrapeRadioRafaela = (html: string): any[] => {
     }
   }
 
+  console.log(`[SCRAPER Radio Rafaela] SelA (PrimaryNote): ${countA} | SelB (SecondaryNotes): ${countB} | SelC (GeneralNotes): ${countC} | Total deduplicado: ${items.length}`);
   return items;
 };
 
@@ -265,14 +270,19 @@ const scrapeDiarioCastellanos = (html: string): any[] => {
       });
     }
   }
+  console.log(`[SCRAPER Diario Castellanos] Selector (tdb/entry-title): ${items.length} noticias encontradas en portada`);
   return items;
 };
 
 const scrapeMinutoRafaela = (html: string): any[] => {
   const items: any[] = [];
-  const titleRegex = /<h\d[^>]*class="[^"]*thumb-info-inner[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   let match;
-  while ((match = titleRegex.exec(html)) !== null) {
+  let countA = 0, countB = 0;
+
+  // Selector A: contenedor thumb-info-inner (carrusel hero — máx 3 artículos)
+  const heroRegex = /<h\d[^>]*class="[^"]*thumb-info-inner[^"]*"[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  while ((match = heroRegex.exec(html)) !== null) {
+    countA++;
     let link = match[1];
     const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim());
     if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
@@ -286,6 +296,28 @@ const scrapeMinutoRafaela = (html: string): any[] => {
       });
     }
   }
+
+  // Selector B: thumb-info-title o entry-title (grid completo — hasta 19 artículos)
+  // Captura <h2 class="thumb-info-title"><a href="...">Título</a></h2>
+  // y <h2 class="entry-title"><a href="...">Título</a></h2>
+  const gridRegex = /<h\d[^>]*class="[^"]*(?:thumb-info-title|entry-title)[^"]*"[^>]*>[\s\S]*?<a[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  while ((match = gridRegex.exec(html)) !== null) {
+    countB++;
+    let link = match[1];
+    const title = decodeHtmlEntities(match[2].replace(/<[^>]+>/g, '').trim());
+    if (title.length >= 10 && !/^(https?:\/\/|www\.)/i.test(title) && !items.some(x => x.link === link)) {
+      items.push({
+        title,
+        link,
+        pubDate: new Date().toISOString(),
+        description: title,
+        content: title,
+        author: 'Minuto Rafaela'
+      });
+    }
+  }
+
+  console.log(`[SCRAPER Minuto Rafaela] SelA (thumb-info-inner hero): ${countA} | SelB (thumb-info-title/entry-title grid): ${countB} | Total deduplicado: ${items.length}`);
   return items;
 };
 

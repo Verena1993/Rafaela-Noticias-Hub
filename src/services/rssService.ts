@@ -363,29 +363,32 @@ export const rssService = {
             coverError = err;
             coverStatus = 'ERROR';
           }
+          // Log de portada — diagnóstico por fuente
+          console.log(`[${feed.name}] Portada scraping: ${coverItems.length} noticias encontradas${coverStatus === 'ERROR' ? ` — ERROR: ${coverError?.message}` : ''}`);
         }
 
-        // Fetch fallback RSS if we need more items
-        if ((coverItems.length < 3 || coverStatus === 'ERROR') && feed.rssFallbackUrl) {
+        // RSS Fallback: solo se activa si el scraper devolvió 0 noticias O hubo error de red.
+        // Si portada tiene ≥ 1 noticia válida, se usa portada exclusivamente (sin completar con RSS).
+        const rssNeeded = (coverItems.length === 0 || coverStatus === 'ERROR') && !!feed.rssFallbackUrl;
+        if (rssNeeded) {
+          console.log(`[${feed.name}] RSS Fallback ACTIVADO — motivo: ${coverStatus === 'ERROR' ? `error de scraper (${coverError?.message})` : '0 noticias en portada'}`);
           try {
-            const fallbackType = feed.rssFallbackUrl.includes('google.com') ? 'google_news' : 'rss2json_proxy';
-            const fetchResult = await supabaseRadarGateway.fetchFromSupabaseGateway(feed.rssFallbackUrl, fallbackType);
-            if (coverItems.length === 0) {
-              methodUsed = fetchResult.methodUsed as ConnectionType;
-              responseTimeMs = fetchResult.responseTimeMs;
-            } else {
-              responseTimeMs += fetchResult.responseTimeMs;
-            }
+            const fallbackType = feed.rssFallbackUrl!.includes('google.com') ? 'google_news' : 'rss2json_proxy';
+            const fetchResult = await supabaseRadarGateway.fetchFromSupabaseGateway(feed.rssFallbackUrl!, fallbackType);
+            methodUsed = fetchResult.methodUsed as ConnectionType;
+            responseTimeMs = fetchResult.responseTimeMs;
             if (fetchResult.data && Array.isArray(fetchResult.data.items)) {
               fallbackItems = fetchResult.data.items;
             }
           } catch (errFallback: any) {
-            if (coverItems.length === 0 && coverStatus === 'ERROR') {
+            if (coverStatus === 'ERROR') {
               throw coverError || errFallback;
             }
           }
         } else if (coverStatus === 'ERROR') {
           throw coverError;
+        } else if (feed.connectionType === 'html_scraping' && coverItems.length >= 1) {
+          console.log(`[${feed.name}] RSS Fallback OMITIDO — portada devolvió ${coverItems.length} noticias, se usa exclusivamente portada.`);
         }
 
         // For non-scraping channels (like standard national RSS)
@@ -587,13 +590,14 @@ export const rssService = {
             if (feed.connectionType === 'html_scraping') {
               let reasonStr = '';
               if (portadaCount > 0 && rssCount > 0) {
-                reasonStr = `Portada HTML (${portadaCount}) + RSS Fallback (${rssCount})`;
+                reasonStr = `PORTADA (${portadaCount}) + RSS (${rssCount})`;
               } else if (portadaCount > 0) {
-                reasonStr = `Portada HTML (${portadaCount})`;
+                reasonStr = `PORTADA (${portadaCount})`;
               } else {
-                reasonStr = `RSS Fallback (${rssCount})`;
+                reasonStr = `RSS FALLBACK (${rssCount})`;
               }
               diag.reason = reasonStr;
+              console.log(`[${feed.name}] Resultado final: ${reasonStr}`);
             } else {
               diag.reason = 'Activa';
             }
