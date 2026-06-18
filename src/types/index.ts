@@ -3,8 +3,10 @@ export interface User {
   name: string;
   email: string;
   password?: string;
-  role: 'admin' | 'journalist';
+  role: 'admin' | 'editor' | 'journalist';
   avatarColor: string;
+  activo?: boolean;
+  created_at?: string;
 }
 
 export interface Comment {

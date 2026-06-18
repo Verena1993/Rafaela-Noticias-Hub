@@ -2,6 +2,20 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { INITIAL_USERS, INITIAL_COVERAGES, INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS, INITIAL_PROPOSALS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR } from '../data/initialData';
 
 import type { User, Coverage, Task, Alert, CalendarEvent, Notification, Activity, Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, StaffSchedule, ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic } from '../types';
+import { supabase } from '../lib/supabase';
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseAdminClient = createClient(
+  'https://htujxxcfoiumykhmpbwe.supabase.co',
+  'sb_publishable_-92NeVbbQCIdgVPUpeav-g_auqe0oDV',
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false
+    }
+  }
+);
 
 const generateStableId = (title: string): string => {
   let hash = 0;
@@ -24,8 +38,11 @@ interface HubContextType {
   proposals: Proposal[];
   staffSchedules: StaffSchedule[];
   newsRadarItems: NewsRadarItem[];
-  login: (email: string, password?: string) => boolean;
-  logout: () => void;
+  login: (email: string, password?: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  createHubUser: (nombre: string, email: string, password?: string, rol?: 'admin' | 'editor') => Promise<void>;
+  updateHubUser: (id: string, updates: Partial<User>) => Promise<void>;
+  toggleUserActive: (id: string, activo: boolean) => Promise<void>;
   addCoverage: (title: string, description: string, dateTime: string, location: string, assignees: string[], programs?: ProgramType[], formats?: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[]) => string;
   updateCoverageStatus: (coverageId: string, status: Coverage['status']) => void;
   addCommentToCoverage: (coverageId: string, text: string) => void;
@@ -46,7 +63,7 @@ interface HubContextType {
   setSearchQuery: (query: string) => void;
   logActivity: (coverageId: string | undefined, action: string) => void;
   activities: Activity[];
-  
+
   // Proposals
   addProposal: (title: string, description: string, dateTime?: string, location?: string, assignees?: string[], files?: Omit<MultimediaItem, 'id' | 'uploadDate' | 'userId'>[], links?: Omit<SharedLink, 'id' | 'uploadDate' | 'userId'>[], programs?: ProgramType[], formats?: FormatType[]) => void;
   updateProposalStatus: (proposalId: string, status: Proposal['status']) => void;
@@ -63,7 +80,7 @@ interface HubContextType {
   updateInstagramPost: (id: string, updates: Partial<InstagramPost>) => void;
   deleteInstagramPost: (id: string) => void;
   updateProposalDetails: (proposalId: string, title: string, description: string, dateTime?: string, location?: string, assignees?: string[], programs?: ProgramType[], formats?: FormatType[]) => void;
-  
+
   // News Radar
   updateNewsRadarItem: (id: string, updates: Partial<NewsRadarItem>) => void;
   fetchLiveRadarNews: () => Promise<void>;
@@ -84,11 +101,8 @@ export const useHub = () => {
 };
 
 export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Load initial states from localStorage if available
-  const [currentUser, setCurrentUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('hub_current_user');
-    return saved ? JSON.parse(saved) : null;
-  });
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
 
   const [coverages, setCoverages] = useState<Coverage[]>(() => {
     const saved = localStorage.getItem('hub_coverages');
@@ -178,7 +192,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setRadarError(null);
     try {
       const { rssService } = await import('../services/rssService');
-      
+
       const result = await rssService.fetchNews();
       const { items, alerts: newAlerts, diagnostics } = result;
 
@@ -187,7 +201,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       setRssDiagnostics(diagnostics);
       setLastRadarUpdate(new Date().toISOString());
-      
+
       // Add alerts to global context
       if (newAlerts.length > 0) {
         setAlerts(prev => {
@@ -222,6 +236,112 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setLoadingRadar(false);
     }
   };
+
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*');
+      if (error) {
+        console.error('Error fetching profiles:', error.message);
+        return;
+      }
+      if (data) {
+        const dbUsers: User[] = data.map(p => ({
+          id: p.id,
+          name: p.nombre,
+          email: p.email,
+          role: p.rol as 'admin' | 'editor',
+          avatarColor: p.rol === 'admin' ? '#1e3a8a' : '#0f766e',
+          activo: p.activo,
+          created_at: p.created_at
+        }));
+
+        // Merge dbUsers with INITIAL_USERS to keep mock users
+        const merged = [...INITIAL_USERS];
+        dbUsers.forEach(dbU => {
+          const idx = merged.findIndex(u => u.email.toLowerCase() === dbU.email.toLowerCase());
+          if (idx !== -1) {
+            merged[idx] = { ...merged[idx], ...dbU };
+          } else {
+            merged.push(dbU);
+          }
+        });
+        setUsers(merged);
+      }
+    } catch (err) {
+      console.error('Failed to fetch profiles:', err);
+    }
+  };
+
+  useEffect(() => {
+    // 1. Initial auth check
+    const checkUser = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        if (profile && profile.activo) {
+          setCurrentUser({
+            id: profile.id,
+            name: profile.nombre,
+            email: profile.email,
+            role: profile.rol as 'admin' | 'editor',
+            avatarColor: profile.rol === 'admin' ? '#1e3a8a' : '#0f766e',
+            activo: profile.activo,
+            created_at: profile.created_at
+          });
+        } else {
+          if (profile && !profile.activo) {
+            await supabase.auth.signOut();
+          }
+          setCurrentUser(null);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      fetchUsers();
+    };
+
+    checkUser();
+
+    // 2. Auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        if (profile && profile.activo) {
+          setCurrentUser({
+            id: profile.id,
+            name: profile.nombre,
+            email: profile.email,
+            role: profile.rol as 'admin' | 'editor',
+            avatarColor: profile.rol === 'admin' ? '#1e3a8a' : '#0f766e',
+            activo: profile.activo,
+            created_at: profile.created_at
+          });
+        } else {
+          if (profile && !profile.activo) {
+            await supabase.auth.signOut();
+          }
+          setCurrentUser(null);
+        }
+      } else {
+        setCurrentUser(null);
+      }
+      fetchUsers();
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     // Automatically load RSS feeds on initial mount
@@ -276,21 +396,21 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Enforce bidireccional event <-> coverage 1-to-1 sync and auto-creation of missing coverages (Req 33 & 35)
   useEffect(() => {
     let coveragesUpdated = false;
-    
+
     const currentCoverages = [...coverages];
     const currentEvents = [...events];
-    
+
     // Check all events and ensure they have a coverage
     const updatedEvents = currentEvents.map(evt => {
       let covId = evt.coverageId;
       let eventChanged = false;
-      
+
       // Every event must have a coverageId
       if (!covId) {
         covId = `cov_auto_${evt.id}`;
         eventChanged = true;
       }
-      
+
       // Verify if corresponding coverage exists in list
       const coverageExists = currentCoverages.some(c => c.id === covId);
       if (!coverageExists) {
@@ -327,34 +447,129 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentCoverages.push(newCoverage);
         coveragesUpdated = true;
       }
-      
+
       return eventChanged ? { ...evt, coverageId: covId } : evt;
     });
-    
+
     // Update state only if changed, using string comparison to avoid loops
     const eventsStr = JSON.stringify(events);
     const updatedEventsStr = JSON.stringify(updatedEvents);
     if (eventsStr !== updatedEventsStr) {
       setEvents(updatedEvents);
     }
-    
+
     if (coveragesUpdated) {
       setCoverages(currentCoverages);
     }
   }, [events, coverages]);
 
   // Auth
-  const login = (email: string, password?: string): boolean => {
-    const user = INITIAL_USERS.find(u => u.email.toLowerCase() === email.toLowerCase() && (!password || u.password === password));
-    if (user) {
-      setCurrentUser(user);
-      return true;
+  const login = async (email: string, password?: string): Promise<boolean> => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password: password || 'password123',
+      });
+      if (error) {
+        throw error;
+      }
+      if (data.user) {
+        const { data: profiles, error: pError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', data.user.id);
+
+        const profile = profiles?.[0];
+        if (pError || !profile) {
+          await supabase.auth.signOut();
+          throw new Error('Perfil de usuario no encontrado.');
+        }
+        if (!profile.activo) {
+          await supabase.auth.signOut();
+          throw new Error('Tu cuenta ha sido desactivada. Comunícate con el administrador.');
+        }
+
+        setCurrentUser({
+          id: profile.id,
+          name: profile.nombre,
+          email: profile.email,
+          role: profile.rol as 'admin' | 'editor',
+          avatarColor: profile.rol === 'admin' ? '#1e3a8a' : '#0f766e',
+          activo: profile.activo,
+          created_at: profile.created_at
+        });
+        return true;
+      }
+      return false;
+    } catch (err: any) {
+      console.error('Error logging in:', err.message);
+      throw err;
     }
-    return false;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setCurrentUser(null);
+  };
+
+  const createHubUser = async (nombre: string, email: string, password?: string, rol?: 'admin' | 'editor') => {
+    try {
+      const { data, error } = await supabaseAdminClient.auth.signUp({
+        email,
+        password: password || 'password123',
+        options: {
+          data: {
+            nombre,
+            rol: rol || 'editor'
+          }
+        }
+      });
+      if (error) {
+        throw error;
+      }
+      console.log('User created:', data);
+      await fetchUsers();
+    } catch (err: any) {
+      console.error('Error in createHubUser:', err.message);
+      throw err;
+    }
+  };
+
+  const updateHubUser = async (id: string, updates: Partial<User>) => {
+    try {
+      const dbUpdates: any = {};
+      if (updates.name) dbUpdates.nombre = updates.name;
+      if (updates.role) dbUpdates.rol = updates.role;
+      if (updates.activo !== undefined) dbUpdates.activo = updates.activo;
+
+      const { error } = await supabase
+        .from('profiles')
+        .update(dbUpdates)
+        .eq('id', id);
+      if (error) {
+        throw error;
+      }
+      await fetchUsers();
+    } catch (err: any) {
+      console.error('Error in updateHubUser:', err.message);
+      throw err;
+    }
+  };
+
+  const toggleUserActive = async (id: string, activo: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ activo })
+        .eq('id', id);
+      if (error) {
+        throw error;
+      }
+      await fetchUsers();
+    } catch (err: any) {
+      console.error('Error in toggleUserActive:', err.message);
+      throw err;
+    }
   };
 
   // Activity Log helper
@@ -386,10 +601,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Coverages
   const addCoverage = (
-    title: string, 
-    description: string, 
-    dateTime: string, 
-    location: string, 
+    title: string,
+    description: string,
+    dateTime: string,
+    location: string,
     assignees: string[],
     programs?: ProgramType[],
     formats?: FormatType[],
@@ -597,10 +812,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addMultimediaToCoverage = (
-    coverageId: string, 
-    name: string, 
-    type: 'photo' | 'video' | 'audio' | 'document', 
-    url: string, 
+    coverageId: string,
+    name: string,
+    type: 'photo' | 'video' | 'audio' | 'document',
+    url: string,
     size: string
   ) => {
     if (!currentUser) return;
@@ -636,9 +851,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const addSharedLinkToCoverage = (
-    coverageId: string, 
-    title: string, 
-    url: string, 
+    coverageId: string,
+    title: string,
+    url: string,
     comments?: string
   ) => {
     if (!currentUser) return;
@@ -673,9 +888,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updatePublicationStatus = (
-    coverageId: string, 
-    platform: keyof PublicationChecklist, 
-    status: 'pending' | 'published', 
+    coverageId: string,
+    platform: keyof PublicationChecklist,
+    status: 'pending' | 'published',
     link?: string
   ) => {
     if (!currentUser) return;
@@ -706,8 +921,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           id: `act_${Date.now()}`,
           userId: currentUser.id,
           userName: currentUser.name,
-          action: status === 'published' 
-            ? `marcó como PUBLICADO en ${platformNames[platform]}` 
+          action: status === 'published'
+            ? `marcó como PUBLICADO en ${platformNames[platform]}`
             : `desmarcó publicación en ${platformNames[platform]}`,
           timestamp: new Date().toISOString()
         };
@@ -773,18 +988,18 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Calendar addEvent - creates matching coverage automatically
   const addEvent = (
-    title: string, 
-    description: string, 
-    type: CalendarEvent['type'], 
-    start: string, 
-    end: string, 
+    title: string,
+    description: string,
+    type: CalendarEvent['type'],
+    start: string,
+    end: string,
     location?: string,
     assigneeId?: string,
     programs?: ProgramType[],
     formats?: FormatType[]
   ) => {
     const coverageId = `cov_event_${Date.now()}`;
-    
+
     // Auto-create corresponding Coverage
     const newCoverage: Coverage = {
       id: coverageId,
@@ -910,7 +1125,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   ) => {
     if (!currentUser) return;
     const id = `prop_${Date.now()}`;
-    
+
     const mappedFiles: MultimediaItem[] = files ? files.map((f, i) => ({
       id: `m_prop_${Date.now()}_${i}`,
       type: f.type,
@@ -1006,7 +1221,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return p;
     }));
-    
+
     const statusNames: Record<Proposal['status'], string> = {
       new: 'Nueva',
       in_evaluation: 'En Evaluación',
@@ -1113,7 +1328,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       programs: targetPrograms,
       formats: targetFormats
     };
-    
+
     // Remove the old proposal event from calendar if exists, and insert this new coverage event
     setEvents(prev => {
       const filtered = prev.filter(e => e.id !== `e_prop_${proposalId}`);
@@ -1382,7 +1597,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <HubContext.Provider value={{
       currentUser,
-      users: INITIAL_USERS,
+      users,
       coverages,
       tasks,
       alerts,
@@ -1393,6 +1608,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newsRadarItems,
       login,
       logout,
+      createHubUser,
+      updateHubUser,
+      toggleUserActive,
       addCoverage,
       updateCoverageStatus,
       addCommentToCoverage,

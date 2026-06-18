@@ -13,6 +13,7 @@ import { NewsRadar } from './components/NewsRadar';
 import { ProductionTable } from './components/ProductionTable';
 import { Publications } from './components/Publications';
 import { Coverages } from './components/Coverages';
+import { UserManagement } from './components/UserManagement';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useHub();
@@ -98,6 +99,12 @@ const AppContent: React.FC = () => {
         return <NewsRadar />;
       case 'activity':
         return <ActivityLog />;
+      case 'user-management':
+        if (currentUser?.role !== 'admin') {
+          setTimeout(() => handleTabChange('dashboard'), 0);
+          return null;
+        }
+        return <UserManagement />;
       default:
         return (
           <Dashboard

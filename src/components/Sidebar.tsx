@@ -9,7 +9,8 @@ import {
   Activity, 
   LogOut,
   Table,
-  Kanban
+  Kanban,
+  UserCheck
 } from 'lucide-react';
 
 // Custom Instagram SVG Icon for reliability across lucide-react versions
@@ -57,6 +58,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
     { id: 'activity', name: 'Panel de Actividad', icon: Activity }
   ];
 
+  if (currentUser?.role === 'admin') {
+    menuItems.push({ id: 'user-management', name: 'Gestión de Usuarios', icon: UserCheck });
+  }
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleNavClick = (tabId: string) => {
@@ -102,7 +107,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         </div>
         <div className="user-info">
           <span className="user-name">{currentUser.name}</span>
-          <span className="user-role">Miembro del equipo</span>
+          <span className="user-role" style={{ textTransform: 'capitalize' }}>
+            {currentUser.role === 'admin' ? 'Administrador' : currentUser.role === 'editor' ? 'Editor' : 'Redactor'}
+          </span>
         </div>
         <button 
           className="logout-btn" 

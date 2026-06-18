@@ -1,33 +1,47 @@
 import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
-import { INITIAL_USERS } from '../data/initialData';
 
 import { Radio } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login } = useHub();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('password123'); // Mock default password
+  const [password, setPassword] = useState('password123'); // Default password
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
       setError('Por favor ingresa un correo electrónico.');
       return;
     }
-    const success = login(email, password);
-    if (success) {
-      setError('');
-    } else {
-      setError('Credenciales incorrectas. Verifica tu email y contraseña.');
+    setLoading(true);
+    setError('');
+    try {
+      const success = await login(email, password);
+      if (!success) {
+        setError('No se pudo iniciar sesión.');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Credenciales incorrectas. Verifica tu email y contraseña.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleQuickLogin = (quickEmail: string, quickPass: string) => {
+  const handleQuickLogin = async (quickEmail: string, quickPass: string) => {
     setEmail(quickEmail);
     setPassword(quickPass);
-    login(quickEmail, quickPass);
+    setLoading(true);
+    setError('');
+    try {
+      await login(quickEmail, quickPass);
+    } catch (err: any) {
+      setError(err.message || 'Error en el acceso rápido.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -86,26 +100,35 @@ export const Login: React.FC = () => {
               />
             </div>
 
-            <button type="submit" className="btn btn-primary" style={{ padding: '0.75rem', width: '100%', marginTop: '0.5rem' }}>
-              Ingresar al Hub
+             <button 
+              type="submit" 
+              className="btn btn-primary" 
+              style={{ padding: '0.75rem', width: '100%', marginTop: '0.5rem' }}
+              disabled={loading}
+            >
+              {loading ? 'Ingresando...' : 'Ingresar al Hub'}
             </button>
           </form>
 
           <div className="login-role-selector">
             <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-              Accesos Rápidos (Testing de Roles)
+              Accesos Rápidos (Testing de Roles Supabase)
             </h3>
             <div className="role-shortcut-grid">
-              {INITIAL_USERS.slice(0, 6).map((u) => (
+              {[
+                { name: 'Admin Test', email: 'admin@rafaelanoticias.com', role: 'admin' },
+                { name: 'Editor Test', email: 'editor@rafaelanoticias.com', role: 'editor' }
+              ].map((u) => (
                 <button
-                  key={u.id}
+                  key={u.email}
                   type="button"
                   className="role-shortcut-btn"
-                  onClick={() => handleQuickLogin(u.email, u.password || 'password123')}
+                  onClick={() => handleQuickLogin(u.email, 'password123')}
+                  disabled={loading}
                 >
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{u.name.split(' ')[0]}</span>
+                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{u.name}</span>
                   <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                    {u.role.replace('_', ' ')}
+                    {u.role}
                   </span>
                 </button>
               ))}
