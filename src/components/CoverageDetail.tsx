@@ -1171,10 +1171,9 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                   {/* Left Column - Core Data */}
                   <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Cobertura *</label>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Cobertura</label>
                       <input
                         type="text"
-                        required
                         className="form-input"
                         placeholder="Ej. Sesión en el Concejo Deliberante por el presupuesto."
                         value={editTitle}
@@ -1184,20 +1183,18 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                       <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha *</label>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha</label>
                         <input
                           type="date"
-                          required
                           className="form-input"
                           value={editDate}
                           onChange={(e) => setEditDate(e.target.value)}
                         />
                       </div>
                       <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora *</label>
+                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora</label>
                         <input
                           type="time"
-                          required
                           className="form-input"
                           value={editTime}
                           onChange={(e) => setEditTime(e.target.value)}
@@ -1206,10 +1203,9 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación *</label>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación</label>
                       <input
                         type="text"
-                        required
                         className="form-input"
                         placeholder="Ej. Bv. Santa Fe 300, Rafaela"
                         value={editLocation}
@@ -1218,7 +1214,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                     </div>
 
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Estado *</label>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Estado</label>
                       <select
                         className="form-select"
                         value={editStatus}
