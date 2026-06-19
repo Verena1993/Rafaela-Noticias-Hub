@@ -72,3 +72,37 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
+-- ==========================================
+-- ESTRUCTURA DE TABLA COVERAGES (ALTER TABLE)
+-- Ejecutar en el SQL Editor de tu Dashboard de Supabase
+-- ==========================================
+
+-- Añadir las columnas faltantes una a una de forma segura
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS date_time TEXT NOT NULL DEFAULT '';
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS assignees JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS comments JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS multimedia JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS shared_links JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS publications JSONB NOT NULL DEFAULT '{"portal": {"status": "pending"}, "facebook": {"status": "pending"}, "instagram": {"status": "pending"}, "youtube": {"status": "pending"}}'::jsonb;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS activities JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS programs JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS formats JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS logistics_info TEXT;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS observations TEXT;
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS attachments JSONB NOT NULL DEFAULT '[]'::jsonb;
+
+-- Asegurar que RLS esté habilitado y aplicar las políticas
+ALTER TABLE public.coverages ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Coverages are viewable by authenticated users" ON public.coverages;
+DROP POLICY IF EXISTS "Coverages can be inserted by authenticated users" ON public.coverages;
+DROP POLICY IF EXISTS "Coverages can be updated by authenticated users" ON public.coverages;
+DROP POLICY IF EXISTS "Coverages can be deleted by authenticated users" ON public.coverages;
+
+CREATE POLICY "Coverages are viewable by authenticated users" ON public.coverages FOR SELECT TO authenticated USING (true);
+CREATE POLICY "Coverages can be inserted by authenticated users" ON public.coverages FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "Coverages can be updated by authenticated users" ON public.coverages FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "Coverages can be deleted by authenticated users" ON public.coverages FOR DELETE TO authenticated USING (true);
+

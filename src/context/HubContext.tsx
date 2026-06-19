@@ -100,6 +100,51 @@ export const useHub = () => {
   return context;
 };
 
+const mapDbCoverageToApp = (dbCov: any): Coverage => ({
+  id: dbCov.id,
+  title: dbCov.title,
+  description: dbCov.description || '',
+  dateTime: dbCov.date_time,
+  location: dbCov.location || '',
+  status: dbCov.status,
+  assignees: Array.isArray(dbCov.assignees) ? dbCov.assignees : [],
+  comments: Array.isArray(dbCov.comments) ? dbCov.comments : [],
+  multimedia: Array.isArray(dbCov.multimedia) ? dbCov.multimedia : [],
+  sharedLinks: Array.isArray(dbCov.shared_links) ? dbCov.shared_links : [],
+  publications: dbCov.publications || {
+    portal: { status: 'pending' },
+    facebook: { status: 'pending' },
+    instagram: { status: 'pending' },
+    youtube: { status: 'pending' }
+  },
+  activities: Array.isArray(dbCov.activities) ? dbCov.activities : [],
+  programs: Array.isArray(dbCov.programs) ? dbCov.programs : [],
+  formats: Array.isArray(dbCov.formats) ? dbCov.formats : [],
+  logisticsInfo: dbCov.logistics_info || '',
+  observations: dbCov.observations || '',
+  attachments: Array.isArray(dbCov.attachments) ? dbCov.attachments : []
+});
+
+const mapAppCoverageToDb = (appCov: Coverage) => ({
+  id: appCov.id,
+  title: appCov.title,
+  description: appCov.description,
+  date_time: appCov.dateTime,
+  location: appCov.location,
+  status: appCov.status,
+  assignees: appCov.assignees,
+  comments: appCov.comments,
+  multimedia: appCov.multimedia,
+  shared_links: appCov.sharedLinks,
+  publications: appCov.publications,
+  activities: appCov.activities,
+  programs: appCov.programs || [],
+  formats: appCov.formats || [],
+  logistics_info: appCov.logisticsInfo || '',
+  observations: appCov.observations || '',
+  attachments: appCov.attachments || []
+});
+
 export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>(INITIAL_USERS);
@@ -108,6 +153,45 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const saved = localStorage.getItem('hub_coverages');
     return saved ? JSON.parse(saved) : INITIAL_COVERAGES;
   });
+
+  const [loadingCoverages, setLoadingCoverages] = useState(true);
+
+  const fetchCoverages = async () => {
+    try {
+      const { data, error } = await supabase.from('coverages').select('*');
+      if (error) {
+        console.error('Error fetching coverages from Supabase:', error.message);
+        // Fallback a localStorage o INITIAL_COVERAGES
+        const saved = localStorage.getItem('hub_coverages');
+        setCoverages(saved ? JSON.parse(saved) : INITIAL_COVERAGES);
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const loaded = data.map(mapDbCoverageToApp);
+        setCoverages(loaded);
+        localStorage.setItem('hub_coverages', JSON.stringify(loaded));
+      } else {
+        // Seeding inicial con fallback de localStorage o INITIAL_COVERAGES
+        const saved = localStorage.getItem('hub_coverages');
+        const fallback = saved ? JSON.parse(saved) : INITIAL_COVERAGES;
+        const dbData = fallback.map(mapAppCoverageToDb);
+        const { error: insertError } = await supabase.from('coverages').insert(dbData);
+        if (insertError) {
+          console.error('Error seeding initial coverages to Supabase:', insertError.message);
+        }
+        setCoverages(fallback);
+        localStorage.setItem('hub_coverages', JSON.stringify(fallback));
+      }
+    } catch (err) {
+      console.error('Unexpected error in fetchCoverages:', err);
+      const saved = localStorage.getItem('hub_coverages');
+      setCoverages(saved ? JSON.parse(saved) : INITIAL_COVERAGES);
+    } finally {
+      setLoadingCoverages(false);
+    }
+  };
+
 
   const [tasks, setTasks] = useState<Task[]>(() => {
     const saved = localStorage.getItem('hub_tasks');
@@ -346,6 +430,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     // Automatically load RSS feeds on initial mount
     fetchLiveRadarNews();
+    fetchCoverages();
   }, []);
 
   // Sync to localStorage
@@ -395,10 +480,12 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Enforce bidireccional event <-> coverage 1-to-1 sync and auto-creation of missing coverages (Req 33 & 35)
   useEffect(() => {
-    let coveragesUpdated = false;
+    if (loadingCoverages) return; // Prevent sync before coverages are loaded
 
+    let coveragesUpdated = false;
     const currentCoverages = [...coverages];
     const currentEvents = [...events];
+    const newCoveragesToInsert: Coverage[] = [];
 
     // Check all events and ensure they have a coverage
     const updatedEvents = currentEvents.map(evt => {
@@ -445,6 +532,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           formats: evt.formats || []
         };
         currentCoverages.push(newCoverage);
+        newCoveragesToInsert.push(newCoverage);
         coveragesUpdated = true;
       }
 
@@ -461,7 +549,18 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (coveragesUpdated) {
       setCoverages(currentCoverages);
     }
-  }, [events, coverages]);
+
+    if (newCoveragesToInsert.length > 0) {
+      (async () => {
+        try {
+          const { error } = await supabase.from('coverages').insert(newCoveragesToInsert.map(mapAppCoverageToDb));
+          if (error) throw error;
+        } catch (err: any) {
+          console.error('Error auto-creating coverages in Supabase:', err.message || err);
+        }
+      })();
+    }
+  }, [events, coverages, loadingCoverages]);
 
   // Auth
   const login = async (email: string, password?: string): Promise<boolean> => {
@@ -584,15 +683,30 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     if (coverageId) {
-      setCoverages(prev => prev.map(cov => {
-        if (cov.id === coverageId) {
-          return {
-            ...cov,
-            activities: [newAct, ...(cov.activities || [])]
-          };
+      const cov = coverages.find(c => c.id === coverageId);
+      if (!cov) return;
+      const originalCov = { ...cov };
+      const updatedCov = {
+        ...cov,
+        activities: [newAct, ...(cov.activities || [])]
+      };
+
+      setCoverages(prev => prev.map(c => c.id === coverageId ? updatedCov : c));
+
+      // Persistir asincrónicamente con try-catch
+      (async () => {
+        try {
+          const { error } = await supabase
+            .from('coverages')
+            .update(mapAppCoverageToDb(updatedCov))
+            .eq('id', coverageId);
+          if (error) throw error;
+        } catch (err: any) {
+          console.error('Error logging coverage activity in Supabase:', err.message || err);
+          // Rollback
+          setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
         }
-        return cov;
-      }));
+      })();
     } else {
       // Global activity
       setActivities(prev => [newAct, ...prev]);
@@ -649,6 +763,20 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setCoverages(prev => [newCoverage, ...prev]);
 
+    // Persistencia asíncrona robusta con await y rollback
+    (async () => {
+      try {
+        const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error inserting coverage into Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.filter(c => c.id !== id));
+        setEvents(prev => prev.filter(e => e.coverageId !== id));
+        alert('Error al crear la cobertura en el servidor de base de datos.');
+      }
+    })();
+
     // Also add to calendar events
     const newEvent: CalendarEvent = {
       id: `e_${id}`,
@@ -694,22 +822,40 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       published: 'Publicada'
     };
 
-    setCoverages(prev => prev.map(cov => {
-      if (cov.id === coverageId) {
-        const updatedCov = { ...cov, status };
-        // Create activity
-        const newAct: Activity = {
-          id: `act_${Date.now()}`,
-          userId: currentUser?.id || 'system',
-          userName: currentUser?.name || 'Sistema',
-          action: `cambió el estado a "${statusMap[status]}"`,
-          timestamp: new Date().toISOString()
-        };
-        updatedCov.activities = [newAct, ...(updatedCov.activities || [])];
-        return updatedCov;
+    const cov = coverages.find(c => c.id === coverageId);
+    if (!cov) return;
+
+    const originalCov = { ...cov };
+    const newAct: Activity = {
+      id: `act_${Date.now()}`,
+      userId: currentUser?.id || 'system',
+      userName: currentUser?.name || 'Sistema',
+      action: `cambió el estado a "${statusMap[status]}"`,
+      timestamp: new Date().toISOString()
+    };
+    const updatedCov = {
+      ...cov,
+      status,
+      activities: [newAct, ...(cov.activities || [])]
+    };
+
+    setCoverages(prev => prev.map(c => c.id === coverageId ? updatedCov : c));
+
+    // Persistencia asíncrona robusta con await y rollback
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('coverages')
+          .update(mapAppCoverageToDb(updatedCov))
+          .eq('id', coverageId);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error updating status in Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
+        alert('Error al actualizar el estado de la cobertura en el servidor de base de datos.');
       }
-      return cov;
-    }));
+    })();
 
     // Also update corresponding calendar event status
     setEvents(prev => prev.map(e => {
@@ -724,28 +870,29 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     // Notify users
-    const cov = coverages.find(c => c.id === coverageId);
-    if (cov) {
-      cov.assignees.forEach(uid => {
-        if (uid !== currentUser?.id) {
-          const notif: Notification = {
-            id: `not_${Date.now()}_${uid}`,
-            title: 'Cambio de Estado',
-            message: `El estado de "${cov.title}" cambió a: ${statusMap[status]}`,
-            timestamp: new Date().toISOString(),
-            read: false,
-            type: 'coverage',
-            linkId: coverageId
-          };
-          setNotifications(prev => [notif, ...prev]);
-        }
-      });
-    }
+    cov.assignees.forEach(uid => {
+      if (uid !== currentUser?.id) {
+        const notif: Notification = {
+          id: `not_${Date.now()}_${uid}`,
+          title: 'Cambio de Estado',
+          message: `El estado de "${cov.title}" cambió a: ${statusMap[status]}`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'coverage',
+          linkId: coverageId
+        };
+        setNotifications(prev => [notif, ...prev]);
+      }
+    });
   };
 
   const addCommentToCoverage = (coverageId: string, text: string) => {
     if (!currentUser) return;
 
+    const cov = coverages.find(c => c.id === coverageId);
+    if (!cov) return;
+
+    const originalCov = { ...cov };
     const newComment: Comment = {
       id: `com_${Date.now()}`,
       userId: currentUser.id,
@@ -753,62 +900,68 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       text,
       timestamp: new Date().toISOString()
     };
+    const newAct: Activity = {
+      id: `act_${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action: 'escribió en el chat de la cobertura',
+      timestamp: new Date().toISOString()
+    };
+    const updatedCov = {
+      ...cov,
+      comments: [...(cov.comments || []), newComment],
+      activities: [newAct, ...(cov.activities || [])]
+    };
 
-    setCoverages(prev => prev.map(cov => {
-      if (cov.id === coverageId) {
-        const updated = {
-          ...cov,
-          comments: [...(cov.comments || []), newComment]
-        };
-        // Add activity
-        const newAct: Activity = {
-          id: `act_${Date.now()}`,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          action: 'escribió en el chat de la cobertura',
-          timestamp: new Date().toISOString()
-        };
-        updated.activities = [newAct, ...(updated.activities || [])];
-        return updated;
+    setCoverages(prev => prev.map(c => c.id === coverageId ? updatedCov : c));
+
+    // Persistir asincrónicamente con try-catch y rollback
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('coverages')
+          .update(mapAppCoverageToDb(updatedCov))
+          .eq('id', coverageId);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error adding comment to coverage in Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
       }
-      return cov;
-    }));
+    })();
 
     // Handle mentions e.g., @Juan or @Laura
-    const cov = coverages.find(c => c.id === coverageId);
-    if (cov) {
-      // Find matches for @Name in the text
-      INITIAL_USERS.forEach(u => {
-        if (text.toLowerCase().includes(`@${u.name.toLowerCase().split(' ')[0]}`) && u.id !== currentUser.id) {
-          const notif: Notification = {
-            id: `not_${Date.now()}_${u.id}`,
-            title: 'Mención en Cobertura',
-            message: `${currentUser.name} te mencionó en la cobertura "${cov.title}"`,
-            timestamp: new Date().toISOString(),
-            read: false,
-            type: 'comment',
-            linkId: coverageId
-          };
-          setNotifications(prev => [notif, ...prev]);
-        }
-      });
+    // Find matches for @Name in the text
+    INITIAL_USERS.forEach(u => {
+      if (text.toLowerCase().includes(`@${u.name.toLowerCase().split(' ')[0]}`) && u.id !== currentUser.id) {
+        const notif: Notification = {
+          id: `not_${Date.now()}_${u.id}`,
+          title: 'Mención en Cobertura',
+          message: `${currentUser.name} te mencionó en la cobertura "${cov.title}"`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'comment',
+          linkId: coverageId
+        };
+        setNotifications(prev => [notif, ...prev]);
+      }
+    });
 
-      // Send general comment notifications to other assignees
-      cov.assignees.forEach(uid => {
-        if (uid !== currentUser.id && !text.toLowerCase().includes(`@${INITIAL_USERS.find(user => user.id === uid)?.name.toLowerCase().split(' ')[0]}`)) {
-          const notif: Notification = {
-            id: `not_${Date.now()}_${uid}`,
-            title: 'Nuevo Comentario en Cobertura',
-            message: `${currentUser.name} comentó en "${cov.title}"`,
-            timestamp: new Date().toISOString(),
-            read: false,
-            type: 'comment',
-            linkId: coverageId
-          };
-          setNotifications(prev => [notif, ...prev]);
-        }
-      });
-    }
+    // Send general comment notifications to other assignees
+    cov.assignees.forEach(uid => {
+      if (uid !== currentUser.id && !text.toLowerCase().includes(`@${INITIAL_USERS.find(user => user.id === uid)?.name.toLowerCase().split(' ')[0]}`)) {
+        const notif: Notification = {
+          id: `not_${Date.now()}_${uid}`,
+          title: 'Nuevo Comentario en Cobertura',
+          message: `${currentUser.name} comentó en "${cov.title}"`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'comment',
+          linkId: coverageId
+        };
+        setNotifications(prev => [notif, ...prev]);
+      }
+    });
   };
 
   const addMultimediaToCoverage = (
@@ -819,6 +972,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     size: string
   ) => {
     if (!currentUser) return;
+    const cov = coverages.find(c => c.id === coverageId);
+    if (!cov) return;
+
+    const originalCov = { ...cov };
     const newItem: MultimediaItem = {
       id: `m_${Date.now()}`,
       type,
@@ -828,26 +985,35 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       uploadDate: new Date().toISOString(),
       userId: currentUser.id
     };
+    const newAct: Activity = {
+      id: `act_${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action: `cargó el archivo "${name}"`,
+      timestamp: new Date().toISOString()
+    };
+    const updatedCov = {
+      ...cov,
+      multimedia: [...(cov.multimedia || []), newItem],
+      activities: [newAct, ...(cov.activities || [])]
+    };
 
-    setCoverages(prev => prev.map(cov => {
-      if (cov.id === coverageId) {
-        const updated = {
-          ...cov,
-          multimedia: [...(cov.multimedia || []), newItem]
-        };
-        // Add activity
-        const newAct: Activity = {
-          id: `act_${Date.now()}`,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          action: `cargó el archivo "${name}"`,
-          timestamp: new Date().toISOString()
-        };
-        updated.activities = [newAct, ...(updated.activities || [])];
-        return updated;
+    setCoverages(prev => prev.map(c => c.id === coverageId ? updatedCov : c));
+
+    // Persistir en Supabase asíncronamente con rollback
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('coverages')
+          .update(mapAppCoverageToDb(updatedCov))
+          .eq('id', coverageId);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error adding multimedia in Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
       }
-      return cov;
-    }));
+    })();
   };
 
   const addSharedLinkToCoverage = (
@@ -857,6 +1023,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     comments?: string
   ) => {
     if (!currentUser) return;
+    const cov = coverages.find(c => c.id === coverageId);
+    if (!cov) return;
+
+    const originalCov = { ...cov };
     const newLink: SharedLink = {
       id: `sl_${Date.now()}`,
       title,
@@ -865,26 +1035,35 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       userId: currentUser.id,
       comments
     };
+    const newAct: Activity = {
+      id: `act_${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action: `agregó el enlace externo "${title}"`,
+      timestamp: new Date().toISOString()
+    };
+    const updatedCov = {
+      ...cov,
+      sharedLinks: [...(cov.sharedLinks || []), newLink],
+      activities: [newAct, ...(cov.activities || [])]
+    };
 
-    setCoverages(prev => prev.map(cov => {
-      if (cov.id === coverageId) {
-        const updated = {
-          ...cov,
-          sharedLinks: [...(cov.sharedLinks || []), newLink]
-        };
-        // Add activity
-        const newAct: Activity = {
-          id: `act_${Date.now()}`,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          action: `agregó el enlace externo "${title}"`,
-          timestamp: new Date().toISOString()
-        };
-        updated.activities = [newAct, ...(updated.activities || [])];
-        return updated;
+    setCoverages(prev => prev.map(c => c.id === coverageId ? updatedCov : c));
+
+    // Persistir en Supabase asíncronamente con rollback
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('coverages')
+          .update(mapAppCoverageToDb(updatedCov))
+          .eq('id', coverageId);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error adding shared link in Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
       }
-      return cov;
-    }));
+    })();
   };
 
   const updatePublicationStatus = (
@@ -894,6 +1073,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     link?: string
   ) => {
     if (!currentUser) return;
+    const cov = coverages.find(c => c.id === coverageId);
+    if (!cov) return;
+
+    const originalCov = { ...cov };
     const platformNames: Record<keyof PublicationChecklist, string> = {
       portal: 'Portal Web',
       facebook: 'Facebook',
@@ -901,36 +1084,46 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       youtube: 'YouTube'
     };
 
-    setCoverages(prev => prev.map(cov => {
-      if (cov.id === coverageId) {
-        const currentPubs = { ...cov.publications };
-        currentPubs[platform] = {
-          status,
-          date: status === 'published' ? new Date().toISOString() : undefined,
-          userId: status === 'published' ? currentUser.id : undefined,
-          link: status === 'published' ? link : undefined
-        };
+    const currentPubs = { ...cov.publications };
+    currentPubs[platform] = {
+      status,
+      date: status === 'published' ? new Date().toISOString() : undefined,
+      userId: status === 'published' ? currentUser.id : undefined,
+      link: status === 'published' ? link : undefined
+    };
 
-        const updated = {
-          ...cov,
-          publications: currentPubs
-        };
+    const newAct: Activity = {
+      id: `act_${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      action: status === 'published'
+        ? `marcó como PUBLICADO en ${platformNames[platform]}`
+        : `desmarcó publicación en ${platformNames[platform]}`,
+      timestamp: new Date().toISOString()
+    };
 
-        // Add activity
-        const newAct: Activity = {
-          id: `act_${Date.now()}`,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          action: status === 'published'
-            ? `marcó como PUBLICADO en ${platformNames[platform]}`
-            : `desmarcó publicación en ${platformNames[platform]}`,
-          timestamp: new Date().toISOString()
-        };
-        updated.activities = [newAct, ...(updated.activities || [])];
-        return updated;
+    const updatedCov = {
+      ...cov,
+      publications: currentPubs,
+      activities: [newAct, ...(cov.activities || [])]
+    };
+
+    setCoverages(prev => prev.map(c => c.id === coverageId ? updatedCov : c));
+
+    // Persistir en Supabase asíncronamente con rollback
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('coverages')
+          .update(mapAppCoverageToDb(updatedCov))
+          .eq('id', coverageId);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error updating publication status in Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
       }
-      return cov;
-    }));
+    })();
   };
 
   // Tasks
@@ -1048,6 +1241,21 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       formats: formats || []
     };
     setEvents(prev => [...prev, newEvent]);
+
+    // Persistir asincrónicamente con rollback en caso de fallo
+    (async () => {
+      try {
+        const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error auto-creating coverage from agenda event in Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.filter(c => c.id !== coverageId));
+        setEvents(prev => prev.filter(e => e.coverageId !== coverageId));
+        alert('Error al crear el evento y su cobertura correspondiente.');
+      }
+    })();
+
     logActivity(undefined, `creó el evento de agenda "${title}" y su cobertura correspondiente`);
   };
 
@@ -1064,33 +1272,37 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     programs?: ProgramType[],
     formats?: FormatType[]
   ) => {
+    const originalEvents = [...events];
+    let originalCov: any = null;
+    let covToUpdate: any = null;
+
     setEvents(prev => prev.map(e => {
       if (e.id === eventId) {
         // If it is linked to a coverage, also update the coverage details!
         if (e.coverageId) {
-          setCoverages(covs => covs.map(c => {
-            if (c.id === e.coverageId) {
-              let coverageStatus: Coverage['status'] = c.status;
-              if (status !== undefined) {
-                if (status === 'in_redaction') coverageStatus = 'in_redaction';
-                else if (status === 'published') coverageStatus = 'published';
-                else if (status === 'pending_confirmation') coverageStatus = 'pending_confirmation';
-                else if (status === 'confirmed') coverageStatus = 'confirmed';
-              }
-              return {
-                ...c,
-                title,
-                description,
-                dateTime: start,
-                location: location || c.location || '',
-                status: coverageStatus,
-                assignees: assigneeId ? [assigneeId] : [],
-                programs: programs || [],
-                formats: formats || []
-              };
+          const c = coverages.find(x => x.id === e.coverageId);
+          if (c) {
+            originalCov = { ...c };
+            let coverageStatus: Coverage['status'] = c.status;
+            if (status !== undefined) {
+              if (status === 'in_redaction') coverageStatus = 'in_redaction';
+              else if (status === 'published') coverageStatus = 'published';
+              else if (status === 'pending_confirmation') coverageStatus = 'pending_confirmation';
+              else if (status === 'confirmed') coverageStatus = 'confirmed';
             }
-            return c;
-          }));
+            covToUpdate = {
+              ...c,
+              title,
+              description,
+              dateTime: start,
+              location: location || c.location || '',
+              status: coverageStatus,
+              assignees: assigneeId ? [assigneeId] : [],
+              programs: programs || [],
+              formats: formats || []
+            };
+            setCoverages(covs => covs.map(x => x.id === e.coverageId ? covToUpdate! : x));
+          }
         }
 
         return {
@@ -1109,6 +1321,26 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return e;
     }));
+
+    if (covToUpdate && originalCov) {
+      const targetCov = covToUpdate;
+      const prevCov = originalCov;
+      (async () => {
+        try {
+          const { error } = await supabase
+            .from('coverages')
+            .update(mapAppCoverageToDb(targetCov))
+            .eq('id', targetCov.id);
+          if (error) throw error;
+        } catch (err: any) {
+          console.error('Error updating coverage from event in Supabase:', err.message || err);
+          // Rollback both coverages and events
+          setCoverages(covs => covs.map(x => x.id === targetCov.id ? prevCov : x));
+          setEvents(originalEvents);
+        }
+      })();
+    }
+
     logActivity(undefined, `actualizó el compromiso de agenda: "${title}"`);
   };
 
@@ -1308,6 +1540,20 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setCoverages(prev => [newCoverage, ...prev]);
 
+    // Persistir asincrónicamente con rollback en caso de fallo
+    (async () => {
+      try {
+        const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error inserting coverage from proposal into Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.filter(c => c.id !== id));
+        setEvents(prev => prev.filter(e => e.coverageId !== id));
+        alert('Error al guardar la nueva cobertura en el servidor de base de datos.');
+      }
+    })();
+
     // Also add to calendar events
     let eventStatus: CalendarEvent['status'] = 'pending_confirmation';
     if (targetStatus === 'confirmed') eventStatus = 'confirmed';
@@ -1361,25 +1607,45 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     observations?: string,
     attachments?: string[]
   ) => {
-    setCoverages(prev => prev.map(c => {
-      if (c.id === coverageId) {
-        return {
-          ...c,
-          title,
-          description,
-          dateTime,
-          location,
-          assignees,
-          programs,
-          formats,
-          status: status !== undefined ? status : c.status,
-          logisticsInfo: logisticsInfo !== undefined ? logisticsInfo : c.logisticsInfo,
-          observations: observations !== undefined ? observations : c.observations,
-          attachments: attachments !== undefined ? attachments : c.attachments
-        };
+    const cov = coverages.find(c => c.id === coverageId);
+    if (!cov) return;
+
+    const originalCov = { ...cov };
+    const originalEvents = [...events];
+
+    const updatedCov: Coverage = {
+      ...cov,
+      title,
+      description,
+      dateTime,
+      location,
+      assignees,
+      programs,
+      formats,
+      status: status !== undefined ? status : cov.status,
+      logisticsInfo: logisticsInfo !== undefined ? logisticsInfo : cov.logisticsInfo,
+      observations: observations !== undefined ? observations : cov.observations,
+      attachments: attachments !== undefined ? attachments : cov.attachments
+    };
+
+    setCoverages(prev => prev.map(c => c.id === coverageId ? updatedCov : c));
+
+    // Persistir asincrónicamente con rollback en caso de fallo
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('coverages')
+          .update(mapAppCoverageToDb(updatedCov))
+          .eq('id', coverageId);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error updating coverage details in Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
+        setEvents(originalEvents);
+        alert('Error al guardar los detalles de la cobertura en el servidor de base de datos.');
       }
-      return c;
-    }));
+    })();
 
     // Update corresponding calendar event
     setEvents(prev => prev.map(e => {
@@ -1591,6 +1857,20 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setCoverages(prev => [newCoverage, ...prev]);
+
+    // Persistir asincrónicamente con rollback en caso de fallo
+    (async () => {
+      try {
+        const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
+        if (error) throw error;
+      } catch (err: any) {
+        console.error('Error recreating coverage in Supabase:', err.message || err);
+        // Rollback state
+        setCoverages(prev => prev.filter(c => c.id !== coverageId));
+        alert('Error al recrear la cobertura en el servidor de base de datos.');
+      }
+    })();
+
     logActivity(undefined, `recreó la cobertura "${newCoverage.title}" vinculada al evento de agenda`);
   };
 
