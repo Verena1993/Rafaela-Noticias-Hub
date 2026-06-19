@@ -96,16 +96,25 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         finalAssignees.push(uid);
       }
     });
+    // If no assignees were specified, keep the current ones
+    const resolvedAssignees = finalAssignees.length > 0 ? finalAssignees : coverage.assignees;
 
-    const combinedDateTime = `${editDate}T${editTime}`;
+    // Use existing coverage datetime as fallback if fields were left untouched/empty
+    const existingDate = (coverage.dateTime || '').split('T')[0] || '';
+    const existingTime = (coverage.dateTime || '').split('T')[1]?.substring(0, 5) || '';
+    const resolvedDate = editDate || existingDate;
+    const resolvedTime = editTime || existingTime;
+    const combinedDateTime = resolvedDate && resolvedTime
+      ? `${resolvedDate}T${resolvedTime}`
+      : coverage.dateTime || '';
 
     updateCoverageDetails(
       coverage.id,
-      editTitle,
-      editObservations || editTitle,
+      editTitle || coverage.title,
+      editObservations || coverage.description || editTitle || coverage.title,
       combinedDateTime,
-      editLocation,
-      finalAssignees,
+      editLocation || coverage.location,
+      resolvedAssignees,
       coverage.programs || [],
       editFormats,
       editStatus,
@@ -1259,14 +1268,13 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                   {/* Right Column - Team & Logistics */}
                   <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                     <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Principal *</label>
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Principal</label>
                       <select
                         className="form-select"
-                        required
                         value={editMainResponsable}
                         onChange={e => setEditMainResponsable(e.target.value)}
                       >
-                        <option value="">Seleccionar responsable...</option>
+                        <option value="">Sin responsable principal</option>
                         {users.map(u => (
                           <option key={u.id} value={u.id}>{u.name}</option>
                         ))}
