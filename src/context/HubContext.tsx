@@ -100,36 +100,51 @@ export const useHub = () => {
   return context;
 };
 
-const mapDbCoverageToApp = (dbCov: any): Coverage => ({
-  id: dbCov.id,
-  title: dbCov.title,
-  description: dbCov.description || '',
-  dateTime: dbCov.date_time,
-  location: dbCov.location || '',
-  status: dbCov.status,
-  assignees: Array.isArray(dbCov.assignees) ? dbCov.assignees : [],
-  comments: Array.isArray(dbCov.comments) ? dbCov.comments : [],
-  multimedia: Array.isArray(dbCov.multimedia) ? dbCov.multimedia : [],
-  sharedLinks: Array.isArray(dbCov.shared_links) ? dbCov.shared_links : [],
-  publications: dbCov.publications || {
-    portal: { status: 'pending' },
-    facebook: { status: 'pending' },
-    instagram: { status: 'pending' },
-    youtube: { status: 'pending' }
-  },
-  activities: Array.isArray(dbCov.activities) ? dbCov.activities : [],
-  programs: Array.isArray(dbCov.programs) ? dbCov.programs : [],
-  formats: Array.isArray(dbCov.formats) ? dbCov.formats : [],
-  logisticsInfo: dbCov.logistics_info || '',
-  observations: dbCov.observations || '',
-  attachments: Array.isArray(dbCov.attachments) ? dbCov.attachments : []
-});
+const mapDbCoverageToApp = (dbCov: any): Coverage => {
+  let formattedDateTime = '';
+  if (dbCov.datetime) {
+    const d = new Date(dbCov.datetime);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      formattedDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+  }
+
+  return {
+    id: dbCov.id,
+    title: dbCov.title,
+    description: dbCov.description || '',
+    dateTime: formattedDateTime,
+    location: dbCov.location || '',
+    status: dbCov.status,
+    assignees: Array.isArray(dbCov.assignees) ? dbCov.assignees : [],
+    comments: Array.isArray(dbCov.comments) ? dbCov.comments : [],
+    multimedia: Array.isArray(dbCov.multimedia) ? dbCov.multimedia : [],
+    sharedLinks: Array.isArray(dbCov.shared_links) ? dbCov.shared_links : [],
+    publications: dbCov.publications || {
+      portal: { status: 'pending' },
+      facebook: { status: 'pending' },
+      instagram: { status: 'pending' },
+      youtube: { status: 'pending' }
+    },
+    activities: Array.isArray(dbCov.activities) ? dbCov.activities : [],
+    programs: Array.isArray(dbCov.programs) ? dbCov.programs : [],
+    formats: Array.isArray(dbCov.formats) ? dbCov.formats : [],
+    logisticsInfo: dbCov.logistics_info || '',
+    observations: dbCov.observations || '',
+    attachments: Array.isArray(dbCov.attachments) ? dbCov.attachments : []
+  };
+};
 
 const mapAppCoverageToDb = (appCov: Coverage) => ({
   id: appCov.id,
   title: appCov.title,
   description: appCov.description,
-  date_time: appCov.dateTime,
+  datetime: appCov.dateTime ? new Date(appCov.dateTime).toISOString() : null,
   location: appCov.location,
   status: appCov.status,
   assignees: appCov.assignees,
@@ -494,7 +509,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Every event must have a coverageId
       if (!covId) {
-        covId = `cov_auto_${evt.id}`;
+        covId = crypto.randomUUID();
         eventChanged = true;
       }
 
@@ -727,7 +742,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     observations?: string,
     attachments?: string[]
   ): string => {
-    const id = `cov_${Date.now()}`;
+    const id = crypto.randomUUID();
     const newCoverage: Coverage = {
       id,
       title,
@@ -1191,7 +1206,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     programs?: ProgramType[],
     formats?: FormatType[]
   ) => {
-    const coverageId = `cov_event_${Date.now()}`;
+    const coverageId = crypto.randomUUID();
 
     // Auto-create corresponding Coverage
     const newCoverage: Coverage = {
@@ -1500,7 +1515,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const prop = proposals.find(p => p.id === proposalId);
     if (!prop || !currentUser) return '';
 
-    const id = `cov_${Date.now()}`;
+    const id = crypto.randomUUID();
     const targetDateTime = extraDetails?.dateTime || prop.dateTime || new Date().toISOString().substring(0, 16);
     const targetLocation = extraDetails?.location || prop.location || 'A determinar';
     const targetPrograms = extraDetails?.programs || prop.programs || [];
