@@ -378,6 +378,17 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     // 1. Initial auth check
     const checkUser = async () => {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      if (
+        hash.includes('type=recovery') || 
+        (hash.includes('access_token=') && hash.includes('recovery')) ||
+        search.includes('type=recovery')
+      ) {
+        fetchUsers();
+        return; // Skip active user session check to avoid dashboard redirect during recovery
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
         const { data: profile } = await supabase
@@ -412,6 +423,14 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // 2. Auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (_event === 'PASSWORD_RECOVERY') {
+        const hash = window.location.hash;
+        const search = window.location.search;
+        window.history.pushState({}, '', '/reset-password' + search + hash);
+        window.dispatchEvent(new Event('locationchange'));
+        return; // Do not sign in or set currentUser, they must reset password first
+      }
+
       if (session?.user) {
         const { data: profile } = await supabase
           .from('profiles')

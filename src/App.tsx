@@ -24,16 +24,38 @@ const AppContent: React.FC = () => {
   const [pathname, setPathname] = useState(window.location.pathname);
 
   useEffect(() => {
-    const handlePopState = () => {
+    // Check if the current URL hash or query params indicate a recovery redirect
+    const checkRecoveryToken = () => {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      if (
+        hash.includes('type=recovery') || 
+        (hash.includes('access_token=') && hash.includes('recovery')) ||
+        search.includes('type=recovery')
+      ) {
+        // Redirect client-side to /reset-password preserving query and hash params
+        window.history.pushState({}, '', '/reset-password' + search + hash);
+        setPathname('/reset-password');
+      }
+    };
+    checkRecoveryToken();
+
+    const handleLocationChange = () => {
       setPathname(window.location.pathname);
     };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('locationchange', handleLocationChange);
+
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('locationchange', handleLocationChange);
+    };
   }, []);
 
   const navigate = (path: string) => {
     window.history.pushState({}, '', path);
-    setPathname(path);
+    window.dispatchEvent(new Event('locationchange'));
   };
 
   const handleTabChange = (tab: string) => {

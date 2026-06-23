@@ -12,8 +12,7 @@ import {
   Table,
   Kanban,
   UserCheck,
-  User,
-  Phone
+  User
 } from 'lucide-react';
 
 // Custom Instagram SVG Icon for reliability across lucide-react versions
@@ -53,7 +52,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
   
   // Profile edit states
   const [profileName, setProfileName] = useState('');
-  const [profilePhone, setProfilePhone] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -67,7 +65,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
   useEffect(() => {
     if (currentUser) {
       setProfileName(currentUser.name);
-      setProfilePhone(currentUser.telefono || '');
     }
   }, [currentUser, showProfileModal]);
 
@@ -115,14 +112,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
     setProfileLoading(true);
 
     try {
-      // 1. Update basic info (name and phone) in Profiles table
+      // 1. Update basic info (name) in Profiles table
       const nameChanged = profileName !== currentUser.name;
-      const phoneChanged = profilePhone !== (currentUser.telefono || '');
 
-      if (nameChanged || phoneChanged) {
+      if (nameChanged) {
         await updateHubUser(currentUser.id, {
-          name: profileName,
-          telefono: profilePhone
+          name: profileName
         });
       }
 
@@ -336,20 +331,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
                       value={currentUser.email}
                       disabled
                       style={{ opacity: 0.7 }}
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                      <Phone size={14} /> Teléfono Móvil
-                    </label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="Ej. +54 3492 123456"
-                      value={profilePhone}
-                      onChange={(e) => setProfilePhone(e.target.value)}
-                      disabled={profileLoading}
                     />
                   </div>
                 </div>

@@ -12,9 +12,7 @@ export const Login: React.FC = () => {
 
   // Recovery modal states
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
-  const [recoveryTab, setRecoveryTab] = useState<'email' | 'sms'>('email');
   const [recoveryEmail, setRecoveryEmail] = useState('');
-  const [recoveryPhone, setRecoveryPhone] = useState('');
   const [recoveryLoading, setRecoveryLoading] = useState(false);
   const [recoveryMessage, setRecoveryMessage] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
@@ -131,8 +129,6 @@ export const Login: React.FC = () => {
                     setRecoveryError('');
                     setRecoveryMessage('');
                     setRecoveryEmail('');
-                    setRecoveryPhone('');
-                    setRecoveryTab('email');
                     setShowRecoveryModal(true);
                   }}
                   style={{
@@ -241,48 +237,6 @@ export const Login: React.FC = () => {
                 ✕
               </button>
             </div>
-            
-            {/* Tabs */}
-            <div style={{ 
-              display: 'flex', 
-              borderBottom: '1px solid var(--border-color)', 
-              marginBottom: '1rem' 
-            }}>
-              <button
-                type="button"
-                onClick={() => { setRecoveryTab('email'); setRecoveryError(''); setRecoveryMessage(''); }}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: recoveryTab === 'email' ? '2px solid var(--primary)' : 'none',
-                  color: recoveryTab === 'email' ? 'var(--text-primary)' : 'var(--text-muted)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontSize: '0.85rem'
-                }}
-              >
-                Por Correo
-              </button>
-              <button
-                type="button"
-                onClick={() => { setRecoveryTab('sms'); setRecoveryError(''); setRecoveryMessage(''); }}
-                style={{
-                  flex: 1,
-                  padding: '0.75rem',
-                  background: 'none',
-                  border: 'none',
-                  borderBottom: recoveryTab === 'sms' ? '2px solid var(--primary)' : 'none',
-                  color: recoveryTab === 'sms' ? 'var(--text-primary)' : 'var(--text-muted)',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontSize: '0.85rem'
-                }}
-              >
-                Por Celular (SMS)
-              </button>
-            </div>
 
             {recoveryError && (
               <div style={{
@@ -312,105 +266,60 @@ export const Login: React.FC = () => {
               </div>
             )}
 
-            {recoveryTab === 'email' ? (
-              <form onSubmit={async (e) => {
-                e.preventDefault();
-                setRecoveryError('');
-                setRecoveryMessage('');
-                if (!recoveryEmail.trim()) {
-                  setRecoveryError('Por favor ingresa tu correo electrónico.');
-                  return;
-                }
-                setRecoveryLoading(true);
-                try {
-                  await resetPassword(recoveryEmail.trim());
-                  setRecoveryMessage('Se ha enviado un enlace de recuperación a tu email. Revisa tu bandeja de entrada.');
-                } catch (err: any) {
-                  setRecoveryError(err.message || 'Error al enviar el email de recuperación.');
-                } finally {
-                  setRecoveryLoading(false);
-                }
-              }}>
-                <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem 0' }}>
-                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                    Ingresa el correo electrónico asociado a tu cuenta. Te enviaremos un enlace seguro para restablecer tu contraseña.
-                  </p>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="recovery-email">Email</label>
-                    <input
-                      id="recovery-email"
-                      type="email"
-                      className="form-input"
-                      placeholder="correo@rafaelanoticias.com"
-                      value={recoveryEmail}
-                      onChange={(e) => setRecoveryEmail(e.target.value)}
-                      required
-                      disabled={recoveryLoading}
-                    />
-                  </div>
-                </div>
-                <div className="modal-footer" style={{ borderTop: 'none', paddingTop: '1rem' }}>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    onClick={() => setShowRecoveryModal(false)}
-                    disabled={recoveryLoading}
-                  >
-                    Cancelar
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="btn btn-primary"
-                    disabled={recoveryLoading}
-                  >
-                    {recoveryLoading ? 'Enviando...' : 'Enviar Enlace'}
-                  </button>
-                </div>
-              </form>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem 0' }}>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setRecoveryError('');
+              setRecoveryMessage('');
+              if (!recoveryEmail.trim()) {
+                setRecoveryError('Por favor ingresa tu correo electrónico.');
+                return;
+              }
+              setRecoveryLoading(true);
+              try {
+                await resetPassword(recoveryEmail.trim());
+                setRecoveryMessage('Se ha enviado un enlace de recuperación a tu email. Revisa tu bandeja de entrada.');
+              } catch (err: any) {
+                setRecoveryError(err.message || 'Error al enviar el email de recuperación.');
+              } finally {
+                setRecoveryLoading(false);
+              }
+            }}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem 0' }}>
                 <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Ingresa tu número de teléfono móvil registrado para recibir un código de verificación SMS (OTP).
+                  Ingresa el correo electrónico asociado a tu cuenta. Te enviaremos un enlace seguro para restablecer tu contraseña.
                 </p>
-                <div className="form-group" style={{ opacity: 0.6 }}>
-                  <label className="form-label" htmlFor="recovery-phone">Teléfono Móvil</label>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="recovery-email">Email</label>
                   <input
-                    id="recovery-phone"
-                    type="text"
+                    id="recovery-email"
+                    type="email"
                     className="form-input"
-                    placeholder="Ej. +54 3492 123456"
-                    value={recoveryPhone}
-                    onChange={(e) => setRecoveryPhone(e.target.value)}
-                    disabled
+                    placeholder="correo@rafaelanoticias.com"
+                    value={recoveryEmail}
+                    onChange={(e) => setRecoveryEmail(e.target.value)}
+                    required
+                    disabled={recoveryLoading}
                   />
                 </div>
-                <div style={{
-                  backgroundColor: 'var(--bg-tertiary)',
-                  border: '1px dashed var(--text-muted)',
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-md)',
-                  textAlign: 'center',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  color: 'var(--text-secondary)'
-                }}>
-                  ✨ Próximamente disponible
-                  <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400, marginTop: '0.2rem' }}>
-                    El proveedor de servicios SMS OTP no está configurado actualmente.
-                  </div>
-                </div>
-                <div className="modal-footer" style={{ borderTop: 'none', paddingTop: '1rem' }}>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    onClick={() => setShowRecoveryModal(false)}
-                    style={{ width: '100%' }}
-                  >
-                    Cerrar
-                  </button>
-                </div>
               </div>
-            )}
+              <div className="modal-footer" style={{ borderTop: 'none', paddingTop: '1rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={() => setShowRecoveryModal(false)}
+                  disabled={recoveryLoading}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  disabled={recoveryLoading}
+                >
+                  {recoveryLoading ? 'Enviando...' : 'Enviar Enlace'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

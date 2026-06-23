@@ -16,14 +16,23 @@ export const ResetPassword: React.FC<ResetPasswordProps> = ({ navigate }) => {
   const [hasSession, setHasSession] = useState(false);
 
   useEffect(() => {
+    let retries = 0;
     // Check if Supabase has successfully parsed the recovery token and established a session
     const checkRecoverySession = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        setHasSession(!!session);
+        if (session) {
+          setHasSession(true);
+          setChecking(false);
+        } else if (retries < 6) {
+          retries++;
+          setTimeout(checkRecoverySession, 150);
+        } else {
+          setHasSession(false);
+          setChecking(false);
+        }
       } catch (err) {
         console.error('Error checking recovery session:', err);
-      } finally {
         setChecking(false);
       }
     };
