@@ -1741,3 +1741,79 @@ a:hover {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* User Profile & Quick Access Popovers */
+.user-menu-popover {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 10px;
+  right: 10px;
+  background-color: #1e293b;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-md);
+  padding: 0.5rem;
+  box-shadow: var(--shadow-lg);
+  z-index: 150;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  animation: popover-slide-up 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes popover-slide-up {
+  from { transform: translateY(5px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.popover-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--sidebar-text-muted);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: var(--transition);
+}
+
+.popover-item:hover {
+  background-color: var(--sidebar-hover);
+  color: white;
+}
+
+.popover-item.logout:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: var(--danger);
+}
+
+.popover-divider {
+  height: 1px;
+  background-color: rgba(255, 255, 255, 0.08);
+  margin: 0.25rem 0;
+}
+
+.user-profile-trigger {
+  padding: 0.35rem;
+  border-radius: var(--radius-md);
+  transition: var(--transition);
+}
+
+.user-profile-trigger:hover {
+  background-color: var(--sidebar-hover);
+}
+
+.hover-card-bg {
+  transition: var(--transition);
+}
+
+.hover-card-bg:hover {
+  background-color: var(--bg-tertiary) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}

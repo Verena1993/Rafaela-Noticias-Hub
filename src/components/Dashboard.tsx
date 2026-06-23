@@ -18,7 +18,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
   const { 
     coverages, tasks, alerts, events, activities, currentUser, users, 
     assignAlert, toggleTaskCompleted, createAlert, proposals,
-    closedAlertIds, closeAlert
+    closedAlertIds, closeAlert, updateHubUser, resetPassword
   } = useHub();
 
   // Today's date reference
@@ -38,6 +38,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertSeverity, setAlertSeverity] = useState<'critical' | 'high' | 'medium'>('high');
+
+  // Quick Access User states
+  const [selectedDashboardUser, setSelectedDashboardUser] = useState<any | null>(null);
+  const [dashboardUserActionTab, setDashboardUserActionTab] = useState<'profile' | 'edit' | 'password' | 'status' | 'activity'>('profile');
+  
+  // Edit user state (for admin quick action)
+  const [dbUserEditName, setDbUserEditName] = useState('');
+  const [dbUserEditRole, setDbUserEditRole] = useState<'admin' | 'editor' | 'journalist'>('editor');
+  const [dbUserEditLoading, setDbUserEditLoading] = useState(false);
+  const [dbUserEditSuccess, setDbUserEditSuccess] = useState('');
+  const [dbUserEditError, setDbUserEditError] = useState('');
+
+  // Password reset state (for admin quick action)
+  const [dbUserResetSuccess, setDbUserResetSuccess] = useState('');
+  const [dbUserResetError, setDbUserResetError] = useState('');
+  const [dbUserResetLoading, setDbUserResetLoading] = useState(false);
+
+  const handleUserClick = (u: any) => {
+    setSelectedDashboardUser(u);
+    setDashboardUserActionTab('profile');
+    setDbUserEditName(u.name);
+    setDbUserEditRole(u.role);
+    setDbUserEditSuccess('');
+    setDbUserEditError('');
+    setDbUserResetSuccess('');
+    setDbUserResetError('');
+  };
 
 
   interface MyDayItem {
@@ -885,6 +912,73 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
               ))}
             </div>
           </div>
+
+          {/* Quick Access to Users Widget */}
+          <div className="card">
+            <h3 className="section-title">
+              <UserCheck size={18} />
+              Accesos Rápidos
+            </h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+              {users.map(u => {
+                const isActive = u.activo !== false;
+                return (
+                  <div
+                    key={u.id}
+                    onClick={() => handleUserClick(u)}
+                    className="hover-card-bg"
+                    style={{
+                      padding: '0.65rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--border-color)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      transition: 'var(--transition)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                      <div
+                        className="avatar-circle"
+                        style={{
+                          backgroundColor: u.avatarColor || '#64748b',
+                          margin: 0,
+                          width: '28px',
+                          height: '28px',
+                          fontSize: '0.8rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'white'
+                        }}
+                      >
+                        {u.name.charAt(0)}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                          {u.name}
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                          {u.role === 'admin' ? 'Administrador' : u.role === 'editor' ? 'Editor' : 'Periodista'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <span
+                        className={`badge ${isActive ? 'status-published' : 'priority-high'}`}
+                        style={{ fontSize: '0.65rem', padding: '0.1rem 0.4rem' }}
+                      >
+                        {isActive ? 'Activo' : 'Suspendido'}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -967,6 +1061,297 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
               </button>
               <button type="button" className="btn btn-primary" onClick={handleAssignAlert}>
                 <UserCheck size={14} /> Asignar y Crear Cobertura
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* User Quick Actions Modal */}
+      {selectedDashboardUser && (
+        <div className="modal-overlay" style={{ zIndex: 1000 }}>
+          <div className="modal-content" style={{ maxWidth: '520px', width: '95%' }}>
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div 
+                  className="avatar-circle"
+                  style={{ 
+                    backgroundColor: selectedDashboardUser.avatarColor || '#64748b', 
+                    width: '32px', 
+                    height: '32px', 
+                    fontSize: '0.9rem',
+                    margin: 0,
+                    color: 'white',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {selectedDashboardUser.name.charAt(0)}
+                </div>
+                <div>
+                  <h3 className="modal-title" style={{ fontSize: '1.1rem' }}>{selectedDashboardUser.name}</h3>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>{selectedDashboardUser.email}</span>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                className="modal-close" 
+                onClick={() => setSelectedDashboardUser(null)}
+              >
+                ✕
+              </button>
+            </div>
+            
+            {/* Modal Tabs */}
+            <div style={{ 
+              display: 'flex', 
+              borderBottom: '1px solid var(--border-color)', 
+              marginBottom: '1rem',
+              overflowX: 'auto'
+            }}>
+              {[
+                { id: 'profile', name: 'Perfil' },
+                { id: 'edit', name: 'Editar' },
+                { id: 'password', name: 'Contraseña' },
+                { id: 'status', name: 'Estado' },
+                { id: 'activity', name: 'Actividad' }
+              ].map(tab => {
+                // Only allow edits/status/password updates if the logged-in user is admin
+                const isAdminOnlyTab = ['edit', 'password', 'status'].includes(tab.id);
+                const showTab = !isAdminOnlyTab || currentUser?.role === 'admin';
+                if (!showTab) return null;
+                
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setDashboardUserActionTab(tab.id as any)}
+                    style={{
+                      padding: '0.6rem 1rem',
+                      background: 'none',
+                      border: 'none',
+                      borderBottom: dashboardUserActionTab === tab.id ? '2px solid var(--primary)' : 'none',
+                      color: dashboardUserActionTab === tab.id ? 'var(--text-primary)' : 'var(--text-muted)',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                      whiteSpace: 'nowrap'
+                    }}
+                  >
+                    {tab.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="modal-body" style={{ padding: '0.25rem 0', minHeight: '180px' }}>
+              
+              {/* TAB 1: Profile Details */}
+              {dashboardUserActionTab === 'profile' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', fontSize: '0.85rem' }}>
+                    <div>
+                      <span style={{ fontWeight: 600, color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem', textTransform: 'uppercase' }}>Nombre</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{selectedDashboardUser.name}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600, color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem', textTransform: 'uppercase' }}>Email</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{selectedDashboardUser.email}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600, color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem', textTransform: 'uppercase' }}>Rol</span>
+                      <span style={{ textTransform: 'capitalize', color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {selectedDashboardUser.role === 'admin' ? 'Administrador' : selectedDashboardUser.role === 'editor' ? 'Editor' : 'Periodista'}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600, color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem', textTransform: 'uppercase' }}>Teléfono Móvil</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{selectedDashboardUser.telefono || 'No registrado'}</span>
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600, color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem', textTransform: 'uppercase' }}>Estado</span>
+                      <span className={`badge ${selectedDashboardUser.activo !== false ? 'status-published' : 'priority-high'}`} style={{ fontSize: '0.7rem', marginTop: '0.1rem' }}>
+                        {selectedDashboardUser.activo !== false ? 'Activo' : 'Suspendido'}
+                      </span>
+                    </div>
+                    <div>
+                      <span style={{ fontWeight: 600, color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem', textTransform: 'uppercase' }}>Fecha de Creación</span>
+                      <span style={{ color: 'var(--text-primary)', fontWeight: 500 }}>
+                        {selectedDashboardUser.created_at ? new Date(selectedDashboardUser.created_at).toLocaleDateString('es-AR') : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* TAB 2: Edit User */}
+              {dashboardUserActionTab === 'edit' && (
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  setDbUserEditError('');
+                  setDbUserEditSuccess('');
+                  setDbUserEditLoading(true);
+                  try {
+                    await updateHubUser(selectedDashboardUser.id, {
+                      name: dbUserEditName,
+                      role: dbUserEditRole as any
+                    });
+                    setDbUserEditSuccess('Datos de usuario actualizados correctamente.');
+                    // Update current modal state
+                    setSelectedDashboardUser({
+                      ...selectedDashboardUser,
+                      name: dbUserEditName,
+                      role: dbUserEditRole
+                    });
+                  } catch (err: any) {
+                    setDbUserEditError(err.message || 'Error al actualizar el usuario.');
+                  } finally {
+                    setDbUserEditLoading(false);
+                  }
+                }}>
+                  {dbUserEditError && <div style={{ backgroundColor: 'var(--danger-light)', color: 'var(--danger-text)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.75rem', marginBottom: '0.75rem' }}>{dbUserEditError}</div>}
+                  {dbUserEditSuccess && <div style={{ backgroundColor: 'var(--success-light)', color: 'var(--success-text)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.75rem', marginBottom: '0.75rem' }}>{dbUserEditSuccess}</div>}
+                  
+                  <div className="form-group" style={{ marginBottom: '0.75rem' }}>
+                    <label className="form-label">Nombre Completo</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      value={dbUserEditName}
+                      onChange={(e) => setDbUserEditName(e.target.value)}
+                      required 
+                    />
+                  </div>
+                  
+                  <div className="form-group" style={{ marginBottom: '1rem' }}>
+                    <label className="form-label">Rol del Usuario</label>
+                    <select 
+                      className="form-select"
+                      value={dbUserEditRole}
+                      onChange={(e) => setDbUserEditRole(e.target.value as any)}
+                    >
+                      <option value="editor">Editor (Redacción estándar)</option>
+                      <option value="admin">Administrador (Acceso total)</option>
+                      {/* Show journalist if it's a mock or is already a journalist */}
+                      {(selectedDashboardUser.role === 'journalist' || !selectedDashboardUser.id.includes('-')) && (
+                        <option value="journalist">Periodista (Móvil)</option>
+                      )}
+                    </select>
+                  </div>
+                  
+                  <button type="submit" className="btn btn-primary" style={{ width: '100%' }} disabled={dbUserEditLoading}>
+                    {dbUserEditLoading ? 'Guardando...' : 'Guardar Cambios'}
+                  </button>
+                </form>
+              )}
+
+              {/* TAB 3: Change Password (email reset) */}
+              {dashboardUserActionTab === 'password' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    Para cambiar la contraseña de <strong>{selectedDashboardUser.name}</strong>, se enviará un correo electrónico de recuperación seguro a su casilla.
+                  </p>
+                  
+                  {dbUserResetError && <div style={{ backgroundColor: 'var(--danger-light)', color: 'var(--danger-text)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>{dbUserResetError}</div>}
+                  {dbUserResetSuccess && <div style={{ backgroundColor: 'var(--success-light)', color: 'var(--success-text)', padding: '0.5rem', borderRadius: '4px', fontSize: '0.75rem' }}>{dbUserResetSuccess}</div>}
+
+                  {selectedDashboardUser.id.includes('-') ? (
+                    <button 
+                      type="button" 
+                      className="btn btn-primary"
+                      onClick={async () => {
+                        setDbUserResetError('');
+                        setDbUserResetSuccess('');
+                        setDbUserResetLoading(true);
+                        try {
+                          await resetPassword(selectedDashboardUser.email);
+                          setDbUserResetSuccess('Se ha enviado el correo de recuperación al usuario.');
+                        } catch (err: any) {
+                          setDbUserResetError(err.message || 'Error al enviar el correo de recuperación.');
+                        } finally {
+                          setDbUserResetLoading(false);
+                        }
+                      }}
+                      disabled={dbUserResetLoading}
+                    >
+                      {dbUserResetLoading ? 'Enviando...' : 'Enviar Correo de Recuperación'}
+                    </button>
+                  ) : (
+                    <div style={{ backgroundColor: 'var(--bg-tertiary)', border: '1px dashed var(--text-muted)', padding: '0.75rem', borderRadius: '4px', fontSize: '0.75rem', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                      Este es un usuario Mock local. Las contraseñas de cuentas Mock no se pueden recuperar por Supabase.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 4: Toggle Status (Activate / Suspend) */}
+              {dashboardUserActionTab === 'status' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                    El estado actual de <strong>{selectedDashboardUser.name}</strong> es: 
+                    <strong style={{ color: selectedDashboardUser.activo !== false ? 'var(--success-text)' : 'var(--danger-text)' }}>
+                      {' '}{selectedDashboardUser.activo !== false ? 'Activo' : 'Suspendido'}
+                    </strong>
+                  </p>
+                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    Al suspender a un usuario, no podrá iniciar sesión en la plataforma hasta que sea reactivado.
+                  </p>
+                  
+                  <button 
+                    type="button"
+                    onClick={async () => {
+                      const nextActive = !(selectedDashboardUser.activo ?? true);
+                      try {
+                        await updateHubUser(selectedDashboardUser.id, { activo: nextActive });
+                        setSelectedDashboardUser({
+                          ...selectedDashboardUser,
+                          activo: nextActive
+                        });
+                      } catch (err: any) {
+                        alert(err.message || 'Error al cambiar el estado del usuario.');
+                      }
+                    }}
+                    className={`btn ${selectedDashboardUser.activo !== false ? 'btn-danger' : 'btn-primary'}`}
+                    style={{ width: '100%', display: 'flex', justifyContent: 'center' }}
+                  >
+                    {selectedDashboardUser.activo !== false ? 'Suspender Usuario' : 'Activar Usuario'}
+                  </button>
+                </div>
+              )}
+
+              {/* TAB 5: Recent Activity */}
+              {dashboardUserActionTab === 'activity' && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)' }}>
+                    ÚLTIMAS ACCIONES EN LA PLATAFORMA
+                  </span>
+                  
+                  {(() => {
+                    const userActs = activities.filter(act => act.userId === selectedDashboardUser.id);
+                    if (userActs.length === 0) {
+                      return <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '1rem 0' }}>No se ha registrado actividad reciente para este usuario.</p>;
+                    }
+                    return (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', maxHeight: '180px', overflowY: 'auto', paddingRight: '0.25rem' }}>
+                        {userActs.map(act => (
+                          <div key={act.id} style={{ fontSize: '0.75rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.35rem' }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>{act.action}</span>
+                            <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
+                              {new Date(act.timestamp).toLocaleString('es-AR')} hs
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+              <button type="button" className="btn btn-secondary" onClick={() => setSelectedDashboardUser(null)} style={{ width: '100%' }}>
+                Cerrar
               </button>
             </div>
           </div>

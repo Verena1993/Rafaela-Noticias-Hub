@@ -88,6 +88,7 @@ interface HubContextType {
   radarError: string | null;
   lastRadarUpdate: string | null;
   rssDiagnostics: RssDiagnostic[];
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const HubContext = createContext<HubContextType | undefined>(undefined);
@@ -353,7 +354,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: p.rol as 'admin' | 'editor',
           avatarColor: p.rol === 'admin' ? '#1e3a8a' : '#0f766e',
           activo: p.activo,
-          created_at: p.created_at
+          created_at: p.created_at,
+          telefono: p.telefono
         }));
 
         // Merge dbUsers with INITIAL_USERS to keep mock users
@@ -391,7 +393,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             role: profile.rol as 'admin' | 'editor',
             avatarColor: profile.rol === 'admin' ? '#1e3a8a' : '#0f766e',
             activo: profile.activo,
-            created_at: profile.created_at
+            created_at: profile.created_at,
+            telefono: profile.telefono
           });
         } else {
           if (profile && !profile.activo) {
@@ -423,7 +426,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             role: profile.rol as 'admin' | 'editor',
             avatarColor: profile.rol === 'admin' ? '#1e3a8a' : '#0f766e',
             activo: profile.activo,
-            created_at: profile.created_at
+            created_at: profile.created_at,
+            telefono: profile.telefono
           });
         } else {
           if (profile && !profile.activo) {
@@ -626,6 +630,15 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(null);
   };
 
+  const resetPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + '/reset-password'
+    });
+    if (error) {
+      throw error;
+    }
+  };
+
   const createHubUser = async (nombre: string, email: string, password?: string, rol?: 'admin' | 'editor') => {
     try {
       const { data, error } = await supabaseAdminClient.auth.signUp({
@@ -655,6 +668,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (updates.name) dbUpdates.nombre = updates.name;
       if (updates.role) dbUpdates.rol = updates.role;
       if (updates.activo !== undefined) dbUpdates.activo = updates.activo;
+      if (updates.telefono !== undefined) dbUpdates.telefono = updates.telefono;
 
       const { error } = await supabase
         .from('profiles')
@@ -662,6 +676,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .eq('id', id);
       if (error) {
         throw error;
+      }
+      if (currentUser && id === currentUser.id) {
+        setCurrentUser(prev => prev ? { ...prev, ...updates } : null);
       }
       await fetchUsers();
     } catch (err: any) {
@@ -1903,6 +1920,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       newsRadarItems,
       login,
       logout,
+      resetPassword,
       createHubUser,
       updateHubUser,
       toggleUserActive,

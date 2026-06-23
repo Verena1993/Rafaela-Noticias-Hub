@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { HubProvider, useHub } from './context/HubContext';
 import { Login } from './components/Login';
 import { Layout } from './components/Layout';
@@ -14,17 +14,36 @@ import { ProductionTable } from './components/ProductionTable';
 import { Publications } from './components/Publications';
 import { Coverages } from './components/Coverages';
 import { UserManagement } from './components/UserManagement';
+import { ResetPassword } from './components/ResetPassword';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useHub();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedCoverageId, setSelectedCoverageId] = useState<string | null>(null);
   const [autoOpenCreateModal, setAutoOpenCreateModal] = useState(false);
+  const [pathname, setPathname] = useState(window.location.pathname);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setPathname(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path);
+    setPathname(path);
+  };
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setSelectedCoverageId(null); // Clean coverage selection to allow navigation
   };
+
+  if (pathname === '/reset-password') {
+    return <ResetPassword navigate={navigate} />;
+  }
 
   if (!currentUser) {
     return <Login />;

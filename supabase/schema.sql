@@ -10,7 +10,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email TEXT NOT NULL UNIQUE,
   rol VARCHAR(50) NOT NULL CHECK (rol IN ('admin', 'editor')),
   activo BOOLEAN NOT NULL DEFAULT TRUE,
-  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+  telefono TEXT
 );
 
 -- 2. Habilitar Seguridad a Nivel de Fila (RLS)

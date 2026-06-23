@@ -7,6 +7,7 @@ export interface User {
   avatarColor: string;
   activo?: boolean;
   created_at?: string;
+  telefono?: string;
 }
 
 export interface Comment {
