@@ -249,7 +249,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
           <div className="user-info">
             <span className="user-name">{currentUser.name}</span>
             <span className="user-role" style={{ textTransform: 'capitalize' }}>
-              {currentUser.role === 'admin' ? 'Administrador' : currentUser.role === 'editor' ? 'Editor' : 'Redactor'}
+              {currentUser.role === 'admin' ? 'Administrador' : 'Editor'}
             </span>
           </div>
         </div>

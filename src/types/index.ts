@@ -3,10 +3,11 @@ export interface User {
   name: string;
   email: string;
   password?: string;
-  role: 'admin' | 'editor' | 'journalist';
+  role: 'admin' | 'editor';
   avatarColor: string;
   activo?: boolean;
   created_at?: string;
+  ultimo_acceso?: string;
   telefono?: string;
 }
 

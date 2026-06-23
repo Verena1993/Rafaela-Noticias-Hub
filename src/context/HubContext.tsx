@@ -355,6 +355,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           avatarColor: p.rol === 'admin' ? '#1e3a8a' : '#0f766e',
           activo: p.activo,
           created_at: p.created_at,
+          ultimo_acceso: p.ultimo_acceso || p.last_sign_in || p.updated_at,
           telefono: p.telefono
         }));
 
@@ -626,6 +627,15 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           throw new Error('Tu cuenta ha sido desactivada. Comunícate con el administrador.');
         }
 
+        // Try updating last sign in timestamp asynchronously
+        supabase
+          .from('profiles')
+          .update({ ultimo_acceso: new Date().toISOString() })
+          .eq('id', profile.id)
+          .then(({ error: uError }) => {
+            if (uError) console.warn('Could not update ultimo_acceso:', uError.message);
+          });
+
         setCurrentUser({
           id: profile.id,
           name: profile.nombre,
@@ -633,7 +643,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           role: profile.rol as 'admin' | 'editor',
           avatarColor: profile.rol === 'admin' ? '#1e3a8a' : '#0f766e',
           activo: profile.activo,
-          created_at: profile.created_at
+          created_at: profile.created_at,
+          ultimo_acceso: new Date().toISOString()
         });
         return true;
       }

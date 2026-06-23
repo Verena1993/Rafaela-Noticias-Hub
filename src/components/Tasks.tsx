@@ -58,7 +58,7 @@ export const Tasks: React.FC<TasksProps> = ({
 
   // Filter logic
   const filteredTasks = tasks.filter(t => {
-    if (currentUser?.role !== 'admin' || taskFilter === 'my') {
+    if (taskFilter === 'my') {
       return t.assigneeId === currentUser?.id;
     }
     return true;
@@ -109,7 +109,7 @@ export const Tasks: React.FC<TasksProps> = ({
       {/* Filter Row */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         {/* User Scope Toggles */}
-        {currentUser?.role === 'admin' && (
+        {(currentUser?.role === 'admin' || currentUser?.role === 'editor') && (
           <div style={{
             display: 'flex', 
             backgroundColor: 'var(--bg-tertiary)', 

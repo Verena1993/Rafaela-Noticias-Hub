@@ -523,7 +523,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             >
               <MessageCircle size={14} /> Compartir
             </button>
-            {(currentUser?.role === 'admin') && (
+            {(currentUser?.role === 'admin' || currentUser?.role === 'editor') && (
               <button 
                 className="btn btn-primary" 
                 style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.5rem 1rem' }}

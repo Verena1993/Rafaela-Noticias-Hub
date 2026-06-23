@@ -1,21 +1,21 @@
 import type { User, Coverage, Task, Alert, CalendarEvent, Notification, Proposal, StaffSchedule, InstagramPost, NewsRadarItem } from '../types';
 
 export const INITIAL_USERS: User[] = [
-  { id: 'u1', name: 'Admin Principal', email: 'admin@rafaelanoticias.com', password: 'password123', role: 'admin', avatarColor: '#1e3a8a' },
-  { id: 'u2', name: 'Mariano Redactor', email: 'mariano@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#0f766e' },
-  { id: 'u3', name: 'Sofía Redactora', email: 'sofia@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#be123c' },
-  { id: 'u4', name: 'Juan Carlos Redactor', email: 'juan@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#d97706' },
-  { id: 'u5', name: 'Laura Redactora', email: 'laura@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#84cc16' },
-  { id: 'u6', name: 'Diego Redactor', email: 'diego@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#06b6d4' },
-  { id: 'u7', name: 'Esteban Redactor', email: 'esteban@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#6366f1' },
-  { id: 'u8', name: 'Martina Redactora', email: 'martina@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#a855f7' },
-  { id: 'u9', name: 'Andrés Redactor', email: 'andres@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#ec4899' },
-  { id: 'u10', name: 'Clara Redactora', email: 'clara@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#14b8a6' },
-  { id: 'u11', name: 'Valentina Redactora', email: 'valentina@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#f43f5e' },
-  { id: 'u12', name: 'Mateo Redactor', email: 'mateo@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#10b981' },
-  { id: 'u13', name: 'Pedro Redactor', email: 'pedro@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#64748b' },
-  { id: 'u14', name: 'Gabriela Redactora', email: 'gabriela@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#fb923c' },
-  { id: 'u15', name: 'Lucas Redactor', email: 'lucas@rafaelanoticias.com', password: 'password123', role: 'journalist', avatarColor: '#a7f3d0' }
+  { id: 'u1', name: 'Admin Principal', email: 'admin@rafaelanoticias.com', password: 'password123', role: 'admin', avatarColor: '#1e3a8a', created_at: '2026-05-15T08:30:00.000Z', ultimo_acceso: '2026-06-23T10:05:00.000Z' },
+  { id: 'u2', name: 'Mariano Redactor', email: 'mariano@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#0f766e', created_at: '2026-05-16T09:15:00.000Z', ultimo_acceso: '2026-06-22T18:45:00.000Z' },
+  { id: 'u3', name: 'Sofía Redactora', email: 'sofia@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#be123c', created_at: '2026-05-16T10:00:00.000Z', ultimo_acceso: '2026-06-23T08:12:00.000Z' },
+  { id: 'u4', name: 'Juan Carlos Redactor', email: 'juan@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#d97706', created_at: '2026-05-17T11:30:00.000Z', ultimo_acceso: '2026-06-21T17:30:00.000Z' },
+  { id: 'u5', name: 'Laura Redactora', email: 'laura@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#84cc16', created_at: '2026-05-18T14:20:00.000Z', ultimo_acceso: '2026-06-22T19:10:00.000Z' },
+  { id: 'u6', name: 'Diego Redactor', email: 'diego@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#06b6d4', created_at: '2026-05-18T15:00:00.000Z', ultimo_acceso: '2026-06-22T20:30:00.000Z' },
+  { id: 'u7', name: 'Esteban Redactor', email: 'esteban@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#6366f1', created_at: '2026-05-19T08:45:00.000Z', ultimo_acceso: '2026-06-23T09:15:00.000Z' },
+  { id: 'u8', name: 'Martina Redactora', email: 'martina@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#a855f7', created_at: '2026-05-19T10:10:00.000Z', ultimo_acceso: '2026-06-22T16:20:00.000Z' },
+  { id: 'u9', name: 'Andrés Redactor', email: 'andres@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#ec4899', created_at: '2026-05-20T11:00:00.000Z', ultimo_acceso: '2026-06-23T07:45:00.000Z' },
+  { id: 'u10', name: 'Clara Redactora', email: 'clara@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#14b8a6', created_at: '2026-05-20T13:40:00.000Z', ultimo_acceso: '2026-06-22T11:30:00.000Z' },
+  { id: 'u11', name: 'Valentina Redactora', email: 'valentina@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#f43f5e', created_at: '2026-05-21T09:00:00.000Z', ultimo_acceso: '2026-06-23T09:55:00.000Z' },
+  { id: 'u12', name: 'Mateo Redactor', email: 'mateo@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#10b981', created_at: '2026-05-22T10:30:00.000Z', ultimo_acceso: '2026-06-20T15:20:00.000Z' },
+  { id: 'u13', name: 'Pedro Redactor', email: 'pedro@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#64748b', created_at: '2026-05-22T11:15:00.000Z', ultimo_acceso: '2026-06-19T14:10:00.000Z' },
+  { id: 'u14', name: 'Gabriela Redactora', email: 'gabriela@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#fb923c', created_at: '2026-05-23T09:40:00.000Z', ultimo_acceso: '2026-06-23T09:20:00.000Z' },
+  { id: 'u15', name: 'Lucas Redactor', email: 'lucas@rafaelanoticias.com', password: 'password123', role: 'editor', avatarColor: '#a7f3d0', created_at: '2026-05-24T12:00:00.000Z', ultimo_acceso: '2026-06-18T10:00:00.000Z' }
 ];
 
 export const INITIAL_COVERAGES: Coverage[] = [

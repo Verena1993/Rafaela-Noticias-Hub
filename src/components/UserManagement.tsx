@@ -157,6 +157,7 @@ export const UserManagement: React.FC = () => {
                   <th style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>Email</th>
                   <th style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>Rol</th>
                   <th style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>Estado</th>
+                  <th style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>Último Acceso</th>
                   <th style={{ padding: '0.75rem 1rem', fontWeight: 700 }}>Fecha Creación</th>
                   <th style={{ padding: '0.75rem 1rem', fontWeight: 700, textAlign: 'right' }}>Acciones</th>
                 </tr>
@@ -180,6 +181,9 @@ export const UserManagement: React.FC = () => {
                       <span className={`badge ${u.activo !== false ? 'status-published' : 'priority-high'}`} style={{ fontSize: '0.7rem' }}>
                         {u.activo !== false ? 'Activo' : 'Suspendido'}
                       </span>
+                    </td>
+                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
+                      {u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-AR') : '—'}
                     </td>
                     <td style={{ padding: '0.75rem 1rem', color: 'var(--text-muted)' }}>
                       {u.created_at ? new Date(u.created_at).toLocaleDateString('es-AR') : '—'}
@@ -231,7 +235,9 @@ export const UserManagement: React.FC = () => {
                 <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Nombre</th>
                 <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Email</th>
                 <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Rol Mock</th>
-                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Tipo</th>
+                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Estado</th>
+                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Último Acceso</th>
+                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Fecha Creación</th>
               </tr>
             </thead>
             <tbody>
@@ -242,12 +248,24 @@ export const UserManagement: React.FC = () => {
                   <td style={{ padding: '0.5rem 1rem' }}>
                     <span style={{
                       fontSize: '0.65rem', fontWeight: 700, padding: '0.1rem 0.35rem', borderRadius: '4px',
-                      backgroundColor: '#f1f5f9', color: '#475569', textTransform: 'uppercase'
+                      backgroundColor: u.role === 'admin' ? '#fee2e2' : '#e0f2fe',
+                      color: u.role === 'admin' ? '#b91c1c' : '#0369a1',
+                      textTransform: 'uppercase'
                     }}>
                       {u.role}
                     </span>
                   </td>
-                  <td style={{ padding: '0.5rem 1rem', color: 'var(--text-muted)' }}>Solo Lectura (Mock)</td>
+                  <td style={{ padding: '0.5rem 1rem' }}>
+                    <span className="badge status-published" style={{ fontSize: '0.65rem', padding: '0.05rem 0.25rem' }}>
+                      Activo
+                    </span>
+                  </td>
+                  <td style={{ padding: '0.5rem 1rem', color: 'var(--text-muted)' }}>
+                    {u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-AR') : '—'}
+                  </td>
+                  <td style={{ padding: '0.5rem 1rem', color: 'var(--text-muted)' }}>
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString('es-AR') : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>

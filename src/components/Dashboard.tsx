@@ -45,7 +45,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
   
   // Edit user state (for admin quick action)
   const [dbUserEditName, setDbUserEditName] = useState('');
-  const [dbUserEditRole, setDbUserEditRole] = useState<'admin' | 'editor' | 'journalist'>('editor');
+  const [dbUserEditRole, setDbUserEditRole] = useState<'admin' | 'editor'>('editor');
   const [dbUserEditLoading, setDbUserEditLoading] = useState(false);
   const [dbUserEditSuccess, setDbUserEditSuccess] = useState('');
   const [dbUserEditError, setDbUserEditError] = useState('');
@@ -297,10 +297,10 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
 
   const openAssignModal = (alert: Alert) => {
     setAssigningAlert(alert);
-    // Auto-select first journalist
-    const journalists = users.filter(u => u.role === 'journalist');
-    if (journalists.length > 0) {
-      setSelectedJournalistId(journalists[0].id);
+    // Auto-select first active editor/admin
+    const assignableUsers = users.filter(u => (u.role === 'editor' || u.role === 'admin') && u.activo !== false);
+    if (assignableUsers.length > 0) {
+      setSelectedJournalistId(assignableUsers[0].id);
     }
   };
 
@@ -921,7 +921,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
             </h3>
             
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', maxHeight: '280px', overflowY: 'auto', paddingRight: '0.25rem' }}>
-              {users.map(u => {
+              {users.filter(u => u.activo !== false).map(u => {
                 const isActive = u.activo !== false;
                 return (
                   <div
@@ -961,7 +961,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
                           {u.name}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                          {u.role === 'admin' ? 'Administrador' : u.role === 'editor' ? 'Editor' : 'Periodista'}
+                          {u.role === 'admin' ? 'Administrador' : 'Editor'}
                         </div>
                       </div>
                     </div>
@@ -1034,7 +1034,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
         <div className="modal-overlay">
           <div className="modal-content">
             <div className="modal-header">
-              <h3 className="modal-title">Asignar Periodista a Alerta</h3>
+              <h3 className="modal-title">Asignar Redactor a Alerta</h3>
               <button className="modal-close" onClick={() => setAssigningAlert(null)}>✕</button>
             </div>
             <div className="modal-body">
@@ -1049,8 +1049,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
                   value={selectedJournalistId}
                   onChange={(e) => setSelectedJournalistId(e.target.value)}
                 >
-                  {users.filter(u => u.role === 'journalist').map(j => (
-                    <option key={j.id} value={j.id}>{j.name} (Móvil)</option>
+                  {users.filter(u => (u.role === 'editor' || u.role === 'admin') && u.activo !== false).map(e => (
+                    <option key={e.id} value={e.id}>{e.name} ({e.role === 'admin' ? 'Administrador' : 'Editor'})</option>
                   ))}
                 </select>
               </div>
@@ -1162,7 +1162,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
                     <div>
                       <span style={{ fontWeight: 600, color: 'var(--text-muted)', display: 'block', fontSize: '0.7rem', textTransform: 'uppercase' }}>Rol</span>
                       <span style={{ textTransform: 'capitalize', color: 'var(--text-primary)', fontWeight: 500 }}>
-                        {selectedDashboardUser.role === 'admin' ? 'Administrador' : selectedDashboardUser.role === 'editor' ? 'Editor' : 'Periodista'}
+                        {selectedDashboardUser.role === 'admin' ? 'Administrador' : 'Editor'}
                       </span>
                     </div>
                     <div>
@@ -1233,10 +1233,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
                     >
                       <option value="editor">Editor (Redacción estándar)</option>
                       <option value="admin">Administrador (Acceso total)</option>
-                      {/* Show journalist if it's a mock or is already a journalist */}
-                      {(selectedDashboardUser.role === 'journalist' || !selectedDashboardUser.id.includes('-')) && (
-                        <option value="journalist">Periodista (Móvil)</option>
-                      )}
                     </select>
                   </div>
                   

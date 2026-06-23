@@ -385,7 +385,7 @@ export const Proposals: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const isEditorOrAdmin = currentUser?.role === 'admin';
+  const canManageProposals = currentUser?.role === 'admin' || currentUser?.role === 'editor';
 
   return (
     <div className="proposals-module">
@@ -815,7 +815,7 @@ export const Proposals: React.FC = () => {
                   </div>
                 </div>
 
-                {isEditorOrAdmin && (
+                {canManageProposals && (
                   <div className="sidebar-group actions-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <h4 className="sidebar-group-title">Acciones Editoriales</h4>
                     
@@ -836,7 +836,7 @@ export const Proposals: React.FC = () => {
                       Editar Detalles
                     </button>
 
-                    {selectedProposal.status !== 'approved' && selectedProposal.status !== 'covered' && (
+                    {currentUser?.role === 'admin' && selectedProposal.status !== 'approved' && selectedProposal.status !== 'covered' && (
                       <button 
                         onClick={() => {
                           updateProposalStatus(selectedProposal.id, 'approved');
@@ -849,7 +849,7 @@ export const Proposals: React.FC = () => {
                       </button>
                     )}
 
-                    {selectedProposal.status !== 'rejected' && selectedProposal.status !== 'covered' && (
+                    {currentUser?.role === 'admin' && selectedProposal.status !== 'rejected' && selectedProposal.status !== 'covered' && (
                       <button 
                         onClick={() => {
                           if (confirm('¿Seguro que deseas rechazar esta propuesta?')) {
