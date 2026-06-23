@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useHub } from '../context/HubContext';
-import { Radio } from 'lucide-react';
+import { Radio, Key } from 'lucide-react';
 
 export const Login: React.FC = () => {
   const { login, resetPassword } = useHub();
@@ -226,74 +226,67 @@ export const Login: React.FC = () => {
 
       {showRecoveryModal && (
         <div className="modal-overlay" style={{ zIndex: 1000 }}>
-          <div className="modal-content" style={{ maxWidth: '400px', width: '90%' }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Recuperar Contraseña</h3>
-              <button 
-                type="button" 
-                className="modal-close" 
-                onClick={() => setShowRecoveryModal(false)}
-              >
-                ✕
-              </button>
+          <div className="recovery-modal-content">
+            <button 
+              type="button" 
+              className="recovery-modal-close" 
+              onClick={() => setShowRecoveryModal(false)}
+              aria-label="Cerrar modal"
+            >
+              ✕
+            </button>
+
+            <div className="recovery-modal-header">
+              <div className="recovery-icon-container">
+                <Key size={24} />
+              </div>
+              <h3 className="recovery-modal-title">Recuperar Contraseña</h3>
             </div>
 
-            {recoveryError && (
-              <div style={{
-                backgroundColor: 'var(--danger-light)',
-                color: 'var(--danger-text)',
-                padding: '0.75rem',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '0.8rem',
-                fontWeight: 500,
-                marginBottom: '1rem'
-              }}>
-                {recoveryError}
-              </div>
-            )}
+            <div className="recovery-modal-body">
+              <p className="recovery-description">
+                Ingresá tu correo electrónico y te enviaremos un enlace seguro para crear una nueva contraseña.
+              </p>
 
-            {recoveryMessage && (
-              <div style={{
-                backgroundColor: 'var(--success-light)',
-                color: 'var(--success-text)',
-                padding: '0.75rem',
-                borderRadius: 'var(--radius-md)',
-                fontSize: '0.8rem',
-                fontWeight: 500,
-                marginBottom: '1rem'
-              }}>
-                {recoveryMessage}
-              </div>
-            )}
+              {recoveryError && (
+                <div className="recovery-message error">
+                  {recoveryError}
+                </div>
+              )}
 
-            <form onSubmit={async (e) => {
-              e.preventDefault();
-              setRecoveryError('');
-              setRecoveryMessage('');
-              if (!recoveryEmail.trim()) {
-                setRecoveryError('Por favor ingresa tu correo electrónico.');
-                return;
-              }
-              setRecoveryLoading(true);
-              try {
-                await resetPassword(recoveryEmail.trim());
-                setRecoveryMessage('Se ha enviado un enlace de recuperación a tu email. Revisa tu bandeja de entrada.');
-              } catch (err: any) {
-                setRecoveryError(err.message || 'Error al enviar el email de recuperación.');
-              } finally {
-                setRecoveryLoading(false);
-              }
-            }}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '0.5rem 0' }}>
-                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
-                  Ingresa el correo electrónico asociado a tu cuenta. Te enviaremos un enlace seguro para restablecer tu contraseña.
-                </p>
-                <div className="form-group">
-                  <label className="form-label" htmlFor="recovery-email">Email</label>
+              {recoveryMessage && (
+                <div className="recovery-message success">
+                  {recoveryMessage}
+                </div>
+              )}
+
+              <form 
+                className="recovery-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setRecoveryError('');
+                  setRecoveryMessage('');
+                  if (!recoveryEmail.trim()) {
+                    setRecoveryError('Por favor ingresa tu correo electrónico.');
+                    return;
+                  }
+                  setRecoveryLoading(true);
+                  try {
+                    await resetPassword(recoveryEmail.trim());
+                    setRecoveryMessage('Se ha enviado un enlace de recuperación a tu email. Revisa tu bandeja de entrada.');
+                  } catch (err: any) {
+                    setRecoveryError(err.message || 'Error al enviar el email de recuperación.');
+                  } finally {
+                    setRecoveryLoading(false);
+                  }
+                }}
+              >
+                <div className="recovery-input-group">
+                  <label className="recovery-input-label" htmlFor="recovery-email">Email</label>
                   <input
                     id="recovery-email"
                     type="email"
-                    className="form-input"
+                    className="recovery-input"
                     placeholder="correo@rafaelanoticias.com"
                     value={recoveryEmail}
                     onChange={(e) => setRecoveryEmail(e.target.value)}
@@ -301,25 +294,26 @@ export const Login: React.FC = () => {
                     disabled={recoveryLoading}
                   />
                 </div>
-              </div>
-              <div className="modal-footer" style={{ borderTop: 'none', paddingTop: '1rem' }}>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={() => setShowRecoveryModal(false)}
-                  disabled={recoveryLoading}
-                >
-                  Cancelar
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn btn-primary"
-                  disabled={recoveryLoading}
-                >
-                  {recoveryLoading ? 'Enviando...' : 'Enviar Enlace'}
-                </button>
-              </div>
-            </form>
+
+                <div className="recovery-actions">
+                  <button 
+                    type="submit" 
+                    className="btn-recovery-primary"
+                    disabled={recoveryLoading}
+                  >
+                    {recoveryLoading ? 'Enviando...' : 'Enviar Enlace'}
+                  </button>
+                  <button 
+                    type="button" 
+                    className="btn-recovery-secondary" 
+                    onClick={() => setShowRecoveryModal(false)}
+                    disabled={recoveryLoading}
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
