@@ -3,7 +3,7 @@ import { useHub } from '../context/HubContext';
 import { Radio, Key } from 'lucide-react';
 
 export const Login: React.FC = () => {
-  const { login, resetPassword } = useHub();
+  const { login, resetPassword, users } = useHub();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('password123'); // Default password
   const [error, setError] = useState('');
@@ -165,27 +165,49 @@ export const Login: React.FC = () => {
 
           <div className="login-role-selector">
             <h3 style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase', marginBottom: '0.5rem' }}>
-              Accesos Rápidos (Testing de Roles Supabase)
+              Accesos Rápidos
             </h3>
-            <div className="role-shortcut-grid">
-              {[
-                { name: 'Admin Test', email: 'admin@rafaelanoticias.com', role: 'admin' },
-                { name: 'Editor Test', email: 'editor@rafaelanoticias.com', role: 'editor' }
-              ].map((u) => (
-                <button
-                  key={u.email}
-                  type="button"
-                  className="role-shortcut-btn"
-                  onClick={() => handleQuickLogin(u.email, 'password123')}
-                  disabled={loading}
-                >
-                  <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{u.name}</span>
-                  <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
-                    {u.role}
-                  </span>
-                </button>
-              ))}
-            </div>
+            {(() => {
+              const isRealDbUser = (u: any) => u.id.includes('-') || !u.id.startsWith('u');
+              const activeDbUsers = users
+                .filter(u => isRealDbUser(u) && (u.activo !== false))
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+              if (activeDbUsers.length === 0) {
+                return (
+                  <div style={{
+                    padding: '1.25rem',
+                    textAlign: 'center',
+                    backgroundColor: 'var(--bg-secondary)',
+                    borderRadius: '8px',
+                    border: '1px dashed var(--border-color)',
+                    color: 'var(--text-secondary)',
+                    fontSize: '0.85rem'
+                  }}>
+                    No hay usuarios activos disponibles para acceso rápido.
+                  </div>
+                );
+              }
+
+              return (
+                <div className="role-shortcut-grid">
+                  {activeDbUsers.map((u) => (
+                    <button
+                      key={u.email}
+                      type="button"
+                      className="role-shortcut-btn"
+                      onClick={() => handleQuickLogin(u.email, 'password123')}
+                      disabled={loading}
+                    >
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{u.name}</span>
+                      <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textTransform: 'capitalize' }}>
+                        {u.role === 'admin' ? 'Administrador' : 'Editor'}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
       </div>

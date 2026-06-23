@@ -258,64 +258,52 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
       {/* Mi Perfil Modal */}
       {showProfileModal && (
         <div className="modal-overlay" style={{ zIndex: 1000 }}>
-          <div className="modal-content" style={{ maxWidth: '480px', width: '95%' }}>
-            <div className="modal-header">
-              <h3 className="modal-title">Mi Perfil</h3>
-              <button 
-                type="button" 
-                className="modal-close" 
-                onClick={() => {
-                  setShowProfileModal(false);
-                  setError('');
-                  setSuccess('');
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmNewPassword('');
-                }}
-              >
-                ✕
-              </button>
+          <div className="profile-modal-content">
+            <button 
+              type="button" 
+              className="profile-modal-close" 
+              onClick={() => {
+                setShowProfileModal(false);
+                setError('');
+                setSuccess('');
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmNewPassword('');
+              }}
+              aria-label="Cerrar modal"
+            >
+              ✕
+            </button>
+
+            <div className="profile-modal-header">
+              <h3 className="profile-modal-title">Mi Perfil</h3>
             </div>
             
-            <form onSubmit={handleProfileSubmit}>
-              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', padding: '0.5rem 0' }}>
+            <form onSubmit={handleProfileSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div className="profile-modal-body">
                 {error && (
-                  <div style={{
-                    backgroundColor: 'var(--danger-light)',
-                    color: 'var(--danger-text)',
-                    padding: '0.75rem',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.8rem',
-                    fontWeight: 500
-                  }}>
+                  <div className="recovery-message error">
                     {error}
                   </div>
                 )}
 
                 {success && (
-                  <div style={{
-                    backgroundColor: 'var(--success-light)',
-                    color: 'var(--success-text)',
-                    padding: '0.75rem',
-                    borderRadius: 'var(--radius-md)',
-                    fontSize: '0.8rem',
-                    fontWeight: 500
-                  }}>
+                  <div className="recovery-message success">
                     {success}
                   </div>
                 )}
 
                 {/* Personal Info */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem', letterSpacing: '0.05em' }}>
+                <div className="profile-section">
+                  <h4 className="profile-section-title">
                     Información Personal
                   </h4>
                   
-                  <div className="form-group">
-                    <label className="form-label">Nombre Completo</label>
+                  <div className="profile-form-group">
+                    <label className="profile-form-label">Nombre Completo</label>
                     <input
                       type="text"
-                      className="form-input"
+                      className="profile-form-input"
                       value={profileName}
                       onChange={(e) => setProfileName(e.target.value)}
                       required
@@ -323,11 +311,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
                     />
                   </div>
                   
-                  <div className="form-group">
-                    <label className="form-label">Email (Solo Lectura)</label>
+                  <div className="profile-form-group">
+                    <label className="profile-form-label">Email (Solo Lectura)</label>
                     <input
                       type="email"
-                      className="form-input"
+                      className="profile-form-input"
                       value={currentUser.email}
                       disabled
                       style={{ opacity: 0.7 }}
@@ -336,19 +324,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
                 </div>
 
                 {/* Password Change */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
-                  <h4 style={{ fontSize: '0.8rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.25rem', letterSpacing: '0.05em' }}>
+                <div className="profile-section">
+                  <h4 className="profile-section-title">
                     Cambiar Contraseña
                   </h4>
-                  <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '-0.25rem' }}>
+                  <p className="profile-section-subtitle">
                     Deja los siguientes campos vacíos si no deseas cambiar tu contraseña.
                   </p>
                   
-                  <div className="form-group">
-                    <label className="form-label">Contraseña Actual</label>
+                  <div className="profile-form-group">
+                    <label className="profile-form-label">Contraseña Actual</label>
                     <input
                       type="password"
-                      className="form-input"
+                      className="profile-form-input"
                       placeholder="Contraseña actual"
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
@@ -356,11 +344,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Nueva Contraseña (mínimo 8 caracteres)</label>
+                  <div className="profile-form-group">
+                    <label className="profile-form-label">Nueva Contraseña (mínimo 8 caracteres)</label>
                     <input
                       type="password"
-                      className="form-input"
+                      className="profile-form-input"
                       placeholder="Mínimo 8 caracteres"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
@@ -368,11 +356,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Confirmar Nueva Contraseña</label>
+                  <div className="profile-form-group">
+                    <label className="profile-form-label">Confirmar Nueva Contraseña</label>
                     <input
                       type="password"
-                      className="form-input"
+                      className="profile-form-input"
                       placeholder="Repite la nueva contraseña"
                       value={confirmNewPassword}
                       onChange={(e) => setConfirmNewPassword(e.target.value)}
@@ -382,10 +370,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
                 </div>
               </div>
               
-              <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
+              <div className="profile-modal-footer">
                 <button 
                   type="button" 
-                  className="btn btn-secondary" 
+                  className="profile-btn-secondary" 
                   onClick={() => {
                     setShowProfileModal(false);
                     setError('');
@@ -396,11 +384,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
                   }}
                   disabled={profileLoading}
                 >
-                  Cerrar
+                  Cancelar
                 </button>
                 <button 
                   type="submit" 
-                  className="btn btn-primary"
+                  className="profile-btn-primary"
                   disabled={profileLoading}
                 >
                   {profileLoading ? 'Guardando...' : 'Guardar Cambios'}

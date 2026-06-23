@@ -19,14 +19,14 @@ ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
 -- 3. Eliminar políticas existentes si las hay (para re-ejecución limpia)
 DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON public.profiles;
+DROP POLICY IF EXISTS "Profiles are viewable by everyone" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can do everything on profiles" ON public.profiles;
 
 -- 4. Crear políticas RLS
--- Permitir que cualquier usuario autenticado vea los perfiles de todos (necesario para ver asignatarios, autores de comentarios, etc.)
-CREATE POLICY "Profiles are viewable by authenticated users" 
+-- Permitir que cualquiera vea los perfiles (necesario para accesos rápidos en login)
+CREATE POLICY "Profiles are viewable by everyone" 
 ON public.profiles FOR SELECT 
-TO authenticated 
 USING (true);
 
 -- Permitir que cada usuario edite su propio perfil (nombre, etc.)

@@ -342,6 +342,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase
         .from('profiles')
         .select('*');
+      console.log('HubContext fetchUsers raw data:', data, 'error:', error);
       if (error) {
         console.error('Error fetching profiles:', error.message);
         return;
