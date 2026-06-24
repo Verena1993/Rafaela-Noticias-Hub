@@ -107,3 +107,27 @@ CREATE POLICY "Coverages can be inserted by authenticated users" ON public.cover
 CREATE POLICY "Coverages can be updated by authenticated users" ON public.coverages FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY "Coverages can be deleted by authenticated users" ON public.coverages FOR DELETE TO authenticated USING (true);
 
+
+-- ==========================================
+-- ELIMINACIÓN DE USUARIOS (RPC SECURE)
+-- ==========================================
+
+CREATE OR REPLACE FUNCTION public.delete_user_by_id(user_id UUID)
+RETURNS VOID AS $$
+DECLARE
+  caller_role TEXT;
+BEGIN
+  -- Obtener el rol del usuario que realiza la llamada
+  SELECT rol INTO caller_role FROM public.profiles WHERE id = auth.uid() AND activo = true;
+
+  -- Validar que el ejecutor sea un administrador activo
+  IF caller_role <> 'admin' OR caller_role IS NULL THEN
+    RAISE EXCEPTION 'Solo los administradores activos pueden eliminar usuarios.';
+  END IF;
+
+  -- Eliminar de auth.users (cascada automática a public.profiles)
+  DELETE FROM auth.users WHERE id = user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+

@@ -45,6 +45,7 @@ interface HubContextType {
   createHubUser: (nombre: string, email: string, password?: string, rol?: 'admin' | 'editor') => Promise<void>;
   updateHubUser: (id: string, updates: Partial<User>) => Promise<void>;
   toggleUserActive: (id: string, activo: boolean) => Promise<void>;
+  deleteHubUser: (id: string) => Promise<void>;
   addCoverage: (title: string, description: string, dateTime: string, location: string, assignees: string[], programs?: ProgramType[], formats?: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[]) => string;
   updateCoverageStatus: (coverageId: string, status: Coverage['status']) => void;
   addCommentToCoverage: (coverageId: string, text: string) => void;
@@ -738,6 +739,58 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       await fetchUsers();
     } catch (err: any) {
       console.error('Error in toggleUserActive:', err.message);
+      throw err;
+    }
+  };
+
+  const deleteHubUser = async (id: string) => {
+    // 1. Guard check: only admins can call this
+    if (currentUser?.role !== 'admin') {
+      throw new Error('Solo los administradores pueden eliminar usuarios.');
+    }
+    
+    // 2. Guard check: cannot delete self
+    if (id === currentUser.id) {
+      throw new Error('No puedes eliminar tu propio usuario.');
+    }
+    
+    // 3. Guard check: cannot delete Verena Guglielmone if she is the only active admin
+    const userToDelete = users.find(u => u.id === id);
+    if (!userToDelete) {
+      throw new Error('El usuario a eliminar no existe.');
+    }
+    
+    const activeAdmins = users.filter(u => u.role === 'admin' && u.activo !== false);
+    
+    if (userToDelete.name === 'Verena Guglielmone' || userToDelete.email === 'verena@rafaelanoticias.com' || userToDelete.email === 'vereguglielmone@gmail.com') {
+      const isVerenaActiveAdmin = userToDelete.role === 'admin' && userToDelete.activo !== false;
+      if (isVerenaActiveAdmin && activeAdmins.length <= 1) {
+        throw new Error('No se puede eliminar a Verena Guglielmone porque es la única Administradora activa del sistema.');
+      }
+    }
+    
+    // 4. Guard check: cannot delete the last active Administrator
+    if (userToDelete.role === 'admin' && userToDelete.activo !== false && activeAdmins.length <= 1) {
+      throw new Error('No se puede eliminar al último Administrador activo del sistema.');
+    }
+
+    try {
+      // Intentar llamar al RPC de base de datos para borrar de auth.users (cascada a profiles)
+      const { error: rpcError } = await supabase.rpc('delete_user_by_id', { user_id: id });
+      if (rpcError) {
+        console.warn('RPC delete_user_by_id failed or not found, falling back to direct profiles delete:', rpcError.message);
+        // Fallback: eliminar directamente de la tabla public.profiles
+        const { error: dbError } = await supabase.from('profiles').delete().eq('id', id);
+        if (dbError) throw dbError;
+      }
+      
+      // Actualizar estado local
+      setUsers(prev => prev.filter(u => u.id !== id));
+      
+      // Registrar actividad de auditoría
+      logActivity(undefined, `Usuario eliminado: "${userToDelete.name}" (${userToDelete.email})`);
+    } catch (err: any) {
+      console.error('Error deleting user:', err.message);
       throw err;
     }
   };
@@ -1963,6 +2016,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createHubUser,
       updateHubUser,
       toggleUserActive,
+      deleteHubUser,
       addCoverage,
       updateCoverageStatus,
       addCommentToCoverage,

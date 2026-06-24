@@ -1,14 +1,48 @@
 import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
-import { UserPlus, Edit2, Shield, UserCheck, UserX, Mail, Key } from 'lucide-react';
+import { UserPlus, Edit2, Shield, UserCheck, UserX, Mail, Key, Trash2 } from 'lucide-react';
 import type { User } from '../types';
 
 export const UserManagement: React.FC = () => {
-  const { users, createHubUser, updateHubUser } = useHub();
+  const { users, createHubUser, updateHubUser, currentUser, deleteHubUser } = useHub();
 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  // Delete Form State
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [deleteSuccess, setDeleteSuccess] = useState('');
+
+  const handleDeleteClick = (user: User) => {
+    setUserToDelete(user);
+    setDeleteError('');
+    setDeleteSuccess('');
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!userToDelete) return;
+    setDeleting(true);
+    setDeleteError('');
+    setDeleteSuccess('');
+    try {
+      await deleteHubUser(userToDelete.id);
+      setDeleteSuccess('Usuario eliminado con éxito.');
+      setTimeout(() => {
+        setShowDeleteConfirm(false);
+        setUserToDelete(null);
+        setDeleteSuccess('');
+      }, 1500);
+    } catch (err: any) {
+      setDeleteError(err.message || 'Error al eliminar el usuario.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   // Creation Form State
   const [createName, setCreateName] = useState('');
@@ -210,6 +244,21 @@ export const UserManagement: React.FC = () => {
                         >
                           {u.activo !== false ? <><UserX size={12} /> Suspender</> : <><UserCheck size={12} /> Activar</>}
                         </button>
+                        {currentUser?.role === 'admin' && (
+                          <button 
+                            className="btn" 
+                            style={{ 
+                              padding: '0.25rem 0.5rem', 
+                              fontSize: '0.75rem',
+                              backgroundColor: '#dc2626',
+                              color: 'white',
+                              borderColor: 'transparent'
+                            }}
+                            onClick={() => handleDeleteClick(u)}
+                          >
+                            <Trash2 size={12} /> Eliminar
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -411,6 +460,66 @@ export const UserManagement: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE USER CONFIRMATION MODAL */}
+      {showDeleteConfirm && userToDelete && (
+        <div className="modal-overlay">
+          <div className="modal-content" style={{ maxWidth: '450px' }}>
+            <div className="modal-header">
+              <h3 className="modal-title">Eliminar Usuario</h3>
+              <button className="modal-close" onClick={() => { if (!deleting) setShowDeleteConfirm(false); }} disabled={deleting}>✕</button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 0' }}>
+              
+              {deleteError && (
+                <div style={{
+                  backgroundColor: 'var(--danger-light)', color: 'var(--danger-text)',
+                  padding: '0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', fontWeight: 500
+                }}>
+                  {deleteError}
+                </div>
+              )}
+
+              {deleteSuccess && (
+                <div style={{
+                  backgroundColor: 'var(--success-light)', color: 'var(--success-text)',
+                  padding: '0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', fontWeight: 500
+                }}>
+                  {deleteSuccess}
+                </div>
+              )}
+
+              <p style={{ fontSize: '0.9rem', color: 'var(--text-primary)', margin: 0 }}>
+                ¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.
+              </p>
+              
+              <div style={{ fontSize: '0.85rem', padding: '0.5rem', backgroundColor: 'var(--bg-secondary)', borderRadius: '4px', borderLeft: '4px solid var(--primary)' }}>
+                <strong>Usuario:</strong> {userToDelete.name} ({userToDelete.email})
+              </div>
+
+            </div>
+            <div className="modal-footer">
+              <button 
+                type="button" 
+                className="btn btn-secondary" 
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+              <button 
+                type="button" 
+                className="btn" 
+                style={{ backgroundColor: '#dc2626', color: 'white', border: 'none' }}
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
+              >
+                {deleting ? 'Eliminando...' : 'Eliminar definitivamente'}
+              </button>
+            </div>
           </div>
         </div>
       )}
