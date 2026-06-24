@@ -17,6 +17,8 @@ const supabaseAdminClient = createClient(
   }
 );
 
+
+
 const generateStableId = (title: string): string => {
   let hash = 0;
   for (let i = 0; i < title.length; i++) {
@@ -387,17 +389,18 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         (hash.includes('access_token=') && hash.includes('recovery')) ||
         search.includes('type=recovery')
       ) {
-        fetchUsers();
+        await fetchUsers();
         return; // Skip active user session check to avoid dashboard redirect during recovery
       }
 
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        // Fetch profile and users list in parallel
+        const [profileRes, _] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+          fetchUsers()
+        ]);
+        const profile = profileRes.data;
         if (profile && profile.activo) {
           setCurrentUser({
             id: profile.id,
@@ -417,8 +420,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else {
         setCurrentUser(null);
+        await fetchUsers();
       }
-      fetchUsers();
     };
 
     checkUser();
@@ -434,11 +437,12 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       if (session?.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
+        // Fetch profile and users list in parallel
+        const [profileRes, _] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', session.user.id).single(),
+          fetchUsers()
+        ]);
+        const profile = profileRes.data;
         if (profile && profile.activo) {
           setCurrentUser({
             id: profile.id,
@@ -458,8 +462,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } else {
         setCurrentUser(null);
+        await fetchUsers();
       }
-      fetchUsers();
     });
 
     return () => {
@@ -468,9 +472,13 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    // Automatically load RSS feeds on initial mount
-    fetchLiveRadarNews();
-    fetchCoverages();
+    // Automatically load RSS feeds and coverages on initial mount in parallel
+    Promise.all([
+      fetchLiveRadarNews(),
+      fetchCoverages()
+    ]).catch(err => {
+      console.error('Error on initial mount loaders:', err);
+    });
   }, []);
 
   // Sync to localStorage
