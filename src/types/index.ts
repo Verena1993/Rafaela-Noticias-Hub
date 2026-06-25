@@ -152,6 +152,7 @@ export interface ProposalDecision {
 
 export interface Proposal {
   id: string;
+  proposalNumber?: number;
   title: string;
   description: string;
   dateTime?: string; // Event date if applicable
@@ -168,6 +169,10 @@ export interface Proposal {
   authorId: string;
   authorName: string;
   decisionHistory: ProposalDecision[];
+  sourceTypeId?: string;
+  sourceName?: string;
+  deletedAt?: string;
+  deletedBy?: string;
 }
 
 export interface StaffSchedule {
