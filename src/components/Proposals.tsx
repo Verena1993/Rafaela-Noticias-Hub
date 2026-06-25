@@ -9,7 +9,6 @@ import {
   Send, 
   AlertCircle,
   Trash2,
-  CheckCircle2,
   ExternalLink,
   MessageCircle,
   FolderOpen
@@ -34,7 +33,49 @@ export const Proposals: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'proposals' | 'whatsapp'>('proposals');
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [proposalFilter, setProposalFilter] = useState<'all' | 'new' | 'in_evaluation' | 'approved' | 'rejected' | 'covered'>('all');
+  const [proposalFilter, setProposalFilter] = useState<'all' | 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'requiere_cambios'>('all');
+
+  // Admin Decision Modal state
+  const [showAdminDecisionModal, setShowAdminDecisionModal] = useState(false);
+  const [adminDecisionType, setAdminDecisionType] = useState<'aprobada' | 'rechazada' | 'requiere_cambios' | null>(null);
+  const [adminDecisionComment, setAdminDecisionComment] = useState('');
+  const [adminDecisionError, setAdminDecisionError] = useState('');
+
+  const handleAdminDecisionSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedProposal || !adminDecisionType) return;
+
+    if ((adminDecisionType === 'rechazada' || adminDecisionType === 'requiere_cambios') && !adminDecisionComment.trim()) {
+      setAdminDecisionError('El comentario es obligatorio para este estado.');
+      return;
+    }
+
+    try {
+      updateProposalStatus(selectedProposal.id, adminDecisionType, adminDecisionComment);
+      
+      // Update local modal view state
+      setSelectedProposal(prev => prev ? { 
+        ...prev, 
+        status: adminDecisionType,
+        decisionHistory: [
+          {
+            status: adminDecisionType,
+            timestamp: new Date().toISOString(),
+            note: adminDecisionComment || (adminDecisionType === 'aprobada' ? 'Propuesta aprobada por la administración.' : ''),
+            deciderName: currentUser?.name || 'Administrador'
+          },
+          ...(prev.decisionHistory || [])
+        ]
+      } : null);
+
+      setShowAdminDecisionModal(false);
+      setAdminDecisionComment('');
+      setAdminDecisionError('');
+      setAdminDecisionType(null);
+    } catch (err: any) {
+      setAdminDecisionError(err.message || 'Error al procesar la decisión.');
+    }
+  };
 
   // Media Preview State
   const [previewItem, setPreviewItem] = useState<{ name: string; url: string; type: 'photo' | 'video' | 'audio' | 'document'; size: string } | null>(null);
@@ -63,30 +104,7 @@ export const Proposals: React.FC = () => {
   const [convertProgram, setConvertProgram] = useState('');
   const [convertFormat, setConvertFormat] = useState('');
 
-  const startConversion = () => {
-    if (selectedProposal) {
-      let datePart = '';
-      let timePart = '';
-      if (selectedProposal.dateTime) {
-        const parts = selectedProposal.dateTime.split('T');
-        datePart = parts[0] || '';
-        timePart = parts[1]?.substring(0, 5) || '';
-      } else {
-        const now = new Date();
-        const pad = (n: number) => String(n).padStart(2, '0');
-        datePart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-        timePart = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-      }
-      setConvertDate(datePart);
-      setConvertTime(timePart);
-      setConvertLocation(selectedProposal.location || '');
-      setConvertAssigneeId(selectedProposal.assignees.length > 0 ? selectedProposal.assignees[0] : '');
-      setConvertStatus('pending_confirmation');
-      setConvertProgram(selectedProposal.programs && selectedProposal.programs.length > 0 ? selectedProposal.programs[0] : '');
-      setConvertFormat(selectedProposal.formats && selectedProposal.formats.length > 0 ? selectedProposal.formats[0] : '');
-      setShowConvertModal(true);
-    }
-  };
+
 
   const handleEditProposalAssigneeToggle = (userId: string) => {
     setEditProposalAssignees(prev => prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]);
@@ -257,6 +275,7 @@ export const Proposals: React.FC = () => {
     setFormFiles([]);
     setProposalPrograms([]);
     setProposalFormats([]);
+    setShowAddModal(false);
   };
 
   const handleProposalAutocompleteConfirm = (data: {
@@ -362,19 +381,23 @@ export const Proposals: React.FC = () => {
 
   const getStatusBadge = (status: Proposal['status']) => {
     const config: Record<Proposal['status'], { label: string; className: string }> = {
-      new: { label: 'Nueva', className: 'status-pending' },
-      in_evaluation: { label: 'En Evaluación', className: 'status-in_coverage' },
-      approved: { label: 'Aprobada', className: 'status-ready_to_publish' },
-      rejected: { label: 'Rechazada', className: 'priority-high' },
-      assigned: { label: 'Asignada', className: 'status-in_redaction' },
-      covered: { label: 'En Cobertura', className: 'status-published' }
+      pendiente: { label: 'Pendiente', className: 'status-pending' },
+      en_revision: { label: 'En Revisión', className: 'status-in_coverage' },
+      aprobada: { label: 'Aprobada', className: 'status-ready_to_publish' },
+      rechazada: { label: 'Rechazada', className: 'priority-high' },
+      requiere_cambios: { label: 'Requiere Cambios', className: 'status-in_redaction' }
     };
-    const c = config[status];
+    const c = config[status] || { label: status, className: 'status-pending' };
     return <span className={`badge ${c.className}`}>{c.label}</span>;
   };
 
   // Filtered proposals list
   const filteredProposals = proposals.filter(p => {
+    // Permisos de visualización: los editores solo ven sus propias propuestas.
+    if (currentUser?.role === 'editor' && p.authorId !== currentUser.id) {
+      return false;
+    }
+
     const matchesSearch = searchQuery
       ? p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
         p.description.toLowerCase().includes(searchQuery.toLowerCase())
@@ -386,6 +409,15 @@ export const Proposals: React.FC = () => {
   });
 
   const canManageProposals = currentUser?.role === 'admin' || currentUser?.role === 'editor';
+
+  const canEditProposal = (prop: Proposal) => {
+    if (!currentUser) return false;
+    if (currentUser.role === 'admin') return true;
+    if (currentUser.role === 'editor') {
+      return prop.authorId === currentUser.id && (prop.status === 'pendiente' || prop.status === 'requiere_cambios');
+    }
+    return false;
+  };
 
   return (
     <div className="proposals-module">
@@ -453,14 +485,14 @@ export const Proposals: React.FC = () => {
           {/* Filter Toolbar */}
           <div className="card" style={{ padding: '0.5rem 1rem', marginBottom: '1.25rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', marginRight: '0.5rem' }}>Estado:</span>
-            {(['all', 'new', 'in_evaluation', 'approved', 'rejected', 'covered'] as const).map(f => {
+            {(['all', 'pendiente', 'en_revision', 'aprobada', 'rechazada', 'requiere_cambios'] as const).map(f => {
               const labelMap: Record<typeof f, string> = {
                 all: 'Todas',
-                new: 'Nuevas',
-                in_evaluation: 'En Evaluación',
-                approved: 'Aprobadas',
-                rejected: 'Rechazadas',
-                covered: 'Cubiertas (Cobertura)'
+                pendiente: 'Pendientes',
+                en_revision: 'En Revisión',
+                aprobada: 'Aprobadas',
+                rechazada: 'Rechazadas',
+                requiere_cambios: 'Requieren Cambios'
               };
               const isSelected = proposalFilter === f;
               return (
@@ -647,7 +679,7 @@ export const Proposals: React.FC = () => {
               <div className="proposal-detail-main">
                 <h1 className="proposal-detail-title">{selectedProposal.title}</h1>
                 
-                <div className="proposal-detail-metadata-bar">
+                <div className="proposal-detail-metadata-bar" style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                   {selectedProposal.dateTime && (
                     <div className="meta-item">
                       <CalendarIcon size={14} />
@@ -660,6 +692,12 @@ export const Proposals: React.FC = () => {
                       <span>{selectedProposal.location}</span>
                     </div>
                   )}
+                  <div className="meta-item">
+                    <span>✍️ <b>Autor:</b> {selectedProposal.authorName || 'Desconocido'}</span>
+                  </div>
+                  <div className="meta-item">
+                    <span>📅 <b>Creada:</b> {new Date(selectedProposal.createdAt || selectedProposal.dateTime || new Date()).toLocaleString('es-AR')}</span>
+                  </div>
                 </div>
 
                 <div className="proposal-section-spacer" />
@@ -758,6 +796,68 @@ export const Proposals: React.FC = () => {
 
                 <div className="proposal-section-spacer" />
 
+                {/* Historial de Decisiones Editoriales */}
+                <div className="proposal-comments-section" style={{ backgroundColor: 'var(--bg-secondary)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', marginBottom: '1rem' }}>
+                  <h4 className="section-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
+                    📋 Historial de Decisiones Editoriales
+                  </h4>
+                  {(!selectedProposal.decisionHistory || selectedProposal.decisionHistory.length === 0) ? (
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                      No hay registros en el historial de decisiones para esta propuesta.
+                    </p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      {selectedProposal.decisionHistory.map((dec, idx) => {
+                        const statusLabelMap: Record<string, string> = {
+                          pendiente: 'Pendiente',
+                          en_revision: 'En Revisión',
+                          aprobada: 'Aprobada',
+                          rechazada: 'Rechazada',
+                          requiere_cambios: 'Requiere Cambios'
+                        };
+                        const statusColorMap: Record<string, string> = {
+                          pendiente: '#6b7280',
+                          en_revision: '#3b82f6',
+                          aprobada: '#10b981',
+                          rechazada: '#ef4444',
+                          requiere_cambios: '#eab308'
+                        };
+
+                        return (
+                          <div 
+                            key={idx} 
+                            style={{ 
+                              fontSize: '0.8rem', 
+                              borderBottom: idx < selectedProposal.decisionHistory.length - 1 ? '1px dashed var(--border-color)' : 'none',
+                              paddingBottom: '0.5rem' 
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.25rem', marginBottom: '0.25rem' }}>
+                              <span style={{ 
+                                fontWeight: 700, 
+                                color: 'white', 
+                                backgroundColor: statusColorMap[dec.status] || '#6b7280', 
+                                padding: '0.1rem 0.4rem', 
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                textTransform: 'uppercase'
+                              }}>
+                                {statusLabelMap[dec.status] || dec.status}
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                                {new Date(dec.timestamp).toLocaleString('es-AR')}
+                              </span>
+                            </div>
+                            <div style={{ color: 'var(--text-primary)', margin: '0.15rem 0' }}>
+                              <b>Comentario del Administrador ({dec.deciderName}):</b> {dec.note || '—'}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
                 {/* Comments / Discussion Chat */}
                 <div className="proposal-comments-section">
                   <h4 className="section-label">💬 Discusión Editorial ({selectedProposal.comments.length})</h4>
@@ -819,59 +919,70 @@ export const Proposals: React.FC = () => {
                   <div className="sidebar-group actions-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <h4 className="sidebar-group-title">Acciones Editoriales</h4>
                     
-                    <button 
-                      onClick={() => {
-                        setEditProposalTitle(selectedProposal.title);
-                        setEditProposalDescription(selectedProposal.description);
-                        setEditProposalDateTime(selectedProposal.dateTime || '');
-                        setEditProposalLocation(selectedProposal.location || '');
-                        setEditProposalAssignees(selectedProposal.assignees);
-                        setEditProposalPrograms(selectedProposal.programs || []);
-                        setEditProposalFormats(selectedProposal.formats || []);
-                        setShowEditProposalModal(true);
-                      }}
-                      className="btn btn-secondary" 
-                      style={{ width: '100%', fontSize: '0.75rem', padding: '0.4rem', marginBottom: '0.25rem' }}
-                    >
-                      Editar Detalles
-                    </button>
-
-                    {currentUser?.role === 'admin' && selectedProposal.status !== 'approved' && selectedProposal.status !== 'covered' && (
+                    {canEditProposal(selectedProposal) && (
                       <button 
                         onClick={() => {
-                          updateProposalStatus(selectedProposal.id, 'approved');
-                          setSelectedProposal(prev => prev ? { ...prev, status: 'approved' } : null);
+                          setEditProposalTitle(selectedProposal.title);
+                          setEditProposalDescription(selectedProposal.description);
+                          setEditProposalDateTime(selectedProposal.dateTime || '');
+                          setEditProposalLocation(selectedProposal.location || '');
+                          setEditProposalAssignees(selectedProposal.assignees);
+                          setEditProposalPrograms(selectedProposal.programs || []);
+                          setEditProposalFormats(selectedProposal.formats || []);
+                          setShowEditProposalModal(true);
                         }}
-                        className="btn btn-success" 
-                        style={{ width: '100%', fontSize: '0.75rem', padding: '0.4rem', backgroundColor: 'var(--success)', color: 'white', border: 'none' }}
+                        className="btn btn-secondary" 
+                        style={{ width: '100%', fontSize: '0.75rem', padding: '0.4rem', marginBottom: '0.25rem' }}
                       >
-                        Aprobar Propuesta
+                        Editar Detalles
                       </button>
                     )}
 
-                    {currentUser?.role === 'admin' && selectedProposal.status !== 'rejected' && selectedProposal.status !== 'covered' && (
-                      <button 
-                        onClick={() => {
-                          if (confirm('¿Seguro que deseas rechazar esta propuesta?')) {
-                            updateProposalStatus(selectedProposal.id, 'rejected');
-                            setSelectedProposal(prev => prev ? { ...prev, status: 'rejected' } : null);
-                          }
-                        }}
-                        className="btn btn-danger" 
-                        style={{ width: '100%', fontSize: '0.75rem', padding: '0.4rem' }}
-                      >
-                        Rechazar Nota
-                      </button>
-                    )}
+                    {currentUser?.role === 'admin' && selectedProposal.status !== 'aprobada' && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', width: '100%' }}>
+                        <button 
+                          onClick={() => {
+                            setAdminDecisionType('aprobada');
+                            setAdminDecisionComment('');
+                            setAdminDecisionError('');
+                            setShowAdminDecisionModal(true);
+                          }}
+                          className="btn btn-success" 
+                          style={{ width: '100%', fontSize: '0.75rem', padding: '0.45rem', backgroundColor: 'var(--success)', color: 'white', border: 'none' }}
+                        >
+                          Aprobar Propuesta
+                        </button>
 
-                    {(selectedProposal.status === 'approved' || selectedProposal.status === 'in_evaluation') && (
-                      <button 
-                        onClick={startConversion}
-                        className="btn btn-primary" 
-                        style={{ width: '100%', fontSize: '0.75rem', padding: '0.5rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.25rem' }}
-                      >
-                        <CheckCircle2 size={14} /> Convertir en Cobertura
-                      </button>
+                        {selectedProposal.status !== 'rechazada' && (
+                          <button 
+                            onClick={() => {
+                              setAdminDecisionType('rechazada');
+                              setAdminDecisionComment('');
+                              setAdminDecisionError('');
+                              setShowAdminDecisionModal(true);
+                            }}
+                            className="btn btn-danger" 
+                            style={{ width: '100%', fontSize: '0.75rem', padding: '0.45rem' }}
+                          >
+                            Rechazar Nota
+                          </button>
+                        )}
+
+                        {selectedProposal.status !== 'requiere_cambios' && (
+                          <button 
+                            onClick={() => {
+                              setAdminDecisionType('requiere_cambios');
+                              setAdminDecisionComment('');
+                              setAdminDecisionError('');
+                              setShowAdminDecisionModal(true);
+                            }}
+                            className="btn btn-warning" 
+                            style={{ width: '100%', fontSize: '0.75rem', padding: '0.45rem', backgroundColor: '#eab308', color: 'white', border: 'none' }}
+                          >
+                            Solicitar Cambios
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -1475,6 +1586,62 @@ export const Proposals: React.FC = () => {
           onClose={() => setShowAutocompleteModal(false)}
           onConfirm={autocompleteTarget === 'proposal' ? handleProposalAutocompleteConfirm : handleConversionAutocompleteConfirm}
         />
+      )}
+
+      {/* ADMIN DECISION MODAL */}
+      {showAdminDecisionModal && adminDecisionType && (
+        <div className="modal-overlay" style={{ display: 'flex', zIndex: 120 }}>
+          <div className="modal-content" style={{ maxWidth: '450px', width: '90%' }}>
+            <div className="modal-header">
+              <h3 className="modal-title" style={{ textTransform: 'capitalize' }}>
+                {adminDecisionType === 'aprobada' ? 'Aprobar Propuesta' : adminDecisionType === 'rechazada' ? 'Rechazar Propuesta' : 'Solicitar Cambios'}
+              </h3>
+              <button className="modal-close" onClick={() => setShowAdminDecisionModal(false)}>✕</button>
+            </div>
+            <form onSubmit={handleAdminDecisionSubmit}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', padding: '1rem 0' }}>
+                {adminDecisionError && (
+                  <div style={{
+                    backgroundColor: 'var(--danger-light)', color: 'var(--danger-text)',
+                    padding: '0.75rem', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', fontWeight: 500
+                  }}>
+                    {adminDecisionError}
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                    {adminDecisionType === 'aprobada' ? 'Comentarios adicionales (Opcional)' : 'Explicación / Motivo (Obligatorio) *'}
+                  </label>
+                  <textarea
+                    className="form-input form-control"
+                    style={{ width: '100%', minHeight: '100px', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--border-color)', resize: 'vertical' }}
+                    placeholder={adminDecisionType === 'aprobada' ? 'Ej: Excelente idea, procedemos con la cobertura.' : 'Ej: Falta detallar las fuentes y el contacto...'}
+                    required={adminDecisionType !== 'aprobada'}
+                    value={adminDecisionComment}
+                    onChange={e => setAdminDecisionComment(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAdminDecisionModal(false)}>
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn btn-primary"
+                  style={{
+                    backgroundColor: adminDecisionType === 'aprobada' ? 'var(--success)' : adminDecisionType === 'rechazada' ? 'var(--danger)' : '#eab308',
+                    borderColor: 'transparent',
+                    color: 'white'
+                  }}
+                >
+                  Confirmar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

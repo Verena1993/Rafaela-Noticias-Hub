@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_USERS, INITIAL_COVERAGES, INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS, INITIAL_PROPOSALS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR } from '../data/initialData';
+import { INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS, INITIAL_PROPOSALS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR } from '../data/initialData';
 
-import type { User, Coverage, Task, Alert, CalendarEvent, Notification, Activity, Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, StaffSchedule, ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic } from '../types';
+import type { User, Coverage, Task, Alert, CalendarEvent, Notification, Activity, Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, ProposalDecision, StaffSchedule, ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic, Category } from '../types';
 import { supabase } from '../lib/supabase';
 import { createClient } from '@supabase/supabase-js';
 
@@ -40,13 +40,17 @@ interface HubContextType {
   proposals: Proposal[];
   staffSchedules: StaffSchedule[];
   newsRadarItems: NewsRadarItem[];
+  categories: Category[];
+  addCategory: (name: string, color: string, icon: string, active: boolean) => Promise<void>;
+  updateCategory: (id: string, name: string, color: string, icon: string, active: boolean) => Promise<void>;
+  deleteCategory: (id: string) => Promise<void>;
   login: (email: string, password?: string) => Promise<boolean>;
   logout: () => Promise<void>;
   createHubUser: (nombre: string, email: string, password?: string, rol?: 'admin' | 'editor') => Promise<void>;
   updateHubUser: (id: string, updates: Partial<User>) => Promise<void>;
   toggleUserActive: (id: string, activo: boolean) => Promise<void>;
   deleteHubUser: (id: string) => Promise<void>;
-  addCoverage: (title: string, description: string, dateTime: string, location: string, assignees: string[], programs?: ProgramType[], formats?: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[]) => string;
+  addCoverage: (title: string, description: string, dateTime: string, location: string, assignees: string[], programs?: ProgramType[], formats?: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[], categoryId?: string) => string;
   updateCoverageStatus: (coverageId: string, status: Coverage['status']) => void;
   addCommentToCoverage: (coverageId: string, text: string) => void;
   addMultimediaToCoverage: (coverageId: string, name: string, type: 'photo' | 'video' | 'audio' | 'document', url: string, size: string) => void;
@@ -56,7 +60,7 @@ interface HubContextType {
   toggleTaskCompleted: (taskId: string) => void;
   addEvent: (title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
   updateEvent: (eventId: string, title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, status?: CalendarEvent['status'], assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
-  updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, assignees: string[], programs: ProgramType[], formats: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[]) => void;
+  updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, assignees: string[], programs: ProgramType[], formats: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[], categoryId?: string) => void;
   createAlert: (title: string, severity: 'critical' | 'high' | 'medium') => void;
   assignAlert: (alertId: string, assigneeId: string) => void;
   closedAlertIds: Set<string>;
@@ -66,10 +70,10 @@ interface HubContextType {
   setSearchQuery: (query: string) => void;
   logActivity: (coverageId: string | undefined, action: string) => void;
   activities: Activity[];
-
+ 
   // Proposals
   addProposal: (title: string, description: string, dateTime?: string, location?: string, assignees?: string[], files?: Omit<MultimediaItem, 'id' | 'uploadDate' | 'userId'>[], links?: Omit<SharedLink, 'id' | 'uploadDate' | 'userId'>[], programs?: ProgramType[], formats?: FormatType[]) => void;
-  updateProposalStatus: (proposalId: string, status: Proposal['status']) => void;
+  updateProposalStatus: (proposalId: string, status: Proposal['status'], note?: string) => void;
   addCommentToProposal: (proposalId: string, text: string) => void;
   convertProposalToCoverage: (proposalId: string, extraDetails?: { dateTime: string; location: string; programs: ProgramType[]; formats: FormatType[]; assigneeId?: string; status: Coverage['status'] }) => string;
   recreateCoverageForEvent: (eventId: string, coverageId: string) => void;
@@ -140,7 +144,8 @@ const mapDbCoverageToApp = (dbCov: any): Coverage => {
     formats: Array.isArray(dbCov.formats) ? dbCov.formats : [],
     logisticsInfo: dbCov.logistics_info || '',
     observations: dbCov.observations || '',
-    attachments: Array.isArray(dbCov.attachments) ? dbCov.attachments : []
+    attachments: Array.isArray(dbCov.attachments) ? dbCov.attachments : [],
+    categoryId: dbCov.category_id || undefined
   };
 };
 
@@ -161,16 +166,18 @@ const mapAppCoverageToDb = (appCov: Coverage) => ({
   formats: appCov.formats || [],
   logistics_info: appCov.logisticsInfo || '',
   observations: appCov.observations || '',
-  attachments: appCov.attachments || []
+  attachments: appCov.attachments || [],
+  category_id: appCov.categoryId || null
 });
 
 export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<User[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
   const [coverages, setCoverages] = useState<Coverage[]>(() => {
     const saved = localStorage.getItem('hub_coverages');
-    return saved ? JSON.parse(saved) : INITIAL_COVERAGES;
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [loadingCoverages, setLoadingCoverages] = useState(true);
@@ -180,32 +187,20 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase.from('coverages').select('*');
       if (error) {
         console.error('Error fetching coverages from Supabase:', error.message);
-        // Fallback a localStorage o INITIAL_COVERAGES
         const saved = localStorage.getItem('hub_coverages');
-        setCoverages(saved ? JSON.parse(saved) : INITIAL_COVERAGES);
+        setCoverages(saved ? JSON.parse(saved) : []);
         return;
       }
 
-      if (data && data.length > 0) {
+      if (data) {
         const loaded = data.map(mapDbCoverageToApp);
         setCoverages(loaded);
         localStorage.setItem('hub_coverages', JSON.stringify(loaded));
-      } else {
-        // Seeding inicial con fallback de localStorage o INITIAL_COVERAGES
-        const saved = localStorage.getItem('hub_coverages');
-        const fallback = saved ? JSON.parse(saved) : INITIAL_COVERAGES;
-        const dbData = fallback.map(mapAppCoverageToDb);
-        const { error: insertError } = await supabase.from('coverages').insert(dbData);
-        if (insertError) {
-          console.error('Error seeding initial coverages to Supabase:', insertError.message);
-        }
-        setCoverages(fallback);
-        localStorage.setItem('hub_coverages', JSON.stringify(fallback));
       }
     } catch (err) {
       console.error('Unexpected error in fetchCoverages:', err);
       const saved = localStorage.getItem('hub_coverages');
-      setCoverages(saved ? JSON.parse(saved) : INITIAL_COVERAGES);
+      setCoverages(saved ? JSON.parse(saved) : []);
     } finally {
       setLoadingCoverages(false);
     }
@@ -257,7 +252,28 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [proposals, setProposals] = useState<Proposal[]>(() => {
     const saved = localStorage.getItem('hub_proposals');
-    return saved ? JSON.parse(saved) : INITIAL_PROPOSALS;
+    const rawProposals = saved ? JSON.parse(saved) : INITIAL_PROPOSALS;
+    return rawProposals.map((p: any) => {
+      let status = p.status;
+      if (status === 'new') status = 'pendiente';
+      else if (status === 'in_evaluation') status = 'en_revision';
+      else if (status === 'approved' || status === 'covered' || status === 'assigned') status = 'aprobada';
+      else if (status === 'rejected') status = 'rechazada';
+      else if (status === 'requires_changes' || status === 'change_required') status = 'requiere_cambios';
+
+      if (status !== 'pendiente' && status !== 'en_revision' && status !== 'aprobada' && status !== 'rechazada' && status !== 'requiere_cambios') {
+        status = 'pendiente';
+      }
+
+      return {
+        ...p,
+        status,
+        createdAt: p.createdAt || p.dateTime || new Date().toISOString(),
+        authorId: p.authorId || 'u1',
+        authorName: p.authorName || 'Admin Principal',
+        decisionHistory: p.decisionHistory || []
+      };
+    });
   });
 
   const [staffSchedules, setStaffSchedules] = useState<StaffSchedule[]>(() => {
@@ -277,9 +293,11 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lastRadarUpdate, setLastRadarUpdate] = useState<string | null>(new Date().toISOString());
   const [rssDiagnostics, setRssDiagnostics] = useState<RssDiagnostic[]>([]);
 
-  // Collect all activities from all coverages
+  // Collect all activities from all coverages and global activities
   const [activities, setActivities] = useState<Activity[]>(() => {
-    const allActs: Activity[] = [];
+    const savedGlobal = localStorage.getItem('hub_global_activities');
+    const globalActs: Activity[] = savedGlobal ? JSON.parse(savedGlobal) : [];
+    const allActs: Activity[] = [...globalActs];
     coverages.forEach(cov => {
       if (cov.activities) {
         allActs.push(...cov.activities.map(act => ({ ...act, coverageId: cov.id })));
@@ -362,21 +380,87 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ultimo_acceso: p.ultimo_acceso || p.last_sign_in || p.updated_at,
           telefono: p.telefono
         }));
-
-        // Merge dbUsers with INITIAL_USERS to keep mock users
-        const merged = [...INITIAL_USERS];
-        dbUsers.forEach(dbU => {
-          const idx = merged.findIndex(u => u.email.toLowerCase() === dbU.email.toLowerCase());
-          if (idx !== -1) {
-            merged[idx] = { ...merged[idx], ...dbU };
-          } else {
-            merged.push(dbU);
-          }
-        });
-        setUsers(merged);
+        setUsers(dbUsers);
       }
     } catch (err) {
       console.error('Failed to fetch profiles:', err);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) {
+        console.error('Error fetching categories from Supabase:', error.message);
+        return;
+      }
+      if (data) {
+        setCategories(data);
+      }
+    } catch (err) {
+      console.error('Unexpected error in fetchCategories:', err);
+    }
+  };
+
+  const addCategory = async (name: string, color: string, icon: string, active: boolean) => {
+    const slug = name.toLowerCase()
+      .trim()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-');
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([{ name, slug, color, icon, active }])
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) {
+        setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    } catch (err: any) {
+      console.error('Error creating category:', err.message || err);
+      throw err;
+    }
+  };
+
+  const updateCategory = async (id: string, name: string, color: string, icon: string, active: boolean) => {
+    const slug = name.toLowerCase()
+      .trim()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove accents
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-');
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .update({ name, slug, color, icon, active })
+        .eq('id', id)
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) {
+        setCategories(prev => prev.map(c => c.id === id ? data : c).sort((a, b) => a.name.localeCompare(b.name)));
+      }
+    } catch (err: any) {
+      console.error('Error updating category:', err.message || err);
+      throw err;
+    }
+  };
+
+  const deleteCategory = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('categories')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      setCategories(prev => prev.filter(c => c.id !== id));
+    } catch (err: any) {
+      console.error('Error deleting category:', err.message || err);
+      throw err;
     }
   };
 
@@ -473,10 +557,11 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, []);
 
   useEffect(() => {
-    // Automatically load RSS feeds and coverages on initial mount in parallel
+    // Automatically load RSS feeds, coverages and categories on initial mount in parallel
     Promise.all([
       fetchLiveRadarNews(),
-      fetchCoverages()
+      fetchCoverages(),
+      fetchCategories()
     ]).catch(err => {
       console.error('Error on initial mount loaders:', err);
     });
@@ -490,13 +575,17 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     localStorage.setItem('hub_coverages', JSON.stringify(coverages));
     // Update local activity list whenever coverages change
-    const allActs: Activity[] = [];
+    const covActs: Activity[] = [];
     coverages.forEach(cov => {
       if (cov.activities) {
-        allActs.push(...cov.activities.map(act => ({ ...act, coverageId: cov.id })));
+        covActs.push(...cov.activities.map(act => ({ ...act, coverageId: cov.id })));
       }
     });
-    setActivities(allActs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()));
+    setActivities(prev => {
+      const globalActs = prev.filter(act => !act.coverageId);
+      localStorage.setItem('hub_global_activities', JSON.stringify(globalActs));
+      return [...globalActs, ...covActs].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    });
   }, [coverages]);
 
   useEffect(() => {
@@ -833,7 +922,12 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })();
     } else {
       // Global activity
-      setActivities(prev => [newAct, ...prev]);
+      setActivities(prev => {
+        const newActs = [newAct, ...prev];
+        const globalActs = newActs.filter(act => !act.coverageId);
+        localStorage.setItem('hub_global_activities', JSON.stringify(globalActs));
+        return newActs;
+      });
     }
   };
 
@@ -849,7 +943,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status?: Coverage['status'],
     logisticsInfo?: string,
     observations?: string,
-    attachments?: string[]
+    attachments?: string[],
+    categoryId?: string
   ): string => {
     const id = crypto.randomUUID();
     const newCoverage: Coverage = {
@@ -882,7 +977,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       formats: formats || [],
       logisticsInfo: logisticsInfo || '',
       observations: observations || '',
-      attachments: attachments || []
+      attachments: attachments || [],
+      categoryId
     };
 
     setCoverages(prev => [newCoverage, ...prev]);
@@ -1056,7 +1152,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Handle mentions e.g., @Juan or @Laura
     // Find matches for @Name in the text
-    INITIAL_USERS.forEach(u => {
+    users.forEach((u: User) => {
       if (text.toLowerCase().includes(`@${u.name.toLowerCase().split(' ')[0]}`) && u.id !== currentUser.id) {
         const notif: Notification = {
           id: `not_${Date.now()}_${u.id}`,
@@ -1073,7 +1169,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     // Send general comment notifications to other assignees
     cov.assignees.forEach(uid => {
-      if (uid !== currentUser.id && !text.toLowerCase().includes(`@${INITIAL_USERS.find(user => user.id === uid)?.name.toLowerCase().split(' ')[0]}`)) {
+      if (uid !== currentUser.id && !text.toLowerCase().includes(`@${(users.find((user: User) => user.id === uid) as User | undefined)?.name.toLowerCase().split(' ')[0]}`)) {
         const notif: Notification = {
           id: `not_${Date.now()}_${uid}`,
           title: 'Nuevo Comentario en Cobertura',
@@ -1278,9 +1374,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     if (coverageId) {
-      logActivity(coverageId, `asignó la tarea "${title}" a ${INITIAL_USERS.find(u => u.id === assigneeId)?.name}`);
+      logActivity(coverageId, `asignó la tarea "${title}" a ${(users.find((u: User) => u.id === assigneeId) as User | undefined)?.name}`);
     } else {
-      logActivity(undefined, `asignó la tarea general "${title}" a ${INITIAL_USERS.find(u => u.id === assigneeId)?.name}`);
+      logActivity(undefined, `asignó la tarea general "${title}" a ${(users.find((u: User) => u.id === assigneeId) as User | undefined)?.name}`);
     }
   };
 
@@ -1510,83 +1606,117 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       multimedia: mappedFiles,
       sharedLinks: mappedLinks,
       comments: [],
-      status: 'new',
+      status: 'pendiente',
       assignees: assignees || [],
       programs: programs || [],
-      formats: formats || []
+      formats: formats || [],
+      createdAt: new Date().toISOString(),
+      authorId: currentUser.id,
+      authorName: currentUser.name,
+      decisionHistory: []
     };
 
     setProposals(prev => [newProposal, ...prev]);
-    logActivity(undefined, `creó una propuesta de nota: "${title}"`);
+    logActivity(undefined, `Propuesta creada: "${title}"`);
   };
 
   const updateProposalStatus = (
     proposalId: string,
     status: Proposal['status'],
-    extra?: { priority?: 'high' | 'medium' | 'low'; dateTime?: string; location?: string; assignees?: string[]; programs?: ProgramType[]; formats?: FormatType[] }
+    note?: string
   ) => {
+    if (currentUser?.role !== 'admin') {
+      throw new Error('Solo los administradores pueden cambiar el estado de las propuestas.');
+    }
+
+    const prop = proposals.find(p => p.id === proposalId);
+    if (!prop) {
+      throw new Error('La propuesta no existe.');
+    }
+
+    // Exigir comentario obligatorio en rechazada o requiere_cambios
+    if ((status === 'rechazada' || status === 'requiere_cambios') && !note?.trim()) {
+      throw new Error(`Se requiere ingresar un comentario para el estado: ${status === 'rechazada' ? 'Rechazada' : 'Requiere cambios'}`);
+    }
+
+    // Crear la decisión para el historial
+    const newDecision: ProposalDecision = {
+      status,
+      timestamp: new Date().toISOString(),
+      note: note || (status === 'aprobada' ? 'Propuesta aprobada por la administración.' : `Estado actualizado a ${status}`),
+      deciderName: currentUser.name
+    };
+
     setProposals(prev => prev.map(p => {
       if (p.id === proposalId) {
-        const nextProposal = {
+        return {
           ...p,
           status,
-          priority: extra?.priority !== undefined ? extra.priority : p.priority,
-          dateTime: extra?.dateTime !== undefined ? extra.dateTime : p.dateTime,
-          location: extra?.location !== undefined ? extra.location : p.location,
-          assignees: extra?.assignees !== undefined ? extra.assignees : p.assignees,
-          programs: extra?.programs !== undefined ? extra.programs : p.programs,
-          formats: extra?.formats !== undefined ? extra.formats : p.formats
+          decisionHistory: [newDecision, ...(p.decisionHistory || [])]
         };
-
-        // If approved and has date/time, verify if it is already in the calendar, otherwise add it
-        if (status === 'approved' && nextProposal.dateTime) {
-          const eventId = `e_prop_${proposalId}`;
-          setEvents(evts => {
-            const exists = evts.some(e => e.id === eventId);
-            if (!exists) {
-              const newEvt: CalendarEvent = {
-                id: eventId,
-                title: `[Propuesta Aprobada] ${p.title}`,
-                description: p.description,
-                type: 'event',
-                start: nextProposal.dateTime!,
-                end: new Date(new Date(nextProposal.dateTime!).getTime() + 2 * 60 * 60 * 1000).toISOString().substring(0, 16),
-                location: nextProposal.location,
-                status: 'confirmed',
-                assigneeId: nextProposal.assignees.length > 0 ? nextProposal.assignees[0] : undefined,
-                programs: nextProposal.programs || [],
-                formats: nextProposal.formats || []
-              };
-              return [...evts, newEvt];
-            } else {
-              // Update existing event date/time
-              return evts.map(e => e.id === eventId ? {
-                ...e,
-                start: nextProposal.dateTime!,
-                end: new Date(new Date(nextProposal.dateTime!).getTime() + 2 * 60 * 60 * 1000).toISOString().substring(0, 16),
-                location: nextProposal.location,
-                assigneeId: nextProposal.assignees.length > 0 ? nextProposal.assignees[0] : undefined,
-                programs: nextProposal.programs || [],
-                formats: nextProposal.formats || []
-              } : e);
-            }
-          });
-        }
-
-        return nextProposal;
       }
       return p;
     }));
 
-    const statusNames: Record<Proposal['status'], string> = {
-      new: 'Nueva',
-      in_evaluation: 'En Evaluación',
-      approved: 'Aprobada',
-      rejected: 'Rechazada',
-      assigned: 'Asignada',
-      covered: 'Cubierta'
-    };
-    logActivity(undefined, `cambió el estado de propuesta a "${statusNames[status]}"`);
+    // Acciones y auditoría según estado
+    if (status === 'aprobada') {
+      // Registrar auditoría de aprobación
+      logActivity(undefined, `Propuesta aprobada: "${prop.title}"`);
+
+      // Convertir automáticamente a cobertura
+      const newCoverageId = convertProposalToCoverage(proposalId);
+
+      // Crear notificación al autor
+      if (prop.authorId) {
+        const notif: Notification = {
+          id: `not_prop_app_${Date.now()}`,
+          title: 'Propuesta Aprobada 📈',
+          message: `Tu propuesta "${prop.title}" fue aprobada y se inició su cobertura.`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'coverage',
+          linkId: newCoverageId
+        };
+        setNotifications(prev => [notif, ...prev]);
+      }
+    } else if (status === 'rechazada') {
+      // Registrar auditoría de rechazo
+      logActivity(undefined, `Propuesta rechazada: "${prop.title}"`);
+
+      // Crear notificación al autor
+      if (prop.authorId) {
+        const notif: Notification = {
+          id: `not_prop_rej_${Date.now()}`,
+          title: 'Propuesta Rechazada ❌',
+          message: `Tu propuesta "${prop.title}" fue rechazada. Motivo: ${note}`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'coverage',
+          linkId: proposalId
+        };
+        setNotifications(prev => [notif, ...prev]);
+      }
+    } else if (status === 'requiere_cambios') {
+      // Registrar auditoría de cambios solicitados
+      logActivity(undefined, `Cambios solicitados en propuesta: "${prop.title}"`);
+
+      // Crear notificación al autor
+      if (prop.authorId) {
+        const notif: Notification = {
+          id: `not_prop_chg_${Date.now()}`,
+          title: 'Propuesta: Requiere Cambios ⚠️',
+          message: `Tu propuesta "${prop.title}" requiere cambios. Observaciones: ${note}`,
+          timestamp: new Date().toISOString(),
+          read: false,
+          type: 'coverage',
+          linkId: proposalId
+        };
+        setNotifications(prev => [notif, ...prev]);
+      }
+    } else {
+      // General status update (like 'en_revision')
+      logActivity(undefined, `Propuesta en revisión: "${prop.title}"`);
+    }
   };
 
   const addCommentToProposal = (proposalId: string, text: string) => {
@@ -1705,15 +1835,15 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return [...filtered, newEvent];
     });
 
-    // Mark proposal as covered
+    // Mark proposal as approved
     setProposals(prev => prev.map(p => {
       if (p.id === proposalId) {
-        return { ...p, status: 'covered' };
+        return { ...p, status: 'aprobada' };
       }
       return p;
     }));
 
-    logActivity(undefined, `convirtió propuesta "${prop.title}" en cobertura periodística activa`);
+    logActivity(undefined, `Cobertura creada desde propuesta: "${prop.title}"`);
     return id;
   };
 
@@ -1729,7 +1859,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     status?: Coverage['status'],
     logisticsInfo?: string,
     observations?: string,
-    attachments?: string[]
+    attachments?: string[],
+    categoryId?: string
   ) => {
     const cov = coverages.find(c => c.id === coverageId);
     if (!cov) return;
@@ -1749,7 +1880,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: status !== undefined ? status : cov.status,
       logisticsInfo: logisticsInfo !== undefined ? logisticsInfo : cov.logisticsInfo,
       observations: observations !== undefined ? observations : cov.observations,
-      attachments: attachments !== undefined ? attachments : cov.attachments
+      attachments: attachments !== undefined ? attachments : cov.attachments,
+      categoryId: categoryId !== undefined ? categoryId : cov.categoryId
     };
 
     setCoverages(prev => prev.map(c => c.id === coverageId ? updatedCov : c));
@@ -1889,7 +2021,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setAlerts(prev => [newAlert, ...prev]);
 
     // Send notifications to everyone
-    INITIAL_USERS.forEach(u => {
+    users.forEach((u: User) => {
       if (u.id !== currentUser?.id) {
         const notif: Notification = {
           id: `not_${Date.now()}_${u.id}`,
@@ -2010,6 +2142,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       proposals,
       staffSchedules,
       newsRadarItems,
+      categories,
+      addCategory,
+      updateCategory,
+      deleteCategory,
       login,
       logout,
       resetPassword,

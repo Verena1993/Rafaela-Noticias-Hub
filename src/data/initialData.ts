@@ -455,10 +455,14 @@ export const INITIAL_PROPOSALS: Proposal[] = [
       { id: 'pc1', userId: 'u7', userName: 'Esteban Crónicas', text: 'Me pasaron un video corto de los vecinos que muestra los roedores a plena luz del día.', timestamp: '2026-06-04T08:45:00' }
     ],
     priority: 'medium',
-    status: 'new',
+    status: 'pendiente',
     assignees: [],
     programs: ['Digital'],
-    formats: ['Presencial']
+    formats: ['Presencial'],
+    createdAt: '2026-06-03T10:00:00.000Z',
+    authorId: 'u7',
+    authorName: 'Esteban Redactor',
+    decisionHistory: []
   },
   {
     id: 'prop2',
@@ -482,23 +486,38 @@ export const INITIAL_PROPOSALS: Proposal[] = [
     ],
     comments: [],
     priority: 'low',
-    status: 'approved',
+    status: 'aprobada',
     assignees: ['u11'],
     programs: ['Digital', 'Bien Despiertos'],
-    formats: ['Móvil']
+    formats: ['Móvil'],
+    createdAt: '2026-06-03T09:00:00.000Z',
+    authorId: 'u11',
+    authorName: 'Valentina Redactora',
+    decisionHistory: [
+      {
+        status: 'aprobada',
+        timestamp: '2026-06-03T16:00:00.000Z',
+        note: 'Propuesta excelente para cobertura del fin de semana.',
+        deciderName: 'Admin Principal'
+      }
+    ]
   },
   {
     id: 'prop3',
     title: 'Proyecto de ordenanza sobre monopatines eléctricos',
     description: 'Un concejal presentará un proyecto para regular el uso, velocidad y medidas de seguridad de monopatines en Rafaela. Analizar ordenanzas de Santa Fe como antecedente.',
     priority: 'medium',
-    status: 'in_evaluation',
+    status: 'en_revision',
     multimedia: [],
     sharedLinks: [],
     comments: [],
     assignees: ['u4'],
     programs: ['Noticiero Mañana'],
-    formats: ['Grabada']
+    formats: ['Grabada'],
+    createdAt: '2026-06-02T14:00:00.000Z',
+    authorId: 'u4',
+    authorName: 'Juan Carlos Redactor',
+    decisionHistory: []
   }
 ];
 

@@ -3,38 +3,19 @@ import { useHub } from '../context/HubContext';
 import { supabase } from '../lib/supabase';
 import { 
   LayoutDashboard, 
-  Radar,
-  Inbox,
-  CheckSquare, 
   Calendar, 
   Activity, 
   LogOut,
   Table,
   Kanban,
-  UserCheck,
-  User
+  User,
+  Settings as SettingsIcon,
+  Megaphone,
+  Lightbulb,
+  Users,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
-
-// Custom Instagram SVG Icon for reliability across lucide-react versions
-const Instagram = ({ size = 24, className = '', style = {} }: { size?: number, className?: string, style?: React.CSSProperties }) => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width={size}
-    height={size}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={className}
-    style={style}
-  >
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-  </svg>
-);
 
 interface SidebarProps {
   activeTab: string;
@@ -49,6 +30,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
   // User menu & profile modal states
   const [showMenu, setShowMenu] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Profile edit states
   const [profileName, setProfileName] = useState('');
@@ -81,22 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
 
   if (!currentUser) return null;
 
-  const menuItems = [
-    { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
-    { id: 'coverages', name: 'Coberturas', icon: Kanban },
-    { id: 'production', name: 'Producción', icon: Table },
-    { id: 'proposals', name: 'Propuestas', icon: Inbox },
-    { id: 'tasks', name: 'Tareas', icon: CheckSquare },
-    { id: 'calendar', name: 'Calendario Editorial', icon: Calendar },
-    { id: 'radar', name: 'Radar de Noticias', icon: Radar },
-    { id: 'publications', name: 'Publicaciones', icon: CheckSquare },
-    { id: 'instagram', name: 'Instagram Plan', icon: Instagram },
-    { id: 'activity', name: 'Panel de Actividad', icon: Activity }
-  ];
-
-  if (currentUser?.role === 'admin') {
-    menuItems.push({ id: 'user-management', name: 'Gestión de Usuarios', icon: UserCheck });
-  }
+  // Menu items are rendered directly with structural layout below
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -177,35 +144,265 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
   };
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-      <div className="sidebar-header">
+    <aside 
+      className={`sidebar ${isOpen ? 'open' : ''}`}
+      style={{ 
+        width: isCollapsed ? '70px' : '260px', 
+        transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' 
+      }}
+    >
+      <div 
+        className="sidebar-header"
+        style={{ 
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
+          padding: isCollapsed ? '1rem 0.5rem' : '1.25rem',
+          gap: '0.5rem',
+          display: 'flex',
+          alignItems: 'center'
+        }}
+      >
         <div className="logo-icon">RN</div>
-        <span className="logo-text">RN Hub</span>
+        {!isCollapsed && <span className="logo-text">RN Hub</span>}
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          style={{
+            background: 'transparent',
+            border: 'none',
+            color: 'var(--sidebar-text-muted)',
+            cursor: 'pointer',
+            padding: '0.25rem',
+            borderRadius: '4px',
+            marginLeft: isCollapsed ? '0' : 'auto',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}
+          title={isCollapsed ? "Expandir menú" : "Colapsar menú"}
+        >
+          {isCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
       </div>
 
-      <nav className="sidebar-menu">
-        <span className="menu-section-title">Navegación</span>
-        {menuItems.map((item) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
+      <nav className="sidebar-menu" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        {/* Block 1: Dashboard */}
+        <button
+          className={`menu-item ${activeTab === 'dashboard' ? 'active' : ''}`}
+          onClick={() => handleNavClick('dashboard')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Dashboard" : undefined}
+        >
+          <LayoutDashboard size={18} />
+          {!isCollapsed && <span>Dashboard</span>}
+          {!isCollapsed && unreadCount > 0 && (
+            <span className="menu-badge">{unreadCount}</span>
+          )}
+        </button>
+
+        {/* Separator 1 */}
+        <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.50rem 0' }} />
+
+        {/* Block 2: Herramientas */}
+        <button
+          className={`menu-item ${activeTab === 'coverages' ? 'active' : ''}`}
+          onClick={() => handleNavClick('coverages')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Coberturas" : undefined}
+        >
+          <Kanban size={18} />
+          {!isCollapsed && <span>Coberturas</span>}
+        </button>
+
+        <button
+          className={`menu-item ${activeTab === 'calendar' ? 'active' : ''}`}
+          onClick={() => handleNavClick('calendar')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Agenda" : undefined}
+        >
+          <Calendar size={18} />
+          {!isCollapsed && <span>Agenda</span>}
+        </button>
+
+        <button
+          className={`menu-item ${activeTab === 'production' ? 'active' : ''}`}
+          onClick={() => handleNavClick('production')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Producción" : undefined}
+        >
+          <Table size={18} />
+          {!isCollapsed && <span>Producción</span>}
+        </button>
+
+        <button
+          className={`menu-item ${activeTab === 'publications' ? 'active' : ''}`}
+          onClick={() => handleNavClick('publications')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Publicaciones" : undefined}
+        >
+          <Megaphone size={18} />
+          {!isCollapsed && <span>Publicaciones</span>}
+        </button>
+
+        <button
+          className={`menu-item ${activeTab === 'proposals' ? 'active' : ''}`}
+          onClick={() => handleNavClick('proposals')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Propuestas" : undefined}
+        >
+          <Lightbulb size={18} />
+          {!isCollapsed && <span>Propuestas</span>}
+        </button>
+
+        {/* Block 3 & 4: Administración y Configuración (Admin only) */}
+        {currentUser?.role === 'admin' && (
+          <>
+            {/* Separator 2 */}
+            <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.50rem 0' }} />
+
+            {/* ADMINISTRACIÓN */}
+            {!isCollapsed && (
+              <span className="menu-section-title" style={{ padding: '0.5rem 0.75rem 0.25rem', userSelect: 'none', pointerEvents: 'none' }}>
+                ADMINISTRACIÓN
+              </span>
+            )}
+
             <button
-              key={item.id}
-              className={`menu-item ${isActive ? 'active' : ''}`}
-              onClick={() => handleNavClick(item.id)}
-              style={{ background: 'transparent', border: 'none', width: '100%', textAlign: 'left' }}
+              className={`menu-item ${activeTab === 'user-management' ? 'active' : ''}`}
+              onClick={() => handleNavClick('user-management')}
+              style={{ 
+                background: 'transparent', 
+                border: 'none', 
+                width: '100%', 
+                textAlign: isCollapsed ? 'center' : 'left',
+                justifyContent: isCollapsed ? 'center' : 'flex-start',
+                padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+              }}
+              title={isCollapsed ? "Usuarios" : undefined}
             >
-              <Icon size={18} />
-              <span>{item.name}</span>
-              {item.id === 'dashboard' && unreadCount > 0 && (
-                <span className="menu-badge">{unreadCount}</span>
-              )}
+              <Users size={18} />
+              {!isCollapsed && <span>Usuarios</span>}
             </button>
-          );
-        })}
+
+            {/* Separator 3 */}
+            <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.50rem 0' }} />
+
+            {/* CONFIGURACIÓN */}
+            {!isCollapsed && (
+              <span className="menu-section-title" style={{ padding: '0.5rem 0.75rem 0.25rem', userSelect: 'none', pointerEvents: 'none' }}>
+                CONFIGURACIÓN
+              </span>
+            )}
+
+            <button
+              className={`menu-item ${activeTab === 'settings' ? 'active' : ''}`}
+              onClick={() => handleNavClick('settings')}
+              style={{ 
+                background: 'transparent', 
+                border: 'none', 
+                width: '100%', 
+                textAlign: isCollapsed ? 'center' : 'left',
+                justifyContent: isCollapsed ? 'center' : 'flex-start',
+                padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+              }}
+              title={isCollapsed ? "Categorías" : undefined}
+            >
+              <SettingsIcon size={18} />
+              {!isCollapsed && <span>Categorías</span>}
+            </button>
+          </>
+        )}
+
+        {/* Separator 4 */}
+        <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.50rem 0' }} />
+
+        {/* Block 5: Actividad y Mi Perfil */}
+        <button
+          className={`menu-item ${activeTab === 'activity' ? 'active' : ''}`}
+          onClick={() => handleNavClick('activity')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Actividad" : undefined}
+        >
+          <Activity size={18} />
+          {!isCollapsed && <span>Actividad</span>}
+        </button>
+
+        <button
+          className="menu-item"
+          onClick={() => setShowProfileModal(true)}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Mi Perfil" : undefined}
+        >
+          <User size={18} />
+          {!isCollapsed && <span>Mi Perfil</span>}
+        </button>
       </nav>
 
-      <div className="sidebar-footer" ref={menuRef} style={{ position: 'relative' }}>
+      <div 
+        className="sidebar-footer" 
+        ref={menuRef} 
+        style={{ 
+          position: 'relative',
+          padding: isCollapsed ? '1rem 0.5rem' : '1rem',
+          justifyContent: isCollapsed ? 'center' : 'flex-start',
+          display: 'flex',
+          alignItems: 'center'
+        }}
+      >
         {/* User popover menu */}
         {showMenu && (
           <div className="user-menu-popover">
@@ -238,20 +435,30 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         <div 
           className="user-profile-trigger" 
           onClick={() => setShowMenu(!showMenu)}
-          style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1, cursor: 'pointer', overflow: 'hidden' }}
+          style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: isCollapsed ? '0' : '0.75rem', 
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            flex: 1, 
+            cursor: 'pointer', 
+            overflow: 'hidden' 
+          }}
         >
           <div 
             className="user-avatar" 
-            style={{ backgroundColor: currentUser.avatarColor }}
+            style={{ backgroundColor: currentUser.avatarColor, flexShrink: 0 }}
           >
             {currentUser.name.charAt(0)}
           </div>
-          <div className="user-info">
-            <span className="user-name">{currentUser.name}</span>
-            <span className="user-role" style={{ textTransform: 'capitalize' }}>
-              {currentUser.role === 'admin' ? 'Administrador' : 'Editor'}
-            </span>
-          </div>
+          {!isCollapsed && (
+            <div className="user-info">
+              <span className="user-name">{currentUser.name}</span>
+              <span className="user-role" style={{ textTransform: 'capitalize' }}>
+                {currentUser.role === 'admin' ? 'Administrador' : 'Editor'}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 

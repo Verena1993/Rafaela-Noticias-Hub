@@ -190,6 +190,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
     setSelectedCoverageId(id);
   };
 
+  const visibleProposals = useMemo(() => {
+    if (currentUser?.role === 'editor') {
+      return proposals.filter(p => p.authorId === currentUser.id);
+    }
+    return proposals;
+  }, [proposals, currentUser]);
+
   const decisionItems = useMemo(() => {
     const items: {
       id: string;
@@ -203,8 +210,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
     }[] = [];
 
     // 1. Proposals requiring approval
-    proposals.forEach(p => {
-      if (p.status === 'new') {
+    visibleProposals.forEach(p => {
+      if (p.status === 'pendiente') {
         items.push({
           id: `prop_${p.id}`,
           title: p.title,
@@ -219,9 +226,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
     });
 
     // 2. Flyers received
-    proposals.forEach(p => {
+    visibleProposals.forEach(p => {
       const hasPhoto = p.multimedia.some(m => m.type === 'photo');
-      if (hasPhoto && p.status !== 'approved' && p.status !== 'rejected') {
+      if (hasPhoto && p.status !== 'aprobada' && p.status !== 'rechazada') {
         if (!items.some(it => it.targetId === p.id)) {
           items.push({
             id: `flyer_${p.id}`,
@@ -480,6 +487,42 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActiveTab, setSelectedC
       )}
 
 
+
+      {/* Proposed Projects (Propuestas Editoriales) Summary Metrics */}
+      <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
+        <div className="card" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '4px solid var(--primary)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            Propuestas Pendientes
+          </span>
+          <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--primary)' }}>
+            {visibleProposals.filter(p => p.status === 'pendiente').length}
+          </span>
+        </div>
+        <div className="card" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '4px solid var(--success)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            Propuestas Aprobadas
+          </span>
+          <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--success)' }}>
+            {visibleProposals.filter(p => p.status === 'aprobada').length}
+          </span>
+        </div>
+        <div className="card" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '4px solid var(--danger)' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            Propuestas Rechazadas
+          </span>
+          <span style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--danger)' }}>
+            {visibleProposals.filter(p => p.status === 'rechazada').length}
+          </span>
+        </div>
+        <div className="card" style={{ flex: '1 1 200px', display: 'flex', flexDirection: 'column', gap: '0.25rem', borderLeft: '4px solid #eab308' }}>
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+            Requieren Cambios
+          </span>
+          <span style={{ fontSize: '1.75rem', fontWeight: 800, color: '#eab308' }}>
+            {visibleProposals.filter(p => p.status === 'requiere_cambios').length}
+          </span>
+        </div>
+      </div>
 
       {/* Main Dashboard Layout */}
       <div className="dashboard-grid">

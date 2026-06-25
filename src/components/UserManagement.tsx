@@ -58,11 +58,6 @@ export const UserManagement: React.FC = () => {
   const [editError, setEditError] = useState('');
   const [updating, setUpdating] = useState(false);
 
-  // Check if a user is a real database user (UUID vs mock 'u1')
-  const isDbUser = (user: User) => {
-    return user.id.includes('-') || !user.id.startsWith('u');
-  };
-
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setCreateError('');
@@ -117,8 +112,7 @@ export const UserManagement: React.FC = () => {
     }
   };
 
-  const dbUsersList = users.filter(isDbUser);
-  const mockUsersList = users.filter(u => !isDbUser(u));
+  const dbUsersList = users;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -269,58 +263,7 @@ export const UserManagement: React.FC = () => {
         )}
       </div>
 
-      {/* Mock Users Section (Information Only) */}
-      <div className="card">
-        <h3 className="section-title" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1rem', color: 'var(--text-secondary)' }}>
-          Usuarios de Prueba (Mocks - Locales)
-        </h3>
-        <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '1rem' }}>
-          Estos usuarios están configurados localmente en la redacción y son de solo lectura. Se migrarán a Supabase Auth en la Fase 2.
-        </p>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.8rem', opacity: 0.75 }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)' }}>
-                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Nombre</th>
-                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Email</th>
-                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Rol Mock</th>
-                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Estado</th>
-                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Último Acceso</th>
-                <th style={{ padding: '0.5rem 1rem', fontWeight: 600 }}>Fecha Creación</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mockUsersList.map(u => (
-                <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '0.5rem 1rem' }}>{u.name}</td>
-                  <td style={{ padding: '0.5rem 1rem', color: 'var(--text-muted)' }}>{u.email}</td>
-                  <td style={{ padding: '0.5rem 1rem' }}>
-                    <span style={{
-                      fontSize: '0.65rem', fontWeight: 700, padding: '0.1rem 0.35rem', borderRadius: '4px',
-                      backgroundColor: u.role === 'admin' ? '#fee2e2' : '#e0f2fe',
-                      color: u.role === 'admin' ? '#b91c1c' : '#0369a1',
-                      textTransform: 'uppercase'
-                    }}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.5rem 1rem' }}>
-                    <span className="badge status-published" style={{ fontSize: '0.65rem', padding: '0.05rem 0.25rem' }}>
-                      Activo
-                    </span>
-                  </td>
-                  <td style={{ padding: '0.5rem 1rem', color: 'var(--text-muted)' }}>
-                    {u.ultimo_acceso ? new Date(u.ultimo_acceso).toLocaleString('es-AR') : '—'}
-                  </td>
-                  <td style={{ padding: '0.5rem 1rem', color: 'var(--text-muted)' }}>
-                    {u.created_at ? new Date(u.created_at).toLocaleDateString('es-AR') : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+
 
       {/* CREATE USER MODAL */}
       {showCreateModal && (

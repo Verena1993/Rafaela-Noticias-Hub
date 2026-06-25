@@ -15,6 +15,7 @@ import { Publications } from './components/Publications';
 import { Coverages } from './components/Coverages';
 import { UserManagement } from './components/UserManagement';
 import { ResetPassword } from './components/ResetPassword';
+import { Settings } from './components/Settings';
 
 const AppContent: React.FC = () => {
   const { currentUser } = useHub();
@@ -146,6 +147,12 @@ const AppContent: React.FC = () => {
           return null;
         }
         return <UserManagement />;
+      case 'settings':
+        if (currentUser?.role !== 'admin') {
+          setTimeout(() => handleTabChange('dashboard'), 0);
+          return null;
+        }
+        return <Settings />;
       default:
         return (
           <Dashboard

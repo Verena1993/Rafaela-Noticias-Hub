@@ -18,13 +18,14 @@ export const Coverages: React.FC<CoveragesProps> = ({
   autoOpenCreateModal,
   setAutoOpenCreateModal
 }) => {
-  const { coverages, users, addCoverage, searchQuery } = useHub();
+  const { coverages, users, addCoverage, searchQuery, categories } = useHub();
 
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAutocompleteModal, setShowAutocompleteModal] = useState(false);
 
   // Form states
+  const [newCategory, setNewCategory] = useState('');
   const [newTitle, setNewTitle] = useState('');
   const [newDate, setNewDate] = useState(() => {
     const d = new Date();
@@ -149,9 +150,11 @@ export const Coverages: React.FC<CoveragesProps> = ({
       newStatus,
       '',
       newObservations,
-      newAttachments
+      newAttachments,
+      newCategory || undefined
     );
 
+    setNewCategory('');
     setNewTitle('');
     setNewDate(() => {
       const d = new Date();
@@ -280,18 +283,25 @@ export const Coverages: React.FC<CoveragesProps> = ({
                   <span className="column-count">{col.count}</span>
                 </div>
                 <div className="column-cards">
-                  {colCoverages.map(cov => (
-                    <div 
-                      key={cov.id} 
-                      className="board-card" 
-                      onClick={() => handleCardClick(cov.id)}
-                    >
-                      <h4 className="card-title">{cov.title}</h4>
-                      
-                      {/* Program/Format tags on Kanban Card */}
-                      {((cov.programs && cov.programs.length > 0) || (cov.formats && cov.formats.length > 0)) && (
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginBottom: '0.4rem' }}>
-                          {cov.programs?.map((prog, idx) => (
+                  {colCoverages.map(cov => {
+                    const cat = categories.find(c => c.id === cov.categoryId);
+                    return (
+                      <div 
+                        key={cov.id} 
+                        className="board-card" 
+                        onClick={() => handleCardClick(cov.id)}
+                      >
+                        <h4 className="card-title">{cov.title}</h4>
+                        
+                        {/* Program/Format/Category tags on Kanban Card */}
+                        {((cov.programs && cov.programs.length > 0) || (cov.formats && cov.formats.length > 0) || cat) && (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginBottom: '0.4rem' }}>
+                            {cat && (
+                              <span style={{ fontSize: '0.6rem', backgroundColor: `${cat.color}15`, color: cat.color, padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
+                                📁 {cat.name}
+                              </span>
+                            )}
+                            {cov.programs?.map((prog, idx) => (
                             <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
                               📻 {prog}
                             </span>
@@ -329,7 +339,8 @@ export const Coverages: React.FC<CoveragesProps> = ({
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
                   {colCoverages.length === 0 && (
                     <div style={{ 
                       padding: '2rem 1rem', 
@@ -360,54 +371,62 @@ export const Coverages: React.FC<CoveragesProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredCoverages.map(cov => (
-                <tr 
-                  key={cov.id} 
-                  style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'var(--transition)' }}
-                  onClick={() => handleCardClick(cov.id)}
-                  className="table-row-hover"
-                >
-                  <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                    <div>{cov.title}</div>
-                    {/* Program/Format tags in table cell */}
-                    {((cov.programs && cov.programs.length > 0) || (cov.formats && cov.formats.length > 0)) && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginTop: '0.25rem' }}>
-                        {cov.programs?.map((prog, idx) => (
-                          <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
-                            📻 {prog}
-                          </span>
-                        ))}
-                        {cov.formats?.map((form, idx) => (
-                          <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#f3e8ff', color: '#6b21a8', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
-                            ⚙️ {form}
-                          </span>
-                        ))}
+              {filteredCoverages.map(cov => {
+                const cat = categories.find(c => c.id === cov.categoryId);
+                return (
+                  <tr 
+                    key={cov.id} 
+                    style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'var(--transition)' }}
+                    onClick={() => handleCardClick(cov.id)}
+                    className="table-row-hover"
+                  >
+                    <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
+                      <div>{cov.title}</div>
+                      {/* Program/Format/Category tags in table cell */}
+                      {((cov.programs && cov.programs.length > 0) || (cov.formats && cov.formats.length > 0) || cat) && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginTop: '0.25rem' }}>
+                          {cat && (
+                            <span style={{ fontSize: '0.6rem', backgroundColor: `${cat.color}15`, color: cat.color, padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
+                              📁 {cat.name}
+                            </span>
+                          )}
+                          {cov.programs?.map((prog, idx) => (
+                            <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
+                              📻 {prog}
+                            </span>
+                          ))}
+                          {cov.formats?.map((form, idx) => (
+                            <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#f3e8ff', color: '#6b21a8', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
+                              ⚙️ {form}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </td>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <span className={`badge status-${cov.status}`}>{cov.status.replace(/_/g, ' ')}</span>
+                    </td>
+                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>{cov.location}</td>
+                    <td style={{ padding: '0.75rem 1rem' }}>
+                      <div className="card-assignees">
+                        {cov.assignees.map(uid => {
+                          const u = users.find(usr => usr.id === uid);
+                          return (
+                            <div 
+                              key={uid} 
+                              className="avatar-circle" 
+                              style={{ backgroundColor: u?.avatarColor }}
+                              title={u?.name}
+                            >
+                              {u?.name.charAt(0)}
+                            </div>
+                          );
+                        })}
                       </div>
-                    )}
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <span className={`badge status-${cov.status}`}>{cov.status.replace(/_/g, ' ')}</span>
-                  </td>
-                  <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>{cov.location}</td>
-                  <td style={{ padding: '0.75rem 1rem' }}>
-                    <div className="card-assignees">
-                      {cov.assignees.map(uid => {
-                        const u = users.find(usr => usr.id === uid);
-                        return (
-                          <div 
-                            key={uid} 
-                            className="avatar-circle" 
-                            style={{ backgroundColor: u?.avatarColor }}
-                            title={u?.name}
-                          >
-                            {u?.name.charAt(0)}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                  </tr>
+                );
+              })}
               {filteredCoverages.length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
@@ -554,6 +573,20 @@ export const Coverages: React.FC<CoveragesProps> = ({
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Categoría</label>
+                      <select
+                        className="form-select"
+                        value={newCategory}
+                        onChange={e => setNewCategory(e.target.value)}
+                      >
+                        <option value="">Seleccionar Categoría...</option>
+                        {categories.filter(c => c.active).map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
                     </div>
 
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>

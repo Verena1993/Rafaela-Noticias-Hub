@@ -131,3 +131,78 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 
+-- ==========================================
+-- ESTRUCTURA DE TABLA CATEGORIES Y MIGRACIONES
+-- ==========================================
+
+-- 1. Crear tabla categories
+CREATE TABLE IF NOT EXISTS public.categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL UNIQUE,
+  slug TEXT NOT NULL UNIQUE,
+  color TEXT NOT NULL DEFAULT '#3b82f6',
+  icon TEXT NOT NULL DEFAULT 'Folder',
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Asegurar columnas si la tabla ya existía
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT '#3b82f6';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS icon TEXT NOT NULL DEFAULT 'Folder';
+ALTER TABLE public.categories ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT TRUE;
+
+-- 2. Agregar category_id a coverages
+ALTER TABLE public.coverages ADD COLUMN IF NOT EXISTS category_id UUID REFERENCES public.categories(id) ON DELETE SET NULL;
+
+-- 3. Habilitar RLS en categories
+ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
+
+-- 4. Crear políticas RLS para categories
+DROP POLICY IF EXISTS "Categories are viewable by authenticated users" ON public.categories;
+DROP POLICY IF EXISTS "Categories can be inserted by admins" ON public.categories;
+DROP POLICY IF EXISTS "Categories can be updated by admins" ON public.categories;
+DROP POLICY IF EXISTS "Categories can be deleted by admins" ON public.categories;
+
+CREATE POLICY "Categories are viewable by authenticated users" 
+ON public.categories FOR SELECT 
+TO authenticated 
+USING (true);
+
+CREATE POLICY "Categories can be inserted by admins" 
+ON public.categories FOR INSERT 
+TO authenticated 
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND rol = 'admin' AND activo = true
+  )
+);
+
+CREATE POLICY "Categories can be updated by admins" 
+ON public.categories FOR UPDATE 
+TO authenticated 
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND rol = 'admin' AND activo = true
+  )
+)
+WITH CHECK (
+  EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND rol = 'admin' AND activo = true
+  )
+);
+
+CREATE POLICY "Categories can be deleted by admins" 
+ON public.categories FOR DELETE 
+TO authenticated 
+USING (
+  EXISTS (
+    SELECT 1 FROM public.profiles 
+    WHERE id = auth.uid() AND rol = 'admin' AND activo = true
+  )
+);
+
+
+

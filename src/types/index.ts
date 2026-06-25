@@ -79,6 +79,7 @@ export interface Coverage {
   logisticsInfo?: string;
   observations?: string;
   attachments?: string[];
+  categoryId?: string;
 }
 
 export type RadarCategory = 'national' | 'provincial' | 'regional' | 'local' | 'international';
@@ -142,6 +143,12 @@ export interface CalendarEvent {
   programs?: ProgramType[];
   formats?: FormatType[];
 }
+export interface ProposalDecision {
+  status: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'requiere_cambios';
+  timestamp: string;
+  note?: string;
+  deciderName: string;
+}
 
 export interface Proposal {
   id: string;
@@ -153,10 +160,14 @@ export interface Proposal {
   sharedLinks: SharedLink[];
   comments: Comment[];
   priority?: 'high' | 'medium' | 'low';
-  status: 'new' | 'in_evaluation' | 'approved' | 'rejected' | 'assigned' | 'covered';
+  status: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'requiere_cambios';
   assignees: string[]; // members working on evaluating or drafted it
   programs?: ProgramType[];
   formats?: FormatType[];
+  createdAt: string;
+  authorId: string;
+  authorName: string;
+  decisionHistory: ProposalDecision[];
 }
 
 export interface StaffSchedule {
@@ -214,3 +225,14 @@ export interface Notification {
 }
 
 // Predefined 15 users for the Rafaela Noticias newsroom
+
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  color: string;
+  icon: string;
+  active: boolean;
+  created_at?: string;
+}
+
