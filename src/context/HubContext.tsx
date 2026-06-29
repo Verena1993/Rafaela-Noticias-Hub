@@ -182,6 +182,7 @@ const mapDbCoverageToApp = (dbCov: any): Coverage => {
 
   return {
     id: dbCov.id,
+    proposalId: dbCov.proposal_id || undefined,
     title: dbCov.title,
     description: dbCov.description || '',
     dateTime: formattedDateTime,
@@ -209,6 +210,7 @@ const mapDbCoverageToApp = (dbCov: any): Coverage => {
 
 const mapAppCoverageToDb = (appCov: Coverage) => ({
   id: appCov.id,
+  proposal_id: appCov.proposalId || null,
   title: appCov.title,
   description: appCov.description,
   datetime: appCov.dateTime ? new Date(appCov.dateTime).toISOString() : null,
@@ -2050,6 +2052,12 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const prop = proposals.find(p => p.id === proposalId);
     if (!prop || !currentUser) return '';
 
+    // Guard to prevent duplicate conversion
+    if (prop.status === 'convertida') {
+      reportError('Esta propuesta ya ha sido convertida en cobertura.', new Error('Propuesta ya convertida'));
+      return '';
+    }
+
     const id = crypto.randomUUID();
     const targetDateTime = extraDetails?.dateTime || prop.dateTime || new Date().toISOString().substring(0, 16);
     const targetLocation = extraDetails?.location || prop.location || 'A determinar';
@@ -2060,15 +2068,16 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const newCoverage: Coverage = {
       id,
+      proposalId, // Link coverage to proposal
       title: prop.title,
       description: prop.description,
       dateTime: targetDateTime,
       location: targetLocation,
       status: targetStatus,
       assignees: targetAssignees,
-      comments: prop.comments, // carry over
-      multimedia: prop.multimedia, // carry over
-      sharedLinks: prop.sharedLinks, // carry over
+      comments: [], // Clear comments as per Stage 4.5 rules
+      multimedia: prop.multimedia, // Reuse original multimedia list directly (JSONB references resolved URLs)
+      sharedLinks: prop.sharedLinks, // Reuse links directly
       publications: {
         portal: { status: 'pending' },
         facebook: { status: 'pending' },
@@ -2088,17 +2097,76 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       formats: targetFormats
     };
 
+    const originalProposals = [...proposals];
+    const originalCoverages = [...coverages];
+    const originalEvents = [...events];
+
     setCoverages(prev => [newCoverage, ...prev]);
 
-    // Persistir asincrónicamente con rollback en caso de fallo
+    const conversionDecision: ProposalDecision = {
+      status: 'convertida',
+      timestamp: new Date().toISOString(),
+      note: `Cobertura iniciada con ID: ${id}`,
+      deciderName: currentUser.name
+    };
+
+    setProposals(prev => prev.map(p => {
+      if (p.id === proposalId) {
+        return {
+          ...p,
+          status: 'convertida',
+          decisionHistory: [conversionDecision, ...(p.decisionHistory || [])]
+        };
+      }
+      return p;
+    }));
+
+    // Async DB update with rollback
     (async () => {
       try {
-        const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
-        if (error) throw error;
+        // 1. Insert coverage
+        const { error: covErr } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
+        if (covErr) throw covErr;
+
+        // 2. Update proposals status to 'convertida'
+        const { error: propErr } = await supabase
+          .from('proposals')
+          .update({ status: 'convertida' })
+          .eq('id', proposalId);
+        if (propErr) throw propErr;
+
+        // 3. Add to decision history audit
+        const { error: decErr } = await supabase
+          .from('proposal_decisions')
+          .insert([
+            {
+              proposal_id: proposalId,
+              decider_id: currentUser.id,
+              status: 'convertida',
+              note: conversionDecision.note,
+              timestamp: conversionDecision.timestamp
+            }
+          ]);
+        if (decErr) throw decErr;
+
+        logActivity(undefined, `Cobertura creada desde propuesta: "${prop.title}"`);
       } catch (err: any) {
-        // Rollback state
-        setCoverages(prev => prev.filter(c => c.id !== id));
-        setEvents(prev => prev.filter(e => e.coverageId !== id));
+        // Rollback states
+        setCoverages(originalCoverages);
+        setProposals(originalProposals);
+        setEvents(originalEvents);
+
+        // Delete coverage if inserted
+        await supabase.from('coverages').delete().eq('id', id);
+        // Reset status
+        await supabase.from('proposals').update({ status: prop.status }).eq('id', proposalId);
+        // Delete decision audit
+        await supabase
+          .from('proposal_decisions')
+          .delete()
+          .eq('proposal_id', proposalId)
+          .eq('status', 'convertida');
+
         reportError('Error al guardar la nueva cobertura en el servidor de base de datos.', err);
       }
     })();
@@ -2130,15 +2198,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return [...filtered, newEvent];
     });
 
-    // Mark proposal as approved
-    setProposals(prev => prev.map(p => {
-      if (p.id === proposalId) {
-        return { ...p, status: 'aprobada' };
-      }
-      return p;
-    }));
-
-    logActivity(undefined, `Cobertura creada desde propuesta: "${prop.title}"`);
     return id;
   };
 

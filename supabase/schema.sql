@@ -435,5 +435,21 @@ WITH CHECK (true);
 CREATE INDEX IF NOT EXISTS idx_proposal_media_proposal ON public.proposal_media(proposal_id);
 
 
+-- ==========================================
+-- ACTUALIZACIÓN DE RESTRICCIONES DE ESTADO (ETAPA 4.5)
+-- ==========================================
+
+-- Drop old status constraints
+ALTER TABLE public.proposals DROP CONSTRAINT IF EXISTS proposals_status_check;
+ALTER TABLE public.proposal_decisions DROP CONSTRAINT IF EXISTS proposal_decisions_status_check;
+
+-- Add updated constraints allowing 'convertida'
+ALTER TABLE public.proposals ADD CONSTRAINT proposals_status_check 
+  CHECK (status IN ('pendiente', 'en_revision', 'aprobada', 'rechazada', 'requiere_cambios', 'convertida'));
+
+ALTER TABLE public.proposal_decisions ADD CONSTRAINT proposal_decisions_status_check 
+  CHECK (status IN ('pendiente', 'en_revision', 'aprobada', 'rechazada', 'requiere_cambios', 'convertida'));
+
+
 
 

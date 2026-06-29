@@ -63,6 +63,7 @@ export type EventStatus = 'pending_confirmation' | 'confirmed' | 'in_redaction' 
 
 export interface Coverage {
   id: string;
+  proposalId?: string;
   title: string;
   description: string;
   dateTime: string;
@@ -144,7 +145,7 @@ export interface CalendarEvent {
   formats?: FormatType[];
 }
 export interface ProposalDecision {
-  status: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'requiere_cambios';
+  status: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'requiere_cambios' | 'convertida';
   timestamp: string;
   note?: string;
   deciderName: string;
@@ -161,7 +162,7 @@ export interface Proposal {
   sharedLinks: SharedLink[];
   comments: Comment[];
   priority?: 'high' | 'medium' | 'low';
-  status: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'requiere_cambios';
+  status: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'requiere_cambios' | 'convertida';
   assignees: string[]; // members working on evaluating or drafted it
   programs?: ProgramType[];
   formats?: FormatType[];

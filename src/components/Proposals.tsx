@@ -385,7 +385,8 @@ export const Proposals: React.FC = () => {
       en_revision: { label: 'En Revisión', className: 'status-in_coverage' },
       aprobada: { label: 'Aprobada', className: 'status-ready_to_publish' },
       rechazada: { label: 'Rechazada', className: 'priority-high' },
-      requiere_cambios: { label: 'Requiere Cambios', className: 'status-in_redaction' }
+      requiere_cambios: { label: 'Requiere Cambios', className: 'status-in_redaction' },
+      convertida: { label: 'Convertida', className: 'status-ready_to_publish' }
     };
     const c = config[status] || { label: status, className: 'status-pending' };
     return <span className={`badge ${c.className}`}>{c.label}</span>;
