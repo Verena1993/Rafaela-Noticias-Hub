@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS, INITIAL_PROPOSALS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR } from '../data/initialData';
+import { INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR } from '../data/initialData';
 
 import type { User, Coverage, Task, Alert, CalendarEvent, Notification, Activity, Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, ProposalDecision, StaffSchedule, ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic, Category } from '../types';
 import { supabase } from '../lib/supabase';
@@ -170,6 +170,69 @@ const mapAppCoverageToDb = (appCov: Coverage) => ({
   category_id: appCov.categoryId || null
 });
 
+export const mapDbProposalToApp = (dbProp: any): Proposal => {
+  let formattedDateTime = '';
+  if (dbProp.date_time) {
+    const d = new Date(dbProp.date_time);
+    if (!isNaN(d.getTime())) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      formattedDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
+    }
+  }
+
+  return {
+    id: dbProp.id,
+    proposalNumber: dbProp.proposal_number,
+    title: dbProp.title,
+    description: dbProp.description || '',
+    dateTime: formattedDateTime || undefined,
+    location: dbProp.location || '',
+    multimedia: [],
+    sharedLinks: [],
+    comments: [],
+    priority: dbProp.priority || 'medium',
+    status: dbProp.status || 'pendiente',
+    assignees: [],
+    programs: [],
+    formats: [],
+    createdAt: dbProp.created_at || new Date().toISOString(),
+    authorId: dbProp.author_id,
+    authorName: dbProp.author?.nombre || 'Usuario Desconocido',
+    decisionHistory: Array.isArray(dbProp.proposal_decisions)
+      ? dbProp.proposal_decisions.map((pd: any) => ({
+          status: pd.status,
+          timestamp: pd.timestamp,
+          note: pd.note || undefined,
+          deciderName: pd.decider?.nombre || 'Usuario Desconocido'
+        })).sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      : [],
+    sourceTypeId: dbProp.source_type_id || undefined,
+    sourceName: dbProp.source_name || undefined,
+    deletedAt: dbProp.deleted_at || undefined,
+    deletedBy: dbProp.deleted_by || undefined
+  };
+};
+
+export const mapAppProposalToDb = (appProp: Proposal) => ({
+  id: appProp.id,
+  title: appProp.title,
+  description: appProp.description,
+  date_time: appProp.dateTime ? new Date(appProp.dateTime).toISOString() : null,
+  location: appProp.location || null,
+  status: appProp.status,
+  priority: appProp.priority || 'medium',
+  created_at: appProp.createdAt || new Date().toISOString(),
+  author_id: appProp.authorId,
+  source_type_id: appProp.sourceTypeId || null,
+  source_name: appProp.sourceName || null,
+  deleted_at: appProp.deletedAt ? new Date(appProp.deletedAt).toISOString() : null,
+  deleted_by: appProp.deletedBy || null
+});
+
 export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [users, setUsers] = useState<User[]>([]);
@@ -187,8 +250,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase.from('coverages').select('*');
       if (error) {
         console.error('Error fetching coverages from Supabase:', error.message);
-        const saved = localStorage.getItem('hub_coverages');
-        setCoverages(saved ? JSON.parse(saved) : []);
+        alert('Error al cargar las coberturas desde el servidor: ' + error.message);
+        setCoverages([]);
         return;
       }
 
@@ -199,12 +262,49 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     } catch (err) {
       console.error('Unexpected error in fetchCoverages:', err);
-      const saved = localStorage.getItem('hub_coverages');
-      setCoverages(saved ? JSON.parse(saved) : []);
+      alert('Error inesperado al cargar las coberturas.');
+      setCoverages([]);
     } finally {
       setLoadingCoverages(false);
     }
   };
+
+  const fetchProposals = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('proposals')
+        .select(`
+          *,
+          author:profiles!author_id(nombre),
+          proposal_decisions(
+            status,
+            note,
+            timestamp,
+            decider:profiles!decider_id(nombre)
+          )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching proposals from Supabase:', error.message);
+        alert('Error al cargar las propuestas desde el servidor: ' + error.message);
+        setProposals([]);
+        return;
+      }
+
+      if (data) {
+        const loaded = data.map(mapDbProposalToApp);
+        setProposals(loaded);
+        localStorage.setItem('hub_proposals', JSON.stringify(loaded));
+      }
+    } catch (err: any) {
+      console.error('Unexpected error in fetchProposals:', err);
+      alert('Error inesperado al cargar las propuestas.');
+      setProposals([]);
+    }
+  };
+
+
 
 
   const [tasks, setTasks] = useState<Task[]>(() => {
@@ -252,28 +352,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [proposals, setProposals] = useState<Proposal[]>(() => {
     const saved = localStorage.getItem('hub_proposals');
-    const rawProposals = saved ? JSON.parse(saved) : INITIAL_PROPOSALS;
-    return rawProposals.map((p: any) => {
-      let status = p.status;
-      if (status === 'new') status = 'pendiente';
-      else if (status === 'in_evaluation') status = 'en_revision';
-      else if (status === 'approved' || status === 'covered' || status === 'assigned') status = 'aprobada';
-      else if (status === 'rejected') status = 'rechazada';
-      else if (status === 'requires_changes' || status === 'change_required') status = 'requiere_cambios';
-
-      if (status !== 'pendiente' && status !== 'en_revision' && status !== 'aprobada' && status !== 'rechazada' && status !== 'requiere_cambios') {
-        status = 'pendiente';
-      }
-
-      return {
-        ...p,
-        status,
-        createdAt: p.createdAt || p.dateTime || new Date().toISOString(),
-        authorId: p.authorId || 'u1',
-        authorName: p.authorName || 'Admin Principal',
-        decisionHistory: p.decisionHistory || []
-      };
-    });
+    return saved ? JSON.parse(saved) : [];
   });
 
   const [staffSchedules, setStaffSchedules] = useState<StaffSchedule[]>(() => {
@@ -366,6 +445,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log('HubContext fetchUsers raw data:', data, 'error:', error);
       if (error) {
         console.error('Error fetching profiles:', error.message);
+        alert('Error al cargar los usuarios desde el servidor: ' + error.message);
+        setUsers([]);
         return;
       }
       if (data) {
@@ -382,8 +463,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
         setUsers(dbUsers);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to fetch profiles:', err);
+      alert('Error inesperado al cargar los usuarios.');
+      setUsers([]);
     }
   };
 
@@ -395,13 +478,17 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .order('name', { ascending: true });
       if (error) {
         console.error('Error fetching categories from Supabase:', error.message);
+        alert('Error al cargar las categorías desde el servidor: ' + error.message);
+        setCategories([]);
         return;
       }
       if (data) {
         setCategories(data);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Unexpected error in fetchCategories:', err);
+      alert('Error inesperado al cargar las categorías.');
+      setCategories([]);
     }
   };
 
@@ -561,7 +648,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     Promise.all([
       fetchLiveRadarNews(),
       fetchCoverages(),
-      fetchCategories()
+      fetchCategories(),
+      fetchProposals()
     ]).catch(err => {
       console.error('Error on initial mount loaders:', err);
     });
@@ -1576,10 +1664,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     formats?: FormatType[]
   ) => {
     if (!currentUser) return;
-    const id = `prop_${Date.now()}`;
+    const id = crypto.randomUUID();
 
     const mappedFiles: MultimediaItem[] = files ? files.map((f, i) => ({
-      id: `m_prop_${Date.now()}_${i}`,
+      id: `m_prop_${id}_${i}`,
       type: f.type,
       name: f.name,
       url: f.url,
@@ -1589,7 +1677,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })) : [];
 
     const mappedLinks: SharedLink[] = links ? links.map((l, i) => ({
-      id: `sl_prop_${Date.now()}_${i}`,
+      id: `sl_prop_${id}_${i}`,
       title: l.title,
       url: l.url,
       uploadDate: new Date().toISOString(),
@@ -1617,7 +1705,31 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     setProposals(prev => [newProposal, ...prev]);
-    logActivity(undefined, `Propuesta creada: "${title}"`);
+
+    (async () => {
+      try {
+        const { error } = await supabase.from('proposals').insert([
+          {
+            id,
+            title,
+            description,
+            date_time: dateTime ? new Date(dateTime).toISOString() : null,
+            location: location || null,
+            status: 'pendiente',
+            priority: 'medium',
+            created_at: newProposal.createdAt,
+            author_id: currentUser.id
+          }
+        ]);
+        if (error) throw error;
+        logActivity(undefined, `Propuesta creada: "${title}"`);
+      } catch (err: any) {
+        console.error('Error inserting proposal into Supabase:', err.message || err);
+        // Rollback state
+        setProposals(prev => prev.filter(p => p.id !== id));
+        alert('Error al guardar la propuesta en el servidor de base de datos.');
+      }
+    })();
   };
 
   const updateProposalStatus = (
@@ -1639,6 +1751,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       throw new Error(`Se requiere ingresar un comentario para el estado: ${status === 'rechazada' ? 'Rechazada' : 'Requiere cambios'}`);
     }
 
+    const originalProposals = [...proposals];
+
     // Crear la decisión para el historial
     const newDecision: ProposalDecision = {
       status,
@@ -1658,65 +1772,93 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return p;
     }));
 
-    // Acciones y auditoría según estado
-    if (status === 'aprobada') {
-      // Registrar auditoría de aprobación
-      logActivity(undefined, `Propuesta aprobada: "${prop.title}"`);
+    (async () => {
+      try {
+        const { error: propError } = await supabase
+          .from('proposals')
+          .update({ status })
+          .eq('id', proposalId);
+        if (propError) throw propError;
 
-      // Convertir automáticamente a cobertura
-      const newCoverageId = convertProposalToCoverage(proposalId);
+        const { error: decError } = await supabase
+          .from('proposal_decisions')
+          .insert([
+            {
+              proposal_id: proposalId,
+              decider_id: currentUser.id,
+              status,
+              note: newDecision.note,
+              timestamp: newDecision.timestamp
+            }
+          ]);
+        if (decError) throw decError;
 
-      // Crear notificación al autor
-      if (prop.authorId) {
-        const notif: Notification = {
-          id: `not_prop_app_${Date.now()}`,
-          title: 'Propuesta Aprobada 📈',
-          message: `Tu propuesta "${prop.title}" fue aprobada y se inició su cobertura.`,
-          timestamp: new Date().toISOString(),
-          read: false,
-          type: 'coverage',
-          linkId: newCoverageId
-        };
-        setNotifications(prev => [notif, ...prev]);
+        // Acciones y auditoría según estado
+        if (status === 'aprobada') {
+          // Registrar auditoría de aprobación
+          logActivity(undefined, `Propuesta aprobada: "${prop.title}"`);
+
+          // Convertir automáticamente a cobertura
+          const newCoverageId = convertProposalToCoverage(proposalId);
+
+          // Crear notificación al autor
+          if (prop.authorId) {
+            const notif: Notification = {
+              id: `not_prop_app_${Date.now()}`,
+              title: 'Propuesta Aprobada 📈',
+              message: `Tu propuesta "${prop.title}" fue aprobada y se inició su cobertura.`,
+              timestamp: new Date().toISOString(),
+              read: false,
+              type: 'coverage',
+              linkId: newCoverageId
+            };
+            setNotifications(prev => [notif, ...prev]);
+          }
+        } else if (status === 'rechazada') {
+          // Registrar auditoría de rechazo
+          logActivity(undefined, `Propuesta rechazada: "${prop.title}"`);
+
+          // Crear notificación al autor
+          if (prop.authorId) {
+            const notif: Notification = {
+              id: `not_prop_rej_${Date.now()}`,
+              title: 'Propuesta Rechazada ❌',
+              message: `Tu propuesta "${prop.title}" fue rechazada. Motivo: ${note}`,
+              timestamp: new Date().toISOString(),
+              read: false,
+              type: 'coverage',
+              linkId: proposalId
+            };
+            setNotifications(prev => [notif, ...prev]);
+          }
+        } else if (status === 'requiere_cambios') {
+          // Registrar auditoría de cambios solicitados
+          logActivity(undefined, `Cambios solicitados en propuesta: "${prop.title}"`);
+
+          // Crear notificación al autor
+          if (prop.authorId) {
+            const notif: Notification = {
+              id: `not_prop_chg_${Date.now()}`,
+              title: 'Propuesta: Requiere Cambios ⚠️',
+              message: `Tu propuesta "${prop.title}" requiere cambios. Observaciones: ${note}`,
+              timestamp: new Date().toISOString(),
+              read: false,
+              type: 'coverage',
+              linkId: proposalId
+            };
+            setNotifications(prev => [notif, ...prev]);
+          }
+        } else {
+          // General status update (like 'en_revision')
+          logActivity(undefined, `Propuesta en revisión: "${prop.title}"`);
+        }
+      } catch (err: any) {
+        console.error('Error updating proposal status in Supabase:', err.message || err);
+        // Rollback state
+        setProposals(originalProposals);
+        alert('Error al actualizar el estado de la propuesta en el servidor.');
       }
-    } else if (status === 'rechazada') {
-      // Registrar auditoría de rechazo
-      logActivity(undefined, `Propuesta rechazada: "${prop.title}"`);
-
-      // Crear notificación al autor
-      if (prop.authorId) {
-        const notif: Notification = {
-          id: `not_prop_rej_${Date.now()}`,
-          title: 'Propuesta Rechazada ❌',
-          message: `Tu propuesta "${prop.title}" fue rechazada. Motivo: ${note}`,
-          timestamp: new Date().toISOString(),
-          read: false,
-          type: 'coverage',
-          linkId: proposalId
-        };
-        setNotifications(prev => [notif, ...prev]);
-      }
-    } else if (status === 'requiere_cambios') {
-      // Registrar auditoría de cambios solicitados
-      logActivity(undefined, `Cambios solicitados en propuesta: "${prop.title}"`);
-
-      // Crear notificación al autor
-      if (prop.authorId) {
-        const notif: Notification = {
-          id: `not_prop_chg_${Date.now()}`,
-          title: 'Propuesta: Requiere Cambios ⚠️',
-          message: `Tu propuesta "${prop.title}" requiere cambios. Observaciones: ${note}`,
-          timestamp: new Date().toISOString(),
-          read: false,
-          type: 'coverage',
-          linkId: proposalId
-        };
-        setNotifications(prev => [notif, ...prev]);
-      }
-    } else {
-      // General status update (like 'en_revision')
-      logActivity(undefined, `Propuesta en revisión: "${prop.title}"`);
-    }
+    })();
   };
 
   const addCommentToProposal = (proposalId: string, text: string) => {
@@ -1962,6 +2104,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     programs?: ProgramType[],
     formats?: FormatType[]
   ) => {
+    const originalProposals = [...proposals];
+
     setProposals(prev => prev.map(p => {
       if (p.id === proposalId) {
         return {
@@ -1970,14 +2114,33 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description,
           dateTime,
           location,
-          assignees: assignees || [],
-          programs: programs || [],
-          formats: formats || []
+          assignees: assignees || p.assignees || [],
+          programs: programs || p.programs || [],
+          formats: formats || p.formats || []
         };
       }
       return p;
     }));
-    logActivity(undefined, `actualizó los detalles de la propuesta: "${title}"`);
+
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('proposals')
+          .update({
+            title,
+            description,
+            date_time: dateTime ? new Date(dateTime).toISOString() : null,
+            location: location || null
+          })
+          .eq('id', proposalId);
+        if (error) throw error;
+        logActivity(undefined, `actualizó los detalles de la propuesta: "${title}"`);
+      } catch (err: any) {
+        console.error('Error updating proposal details in Supabase:', err.message || err);
+        setProposals(originalProposals);
+        alert('Error al actualizar los detalles de la propuesta en el servidor.');
+      }
+    })();
   };
 
   // Instagram CRUD
