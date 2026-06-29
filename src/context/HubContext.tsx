@@ -88,6 +88,8 @@ interface HubContextType {
   deleteInstagramPost: (id: string) => void;
   updateProposalDetails: (proposalId: string, title: string, description: string, dateTime?: string, location?: string, assignees?: string[], programs?: ProgramType[], formats?: FormatType[]) => void;
   deleteProposal: (proposalId: string) => Promise<void>;
+  uploadProposalMediaFile: (proposalId: string, file: Omit<MultimediaItem, 'id' | 'uploadDate' | 'userId'>) => Promise<void>;
+  deleteProposalMediaFile: (proposalId: string, mediaId: string) => Promise<void>;
   // News Radar
   updateNewsRadarItem: (id: string, updates: Partial<NewsRadarItem>) => void;
   fetchLiveRadarNews: () => Promise<void>;
@@ -111,6 +113,57 @@ export const useHub = () => {
 const reportError = (message: string, error?: any) => {
   console.error(message, error);
   alert(message);
+};
+
+const resolveMediaUrl = (storagePath: string): string => {
+  return supabase.storage.from('media').getPublicUrl(storagePath).data.publicUrl;
+};
+
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = 1;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+};
+
+export const parseSizeToBytes = (sizeStr: string): number => {
+  const num = parseFloat(sizeStr);
+  if (isNaN(num)) return 0;
+  const upper = sizeStr.toUpperCase();
+  if (upper.includes('MB')) return Math.round(num * 1024 * 1024);
+  if (upper.includes('KB')) return Math.round(num * 1024);
+  if (upper.includes('GB')) return Math.round(num * 1024 * 1024 * 1024);
+  return Math.round(num);
+};
+
+const mapMimeToMediaType = (mimeType: string): 'photo' | 'video' | 'audio' | 'document' => {
+  if (mimeType.startsWith('image/')) return 'photo';
+  if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
+  return 'document';
+};
+
+const dataUrlToBlob = (dataUrl: string): Blob => {
+  const arr = dataUrl.split(',');
+  const mime = arr[0].match(/:(.*?);/)?.[1] || 'application/octet-stream';
+  const bstr = atob(arr[1]);
+  let n = bstr.length;
+  const u8arr = new Uint8Array(n);
+  while (n--) {
+    u8arr[n] = bstr.charCodeAt(n);
+  }
+  return new Blob([u8arr], { type: mime });
+};
+
+const getExtensionFromMime = (mime: string): string => {
+  const parts = mime.split('/');
+  if (parts.length > 1) {
+    if (parts[1] === 'jpeg') return 'jpg';
+    return parts[1];
+  }
+  return 'bin';
 };
 
 const mapDbCoverageToApp = (dbCov: any): Coverage => {
@@ -196,7 +249,17 @@ export const mapDbProposalToApp = (dbProp: any): Proposal => {
     description: dbProp.description || '',
     dateTime: formattedDateTime || undefined,
     location: dbProp.location || '',
-    multimedia: [],
+    multimedia: Array.isArray(dbProp.proposal_media)
+      ? dbProp.proposal_media.map((m: any) => ({
+          id: m.id,
+          name: m.original_name,
+          type: mapMimeToMediaType(m.mime_type),
+          url: resolveMediaUrl(m.storage_path),
+          size: formatBytes(Number(m.size)),
+          uploadDate: m.uploaded_at,
+          userId: m.uploaded_by
+        }))
+      : [],
     sharedLinks: [],
     comments: Array.isArray(dbProp.proposal_comments)
       ? dbProp.proposal_comments.map((c: any) => ({
@@ -299,6 +362,15 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             timestamp,
             user_id,
             user:profiles!user_id(nombre)
+          ),
+          proposal_media(
+            id,
+            original_name,
+            storage_path,
+            mime_type,
+            size,
+            uploaded_by,
+            uploaded_at
           )
         `)
         .is('deleted_at', null)
@@ -1677,15 +1749,23 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!currentUser) return;
     const id = crypto.randomUUID();
 
-    const mappedFiles: MultimediaItem[] = files ? files.map((f, i) => ({
-      id: `m_prop_${id}_${i}`,
-      type: f.type,
-      name: f.name,
-      url: f.url,
-      size: f.size,
-      uploadDate: new Date().toISOString(),
-      userId: currentUser.id
-    })) : [];
+    const filesToUpload: { blob: Blob; fileId: string; storagePath: string; name: string }[] = [];
+    const mappedFiles: MultimediaItem[] = files ? files.map((f) => {
+      const fileId = crypto.randomUUID();
+      const blob = dataUrlToBlob(f.url);
+      const ext = getExtensionFromMime(blob.type);
+      const storagePath = `proposals/${id}/${fileId}.${ext}`;
+      filesToUpload.push({ blob, fileId, storagePath, name: f.name });
+      return {
+        id: fileId,
+        type: f.type,
+        name: f.name,
+        url: resolveMediaUrl(storagePath),
+        size: f.size,
+        uploadDate: new Date().toISOString(),
+        userId: currentUser.id
+      };
+    }) : [];
 
     const mappedLinks: SharedLink[] = links ? links.map((l, i) => ({
       id: `sl_prop_${id}_${i}`,
@@ -1718,8 +1798,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProposals(prev => [newProposal, ...prev]);
 
     (async () => {
+      const uploadedPaths: string[] = [];
       try {
-        const { error } = await supabase.from('proposals').insert([
+        // 1. Insert proposal
+        const { error: propError } = await supabase.from('proposals').insert([
           {
             id,
             title,
@@ -1732,11 +1814,43 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             author_id: currentUser.id
           }
         ]);
-        if (error) throw error;
+        if (propError) throw propError;
+
+        // 2. Upload files and save metadata
+        for (const file of filesToUpload) {
+          const { error: uploadError } = await supabase.storage
+            .from('media')
+            .upload(file.storagePath, file.blob, { contentType: file.blob.type });
+
+          if (uploadError) throw uploadError;
+          uploadedPaths.push(file.storagePath);
+
+          const { error: dbError } = await supabase
+            .from('proposal_media')
+            .insert({
+              id: file.fileId,
+              proposal_id: id,
+              original_name: file.name,
+              storage_path: file.storagePath,
+              mime_type: file.blob.type,
+              size: file.blob.size,
+              uploaded_by: currentUser.id
+            });
+
+          if (dbError) throw dbError;
+        }
+
         logActivity(undefined, `Propuesta creada: "${title}"`);
       } catch (err: any) {
         // Rollback state
         setProposals(prev => prev.filter(p => p.id !== id));
+        // Cleanup storage uploads
+        if (uploadedPaths.length > 0) {
+          await supabase.storage.from('media').remove(uploadedPaths);
+        }
+        // Delete database entry
+        await supabase.from('proposals').delete().eq('id', id);
+
         reportError('Error al guardar la propuesta en el servidor de base de datos.', err);
       }
     })();
@@ -2202,6 +2316,129 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const uploadProposalMediaFile = async (
+    proposalId: string,
+    file: Omit<MultimediaItem, 'id' | 'uploadDate' | 'userId'>
+  ): Promise<void> => {
+    if (!currentUser) return;
+
+    try {
+      const blob = dataUrlToBlob(file.url);
+      const fileId = crypto.randomUUID();
+      const ext = getExtensionFromMime(blob.type);
+      const storagePath = `proposals/${proposalId}/${fileId}.${ext}`;
+
+      // 1. Upload to Supabase Storage first
+      const { error: uploadError } = await supabase.storage
+        .from('media')
+        .upload(storagePath, blob, { contentType: blob.type });
+
+      if (uploadError) throw uploadError;
+
+      // 2. Insert record in database next
+      const { error: dbError } = await supabase
+        .from('proposal_media')
+        .insert({
+          id: fileId,
+          proposal_id: proposalId,
+          original_name: file.name,
+          storage_path: storagePath,
+          mime_type: blob.type,
+          size: blob.size,
+          uploaded_by: currentUser.id
+        });
+
+      if (dbError) {
+        // Prevent orphan file by cleaning up Storage upload
+        await supabase.storage.from('media').remove([storagePath]);
+        throw dbError;
+      }
+
+      // 3. Update React state
+      const newMediaItem: MultimediaItem = {
+        id: fileId,
+        name: file.name,
+        type: mapMimeToMediaType(blob.type),
+        url: resolveMediaUrl(storagePath),
+        size: formatBytes(blob.size),
+        uploadDate: new Date().toISOString(),
+        userId: currentUser.id
+      };
+
+      setProposals(prev => prev.map(p => {
+        if (p.id === proposalId) {
+          return {
+            ...p,
+            multimedia: [...(p.multimedia || []), newMediaItem]
+          };
+        }
+        return p;
+      }));
+
+      logActivity(undefined, `Cargó archivo multimedia "${file.name}" en la propuesta`);
+    } catch (err: any) {
+      reportError('Error al subir el archivo multimedia en el servidor.', err);
+    }
+  };
+
+  const deleteProposalMediaFile = async (
+    proposalId: string,
+    mediaId: string
+  ): Promise<void> => {
+    if (!currentUser) return;
+
+    const prop = proposals.find(p => p.id === proposalId);
+    if (!prop) return;
+
+    const mediaItem = prop.multimedia.find(m => m.id === mediaId);
+    if (!mediaItem) return;
+
+    const originalProposals = [...proposals];
+
+    setProposals(prev => prev.map(p => {
+      if (p.id === proposalId) {
+        return {
+          ...p,
+          multimedia: p.multimedia.filter(m => m.id !== mediaId)
+        };
+      }
+      return p;
+    }));
+
+    try {
+      const { data, error: selectError } = await supabase
+        .from('proposal_media')
+        .select('storage_path')
+        .eq('id', mediaId)
+        .single();
+
+      if (selectError) throw selectError;
+      if (!data) throw new Error('El archivo no existe en el servidor.');
+
+      const storagePath = data.storage_path;
+
+      // 1. Delete from Supabase Storage first
+      const { error: storageError } = await supabase.storage
+        .from('media')
+        .remove([storagePath]);
+
+      if (storageError) throw storageError;
+
+      // 2. Delete from database next
+      const { error: dbError } = await supabase
+        .from('proposal_media')
+        .delete()
+        .eq('id', mediaId);
+
+      if (dbError) throw dbError;
+
+      logActivity(undefined, `Eliminó archivo multimedia de la propuesta`);
+    } catch (err: any) {
+      setProposals(originalProposals);
+      reportError('Error al eliminar el archivo multimedia en el servidor.', err);
+    }
+  };
+
   // Instagram CRUD
   const addInstagramPost = (
     date: string,
@@ -2406,6 +2643,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       deleteInstagramPost,
       updateProposalDetails,
       deleteProposal,
+      uploadProposalMediaFile,
+      deleteProposalMediaFile,
       updateNewsRadarItem,
       fetchLiveRadarNews,
       loadingRadar,

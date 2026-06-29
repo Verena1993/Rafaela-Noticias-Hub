@@ -405,5 +405,35 @@ CREATE POLICY "Authenticated users can do all on media" ON public.media FOR ALL 
 CREATE POLICY "Authenticated users can do all on shared links" ON public.shared_links FOR ALL TO authenticated USING (true) WITH CHECK (true);
 
 
+-- ==========================================
+-- ESTRUCTURA DE TABLA PROPOSAL_MEDIA (ETAPA 4.4)
+-- ==========================================
+
+CREATE TABLE IF NOT EXISTS public.proposal_media (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  proposal_id UUID REFERENCES public.proposals(id) ON DELETE CASCADE NOT NULL,
+  original_name TEXT NOT NULL,
+  storage_path TEXT NOT NULL UNIQUE,
+  mime_type TEXT NOT NULL,
+  size BIGINT NOT NULL,
+  uploaded_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  uploaded_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+-- Enable RLS
+ALTER TABLE public.proposal_media ENABLE ROW LEVEL SECURITY;
+
+-- Select/All Policies
+DROP POLICY IF EXISTS "Authenticated users can do all on proposal_media" ON public.proposal_media;
+CREATE POLICY "Authenticated users can do all on proposal_media" 
+ON public.proposal_media FOR ALL 
+TO authenticated 
+USING (true) 
+WITH CHECK (true);
+
+-- Index
+CREATE INDEX IF NOT EXISTS idx_proposal_media_proposal ON public.proposal_media(proposal_id);
+
+
 
 
