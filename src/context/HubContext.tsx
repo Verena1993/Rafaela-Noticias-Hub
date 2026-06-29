@@ -198,7 +198,15 @@ export const mapDbProposalToApp = (dbProp: any): Proposal => {
     location: dbProp.location || '',
     multimedia: [],
     sharedLinks: [],
-    comments: [],
+    comments: Array.isArray(dbProp.proposal_comments)
+      ? dbProp.proposal_comments.map((c: any) => ({
+          id: c.id,
+          userId: c.user_id,
+          userName: c.user?.nombre || 'Usuario Desconocido',
+          text: c.text,
+          timestamp: c.timestamp
+        }))
+      : [],
     priority: dbProp.priority || 'medium',
     status: dbProp.status || 'pendiente',
     assignees: [],
@@ -284,10 +292,18 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             note,
             timestamp,
             decider:profiles!decider_id(nombre)
+          ),
+          proposal_comments(
+            id,
+            text,
+            timestamp,
+            user_id,
+            user:profiles!user_id(nombre)
           )
         `)
         .is('deleted_at', null)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .order('timestamp', { foreignTable: 'proposal_comments', ascending: true });
 
       if (error) {
         reportError('Error al cargar las propuestas desde el servidor: ' + error.message, error);
@@ -1856,23 +1872,54 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addCommentToProposal = (proposalId: string, text: string) => {
     if (!currentUser) return;
-    const newComment: Comment = {
-      id: `com_${Date.now()}`,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      text,
-      timestamp: new Date().toISOString()
-    };
 
-    setProposals(prev => prev.map(p => {
-      if (p.id === proposalId) {
-        return {
-          ...p,
-          comments: [...p.comments, newComment]
-        };
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('proposal_comments')
+          .insert([
+            {
+              proposal_id: proposalId,
+              user_id: currentUser.id,
+              text
+            }
+          ])
+          .select(`
+            id,
+            text,
+            timestamp,
+            user_id,
+            user:profiles!user_id(nombre)
+          `)
+          .single();
+
+        if (error) throw error;
+
+        if (data) {
+          const newComment: Comment = {
+            id: data.id,
+            userId: data.user_id,
+            userName: (Array.isArray(data.user) ? data.user[0]?.nombre : (data.user as any)?.nombre) || currentUser.name,
+            text: data.text,
+            timestamp: data.timestamp
+          };
+
+          setProposals(prev => prev.map(p => {
+            if (p.id === proposalId) {
+              return {
+                ...p,
+                comments: [...(p.comments || []), newComment]
+              };
+            }
+            return p;
+          }));
+
+          logActivity(undefined, `Agregó un comentario a la propuesta: "${proposals.find(p => p.id === proposalId)?.title || ''}"`);
+        }
+      } catch (err: any) {
+        reportError('Error al agregar el comentario en el servidor.', err);
       }
-      return p;
-    }));
+    })();
   };
 
   const convertProposalToCoverage = (
