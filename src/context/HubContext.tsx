@@ -87,7 +87,7 @@ interface HubContextType {
   updateInstagramPost: (id: string, updates: Partial<InstagramPost>) => void;
   deleteInstagramPost: (id: string) => void;
   updateProposalDetails: (proposalId: string, title: string, description: string, dateTime?: string, location?: string, assignees?: string[], programs?: ProgramType[], formats?: FormatType[]) => void;
-
+  deleteProposal: (proposalId: string) => Promise<void>;
   // News Radar
   updateNewsRadarItem: (id: string, updates: Partial<NewsRadarItem>) => void;
   fetchLiveRadarNews: () => Promise<void>;
@@ -106,6 +106,11 @@ export const useHub = () => {
     throw new Error('useHub must be used within a HubProvider');
   }
   return context;
+};
+
+const reportError = (message: string, error?: any) => {
+  console.error(message, error);
+  alert(message);
 };
 
 const mapDbCoverageToApp = (dbCov: any): Coverage => {
@@ -249,8 +254,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data, error } = await supabase.from('coverages').select('*');
       if (error) {
-        console.error('Error fetching coverages from Supabase:', error.message);
-        alert('Error al cargar las coberturas desde el servidor: ' + error.message);
+        reportError('Error al cargar las coberturas desde el servidor: ' + error.message, error);
         setCoverages([]);
         return;
       }
@@ -260,9 +264,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCoverages(loaded);
         localStorage.setItem('hub_coverages', JSON.stringify(loaded));
       }
-    } catch (err) {
-      console.error('Unexpected error in fetchCoverages:', err);
-      alert('Error inesperado al cargar las coberturas.');
+    } catch (err: any) {
+      reportError('Error inesperado al cargar las coberturas.', err);
       setCoverages([]);
     } finally {
       setLoadingCoverages(false);
@@ -283,11 +286,11 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             decider:profiles!decider_id(nombre)
           )
         `)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching proposals from Supabase:', error.message);
-        alert('Error al cargar las propuestas desde el servidor: ' + error.message);
+        reportError('Error al cargar las propuestas desde el servidor: ' + error.message, error);
         setProposals([]);
         return;
       }
@@ -298,8 +301,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         localStorage.setItem('hub_proposals', JSON.stringify(loaded));
       }
     } catch (err: any) {
-      console.error('Unexpected error in fetchProposals:', err);
-      alert('Error inesperado al cargar las propuestas.');
+      reportError('Error inesperado al cargar las propuestas.', err);
       setProposals([]);
     }
   };
@@ -444,8 +446,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .select('*');
       console.log('HubContext fetchUsers raw data:', data, 'error:', error);
       if (error) {
-        console.error('Error fetching profiles:', error.message);
-        alert('Error al cargar los usuarios desde el servidor: ' + error.message);
+        reportError('Error al cargar los usuarios desde el servidor: ' + error.message, error);
         setUsers([]);
         return;
       }
@@ -464,8 +465,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUsers(dbUsers);
       }
     } catch (err: any) {
-      console.error('Failed to fetch profiles:', err);
-      alert('Error inesperado al cargar los usuarios.');
+      reportError('Error inesperado al cargar los usuarios.', err);
       setUsers([]);
     }
   };
@@ -477,8 +477,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         .select('*')
         .order('name', { ascending: true });
       if (error) {
-        console.error('Error fetching categories from Supabase:', error.message);
-        alert('Error al cargar las categorías desde el servidor: ' + error.message);
+        reportError('Error al cargar las categorías desde el servidor: ' + error.message, error);
         setCategories([]);
         return;
       }
@@ -486,8 +485,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCategories(data);
       }
     } catch (err: any) {
-      console.error('Unexpected error in fetchCategories:', err);
-      alert('Error inesperado al cargar las categorías.');
+      reportError('Error inesperado al cargar las categorías.', err);
       setCategories([]);
     }
   };
@@ -1077,11 +1075,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
         if (error) throw error;
       } catch (err: any) {
-        console.error('Error inserting coverage into Supabase:', err.message || err);
         // Rollback state
         setCoverages(prev => prev.filter(c => c.id !== id));
         setEvents(prev => prev.filter(e => e.coverageId !== id));
-        alert('Error al crear la cobertura en el servidor de base de datos.');
+        reportError('Error al crear la cobertura en el servidor de base de datos.', err);
       }
     })();
 
@@ -1158,10 +1155,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .eq('id', coverageId);
         if (error) throw error;
       } catch (err: any) {
-        console.error('Error updating status in Supabase:', err.message || err);
         // Rollback state
         setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
-        alert('Error al actualizar el estado de la cobertura en el servidor de base de datos.');
+        reportError('Error al actualizar el estado de la cobertura en el servidor de base de datos.', err);
       }
     })();
 
@@ -1556,11 +1552,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
         if (error) throw error;
       } catch (err: any) {
-        console.error('Error auto-creating coverage from agenda event in Supabase:', err.message || err);
         // Rollback state
         setCoverages(prev => prev.filter(c => c.id !== coverageId));
         setEvents(prev => prev.filter(e => e.coverageId !== coverageId));
-        alert('Error al crear el evento y su cobertura correspondiente.');
+        reportError('Error al crear el evento y su cobertura correspondiente.', err);
       }
     })();
 
@@ -1724,10 +1719,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (error) throw error;
         logActivity(undefined, `Propuesta creada: "${title}"`);
       } catch (err: any) {
-        console.error('Error inserting proposal into Supabase:', err.message || err);
         // Rollback state
         setProposals(prev => prev.filter(p => p.id !== id));
-        alert('Error al guardar la propuesta en el servidor de base de datos.');
+        reportError('Error al guardar la propuesta en el servidor de base de datos.', err);
       }
     })();
   };
@@ -1853,10 +1847,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           logActivity(undefined, `Propuesta en revisión: "${prop.title}"`);
         }
       } catch (err: any) {
-        console.error('Error updating proposal status in Supabase:', err.message || err);
         // Rollback state
         setProposals(originalProposals);
-        alert('Error al actualizar el estado de la propuesta en el servidor.');
+        reportError('Error al actualizar el estado de la propuesta en el servidor.', err);
       }
     })();
   };
@@ -1942,11 +1935,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
         if (error) throw error;
       } catch (err: any) {
-        console.error('Error inserting coverage from proposal into Supabase:', err.message || err);
         // Rollback state
         setCoverages(prev => prev.filter(c => c.id !== id));
         setEvents(prev => prev.filter(e => e.coverageId !== id));
-        alert('Error al guardar la nueva cobertura en el servidor de base de datos.');
+        reportError('Error al guardar la nueva cobertura en el servidor de base de datos.', err);
       }
     })();
 
@@ -2037,11 +2029,10 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           .eq('id', coverageId);
         if (error) throw error;
       } catch (err: any) {
-        console.error('Error updating coverage details in Supabase:', err.message || err);
         // Rollback state
         setCoverages(prev => prev.map(c => c.id === coverageId ? originalCov : c));
         setEvents(originalEvents);
-        alert('Error al guardar los detalles de la cobertura en el servidor de base de datos.');
+        reportError('Error al guardar los detalles de la cobertura en el servidor de base de datos.', err);
       }
     })();
 
@@ -2136,11 +2127,32 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (error) throw error;
         logActivity(undefined, `actualizó los detalles de la propuesta: "${title}"`);
       } catch (err: any) {
-        console.error('Error updating proposal details in Supabase:', err.message || err);
         setProposals(originalProposals);
-        alert('Error al actualizar los detalles de la propuesta en el servidor.');
+        reportError('Error al actualizar los detalles de la propuesta en el servidor.', err);
       }
     })();
+  };
+
+  const deleteProposal = async (proposalId: string): Promise<void> => {
+    if (!currentUser) return;
+    const originalProposals = [...proposals];
+
+    setProposals(prev => prev.filter(p => p.id !== proposalId));
+
+    try {
+      const { error } = await supabase
+        .from('proposals')
+        .update({
+          deleted_at: new Date().toISOString(),
+          deleted_by: currentUser.id
+        })
+        .eq('id', proposalId);
+      if (error) throw error;
+      logActivity(undefined, `Eliminó lógicamente la propuesta ID: ${proposalId}`);
+    } catch (err: any) {
+      setProposals(originalProposals);
+      reportError('Error al eliminar la propuesta en el servidor.', err);
+    }
   };
 
   // Instagram CRUD
@@ -2283,10 +2295,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const { error } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
         if (error) throw error;
       } catch (err: any) {
-        console.error('Error recreating coverage in Supabase:', err.message || err);
         // Rollback state
         setCoverages(prev => prev.filter(c => c.id !== coverageId));
-        alert('Error al recrear la cobertura en el servidor de base de datos.');
+        reportError('Error al recrear la cobertura en el servidor de base de datos.', err);
       }
     })();
 
@@ -2347,6 +2358,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateInstagramPost,
       deleteInstagramPost,
       updateProposalDetails,
+      deleteProposal,
       updateNewsRadarItem,
       fetchLiveRadarNews,
       loadingRadar,
