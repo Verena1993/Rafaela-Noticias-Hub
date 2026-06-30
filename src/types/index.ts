@@ -61,6 +61,9 @@ export type FormatType = 'Telefónica' | 'Videollamada' | 'Presencial' | 'Móvil
 export type CoverageStatus = 'pending_confirmation' | 'confirmed' | 'in_redaction' | 'published';
 export type EventStatus = 'pending_confirmation' | 'confirmed' | 'in_redaction' | 'published';
 
+/**
+ * @deprecated Capa de adaptación transitoria - Sólo para compilación del Dashboard.
+ */
 export interface Coverage {
   id: string;
   proposalId?: string;
@@ -81,6 +84,31 @@ export interface Coverage {
   observations?: string;
   attachments?: string[];
   categoryId?: string;
+}
+
+// DEFINITIVE PRODUCTION MODEL (ETAPA 1 MIGRACIÓN)
+export type ProductionStatus = 'pendiente_planificacion' | 'programada' | 'finalizada' | 'suspendida';
+
+export interface Production {
+  id: string;
+  proposalId?: string; // Nullable/Optional for direct creation
+  title: string;
+  description?: string;
+  categoryId?: string;
+  journalistId?: string;
+  photographerId?: string;
+  cameramanId?: string;
+  mediaOutlets: string[]; // Destination platforms
+  formatId?: string;
+  priority: 'high' | 'medium' | 'low';
+  productionDate?: string; // YYYY-MM-DD
+  productionTime?: string; // HH:mm
+  location?: string;
+  observations?: string;
+  multimedia: MultimediaItem[];
+  sharedLinks: SharedLink[];
+  status: ProductionStatus;
+  createdAt?: string;
 }
 
 export type RadarCategory = 'national' | 'provincial' | 'regional' | 'local' | 'international';
@@ -121,6 +149,9 @@ export interface RssDiagnostic {
   responseTimeMs?: number;
 }
 
+/**
+ * @deprecated Capa de adaptación transitoria - Sólo para compilación del Dashboard.
+ */
 export interface Task {
   id: string;
   coverageId?: string;
