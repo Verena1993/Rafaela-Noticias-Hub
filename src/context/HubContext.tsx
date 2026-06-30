@@ -2053,7 +2053,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (!prop || !currentUser) return '';
 
     // Guard to prevent duplicate conversion
-    if (prop.status === 'convertida') {
+    if (coverages.some(c => c.proposalId === proposalId)) {
       reportError('Esta propuesta ya ha sido convertida en cobertura.', new Error('Propuesta ya convertida'));
       return '';
     }
@@ -2103,51 +2103,12 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setCoverages(prev => [newCoverage, ...prev]);
 
-    const conversionDecision: ProposalDecision = {
-      status: 'convertida',
-      timestamp: new Date().toISOString(),
-      note: `Cobertura iniciada con ID: ${id}`,
-      deciderName: currentUser.name
-    };
-
-    setProposals(prev => prev.map(p => {
-      if (p.id === proposalId) {
-        return {
-          ...p,
-          status: 'convertida',
-          decisionHistory: [conversionDecision, ...(p.decisionHistory || [])]
-        };
-      }
-      return p;
-    }));
-
     // Async DB update with rollback
     (async () => {
       try {
         // 1. Insert coverage
         const { error: covErr } = await supabase.from('coverages').insert([mapAppCoverageToDb(newCoverage)]);
         if (covErr) throw covErr;
-
-        // 2. Update proposals status to 'convertida'
-        const { error: propErr } = await supabase
-          .from('proposals')
-          .update({ status: 'convertida' })
-          .eq('id', proposalId);
-        if (propErr) throw propErr;
-
-        // 3. Add to decision history audit
-        const { error: decErr } = await supabase
-          .from('proposal_decisions')
-          .insert([
-            {
-              proposal_id: proposalId,
-              decider_id: currentUser.id,
-              status: 'convertida',
-              note: conversionDecision.note,
-              timestamp: conversionDecision.timestamp
-            }
-          ]);
-        if (decErr) throw decErr;
 
         logActivity(undefined, `Cobertura creada desde propuesta: "${prop.title}"`);
       } catch (err: any) {
@@ -2158,14 +2119,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Delete coverage if inserted
         await supabase.from('coverages').delete().eq('id', id);
-        // Reset status
-        await supabase.from('proposals').update({ status: prop.status }).eq('id', proposalId);
-        // Delete decision audit
-        await supabase
-          .from('proposal_decisions')
-          .delete()
-          .eq('proposal_id', proposalId)
-          .eq('status', 'convertida');
 
         reportError('Error al guardar la nueva cobertura en el servidor de base de datos.', err);
       }

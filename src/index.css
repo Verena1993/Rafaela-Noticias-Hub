@@ -897,18 +897,36 @@ a:hover {
   color: var(--text-secondary);
 }
 
-.form-input, .form-select, .form-textarea {
+.form-input, .form-select, .form-textarea, .form-control {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 0.5rem 0.75rem;
+  padding: 0.625rem 0.875rem !important;
   font-size: 0.875rem;
+  line-height: 1.25rem;
   outline: none;
   background-color: var(--bg-primary);
+  box-sizing: border-box;
+  width: 100%;
 }
 
-.form-input:focus, .form-select:focus, .form-textarea:focus {
+.form-input:focus, .form-select:focus, .form-textarea:focus, .form-control:focus {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Altura uniforme para elementos de una línea y alineación */
+input.form-input:not([type="checkbox"]):not([type="radio"]),
+input.form-control:not([type="checkbox"]):not([type="radio"]),
+select.form-select,
+select.form-control {
+  height: 2.5rem !important;
+}
+
+/* Área de texto flexible */
+textarea.form-textarea,
+textarea.form-control {
+  height: auto !important;
+  min-height: 5rem;
 }
 
 .form-row-grid {
