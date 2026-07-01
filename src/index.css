@@ -1304,12 +1304,28 @@ textarea.form-control {
 .event-modal-content {
   max-width: 900px !important;
   width: 95% !important;
+  max-height: 90vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* The form inside must also be flex-column so footer stays pinned */
+.event-modal-content > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .event-form-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 0.75rem;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .event-detail-grid {

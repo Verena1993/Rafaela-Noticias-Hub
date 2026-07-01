@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
-import { INITIAL_TASKS, INITIAL_ALERTS, INITIAL_EVENTS, INITIAL_NOTIFICATIONS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR } from '../data/initialData';
+import { INITIAL_TASKS, INITIAL_ALERTS, INITIAL_NOTIFICATIONS, INITIAL_STAFF_SCHEDULE, INITIAL_INSTAGRAM_POSTS, INITIAL_NEWS_RADAR } from '../data/initialData';
 
 import type { User, Coverage, Task, Production, ProductionStatus, CoverageStatus, Alert, CalendarEvent, Notification, Activity, Comment, MultimediaItem, SharedLink, PublicationChecklist, Proposal, ProposalDecision, StaffSchedule, ProgramType, FormatType, InstagramPost, NewsRadarItem, RssDiagnostic, Category } from '../types';
 import { supabase } from '../lib/supabase';
@@ -59,9 +59,9 @@ interface HubContextType {
   updatePublicationStatus: (coverageId: string, platform: keyof PublicationChecklist, status: 'pending' | 'published', link?: string) => void;
   addTask: (title: string, dueDate: string, assigneeId: string, coverageId?: string) => void;
   toggleTaskCompleted: (taskId: string) => void;
-  addEvent: (title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
-  updateEvent: (eventId: string, title: string, description: string, type: CalendarEvent['type'], start: string, end: string, location?: string, status?: CalendarEvent['status'], assigneeId?: string, programs?: ProgramType[], formats?: FormatType[]) => void;
-  updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, assignees: string[], programs: ProgramType[], formats: FormatType[], status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[], categoryId?: string) => void;
+  addEvent: (title: string, description: string, type: CalendarEvent['type'], start: string, _end: string, location?: string, assigneeId?: string, programs?: ProgramType[], _formats?: FormatType[], observations?: string, multimedia?: MultimediaItem[], assigneeId2?: string) => void;
+  updateEvent: (eventId: string, title: string, description: string, _type: CalendarEvent['type'], start: string, _end: string, location?: string, status?: CalendarEvent['status'], assigneeId?: string, programs?: ProgramType[], _formats?: FormatType[], observations?: string, multimedia?: MultimediaItem[], assigneeId2?: string) => void;
+  updateCoverageDetails: (coverageId: string, title: string, description: string, dateTime: string, location: string, assignees: string[], _programs: ProgramType[], _formats: FormatType[], _status?: Coverage['status'], logisticsInfo?: string, observations?: string, attachments?: string[], categoryId?: string) => void;
   
   // Production CRUD (ETAPA 2 MIGRACIÓN)
   addProduction: (title: string, proposalId?: string, description?: string, categoryId?: string, journalistId?: string, photographerId?: string, cameramanId?: string, mediaOutlets?: string[], formatId?: string, priority?: 'high' | 'medium' | 'low', productionDate?: string, productionTime?: string, location?: string, observations?: string, multimedia?: MultimediaItem[], sharedLinks?: SharedLink[]) => Promise<string>;
@@ -82,7 +82,7 @@ interface HubContextType {
   addProposal: (title: string, description: string, dateTime?: string, location?: string, assignees?: string[], files?: Omit<MultimediaItem, 'id' | 'uploadDate' | 'userId'>[], links?: Omit<SharedLink, 'id' | 'uploadDate' | 'userId'>[], programs?: ProgramType[], formats?: FormatType[]) => void;
   updateProposalStatus: (proposalId: string, status: Proposal['status'], note?: string) => void;
   addCommentToProposal: (proposalId: string, text: string) => void;
-  convertProposalToCoverage: (proposalId: string, extraDetails?: { dateTime: string; location: string; programs: ProgramType[]; formats: FormatType[]; assigneeId?: string; status: Coverage['status'] }) => string;
+  convertProposalToProduction: (proposalId: string, extraDetails?: { dateTime: string; location: string; programs: ProgramType[]; formats: FormatType[]; assigneeId?: string; status: ProductionStatus }) => string;
   recreateCoverageForEvent: (eventId: string, coverageId: string) => void;
 
   // Staff Scheduling
@@ -309,8 +309,8 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [loadingProductions, setLoadingProductions] = useState(true);
-  const loadingCoverages = loadingProductions;
+
+
 
   const coverages = useMemo<Coverage[]>(() => {
     return productions.map(p => {
@@ -375,8 +375,6 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch (err: any) {
       reportError('Error inesperado al cargar las producciones.', err);
       setProductions([]);
-    } finally {
-      setLoadingProductions(false);
     }
   };
 
@@ -467,10 +465,47 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
   };
 
-  const [events, setEvents] = useState<CalendarEvent[]>(() => {
-    const saved = localStorage.getItem('hub_events');
-    return saved ? JSON.parse(saved) : INITIAL_EVENTS;
-  });
+  const events = useMemo<CalendarEvent[]>(() => {
+    return productions
+      .filter(prod => prod.productionDate)
+      .map(prod => {
+        const startStr = `${prod.productionDate}T${prod.productionTime || '00:00'}`;
+        let endStr = startStr;
+        if (prod.productionTime) {
+          try {
+            const [h, m] = prod.productionTime.split(':').map(Number);
+            const nh = (h + 1) % 24;
+            endStr = `${prod.productionDate}T${String(nh).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+          } catch (e) {
+            endStr = `${prod.productionDate}T23:59`;
+          }
+        } else {
+          endStr = `${prod.productionDate}T23:59`;
+        }
+
+        let eventStatus: CalendarEvent['status'] = 'pending_confirmation';
+        if (prod.status === 'programada') eventStatus = 'confirmed';
+        else if (prod.status === 'finalizada') eventStatus = 'published';
+        else if (prod.status === 'pendiente_planificacion') eventStatus = 'pending_confirmation';
+
+        return {
+          id: `event_${prod.id}`,
+          title: prod.title,
+          description: prod.description || '',
+          type: 'coverage',
+          start: startStr,
+          end: endStr,
+          location: prod.location || '',
+          status: eventStatus,
+          assigneeId: prod.journalistId || undefined,
+          coverageId: prod.id,
+          programs: (prod.mediaOutlets || []) as ProgramType[],
+          formats: [],
+          observations: prod.observations || '',
+          multimedia: prod.multimedia || []
+        };
+      });
+  }, [productions]);
 
   const [notifications, setNotifications] = useState<Notification[]>(() => {
     const saved = localStorage.getItem('hub_notifications');
@@ -808,9 +843,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('hub_alerts', JSON.stringify(alerts));
   }, [alerts]);
 
-  useEffect(() => {
-    localStorage.setItem('hub_events', JSON.stringify(events));
-  }, [events]);
+
 
   useEffect(() => {
     localStorage.setItem('hub_notifications', JSON.stringify(notifications));
@@ -828,79 +861,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('hub_instagram_posts', JSON.stringify(instagramPosts));
   }, [instagramPosts]);
 
-  // Enforce bidireccional event <-> production 1-to-1 sync and auto-creation of missing productions
-  useEffect(() => {
-    if (loadingCoverages) return; // Prevent sync before productions/coverages are loaded
 
-    let productionsUpdated = false;
-    const currentProductions = [...productions];
-    const currentEvents = [...events];
-    const newProdsToInsert: Production[] = [];
-
-    // Check all events and ensure they have a production
-    const updatedEvents = currentEvents.map(evt => {
-      let covId = evt.coverageId;
-      let eventChanged = false;
-
-      // Every event must have a coverageId (which points to a production)
-      if (!covId) {
-        covId = crypto.randomUUID();
-        eventChanged = true;
-      }
-
-      // Verify if corresponding production exists in list
-      const prodExists = currentProductions.some(p => p.id === covId);
-      if (!prodExists) {
-        const [prodDate, prodTime] = evt.start ? evt.start.split('T') : [undefined, undefined];
-        const status: ProductionStatus = (prodDate && prodTime) ? 'programada' : 'pendiente_planificacion';
-
-        // Auto-generate production sheet
-        const newProd: Production = {
-          id: covId!,
-          title: evt.title.replace(/^\[Cobertura\] /, '').replace(/^\[Propuesta Aprobada\] /, '').replace(/^\[Producción\] /, ''),
-          description: evt.description || 'Creado automáticamente a partir del evento de la agenda.',
-          categoryId: undefined,
-          journalistId: evt.assigneeId || undefined,
-          mediaOutlets: [],
-          priority: 'medium',
-          productionDate: prodDate,
-          productionTime: prodTime,
-          location: evt.location || 'A determinar',
-          observations: '',
-          multimedia: [],
-          sharedLinks: [],
-          status
-        };
-        currentProductions.push(newProd);
-        newProdsToInsert.push(newProd);
-        productionsUpdated = true;
-      }
-
-      return eventChanged ? { ...evt, coverageId: covId } : evt;
-    });
-
-    // Update state only if changed, using string comparison to avoid loops
-    const eventsStr = JSON.stringify(events);
-    const updatedEventsStr = JSON.stringify(updatedEvents);
-    if (eventsStr !== updatedEventsStr) {
-      setEvents(updatedEvents);
-    }
-
-    if (productionsUpdated) {
-      setProductions(currentProductions);
-    }
-
-    if (newProdsToInsert.length > 0) {
-      (async () => {
-        try {
-          const { error } = await supabase.from('productions').insert(newProdsToInsert.map(mapAppProductionToDb));
-          if (error) throw error;
-        } catch (err: any) {
-          console.error('Error auto-creating productions in Supabase:', err.message || err);
-        }
-      })();
-    }
-  }, [events, productions, loadingCoverages]);
 
   // Auth
   const login = async (email: string, password?: string): Promise<boolean> => {
@@ -1410,152 +1371,115 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  // Calendar addEvent - creates matching coverage automatically
-  // Calendar addEvent - creates matching production automatically
+  // Calendar addEvent - creates matching production
   const addEvent = (
     title: string,
     description: string,
     type: CalendarEvent['type'],
     start: string,
-    end: string,
+    _end: string,
     location?: string,
     assigneeId?: string,
     programs?: ProgramType[],
-    formats?: FormatType[]
+    _formats?: FormatType[],
+    observations?: string,
+    multimedia?: MultimediaItem[],
+    assigneeId2?: string
   ) => {
-    const coverageId = crypto.randomUUID();
     const [prodDate, prodTime] = start ? start.split('T') : [undefined, undefined];
 
     const newProd: Production = {
-      id: coverageId,
-      title,
+      id: crypto.randomUUID(),
+      title: type === 'coverage' ? title.replace(/^\[Cobertura\] /, '') : title,
       description,
       journalistId: assigneeId || undefined,
-      mediaOutlets: [],
+      photographerId: assigneeId2 || undefined,
+      cameramanId: undefined,
+      mediaOutlets: (programs || []) as string[],
       priority: 'medium',
       productionDate: prodDate,
       productionTime: prodTime,
       location: location || '',
-      observations: '',
-      multimedia: [],
+      observations: observations || '',
+      multimedia: multimedia || [],
       sharedLinks: [],
       status: (prodDate && prodTime) ? 'programada' : 'pendiente_planificacion'
     };
 
     setProductions(prev => [newProd, ...prev]);
 
-    const newEvent: CalendarEvent = {
-      id: `event_${Date.now()}`,
-      title: type === 'coverage' ? `[Cobertura] ${title}` : title,
-      description,
-      type,
-      start,
-      end,
-      location,
-      status: 'pending_confirmation',
-      assigneeId,
-      coverageId, // Link the coverage!
-      programs: programs || [],
-      formats: formats || []
-    };
-    setEvents(prev => [...prev, newEvent]);
-
-    // Persistir asincrónicamente con rollback en caso de fallo
     (async () => {
       try {
         const { error } = await supabase.from('productions').insert([mapAppProductionToDb(newProd)]);
         if (error) throw error;
       } catch (err: any) {
-        // Rollback state
-        setProductions(prev => prev.filter(p => p.id !== coverageId));
-        setEvents(prev => prev.filter(e => e.coverageId !== coverageId));
-        reportError('Error al crear el evento y su producción correspondiente.', err);
+        setProductions(prev => prev.filter(p => p.id !== newProd.id));
+        reportError('Error al crear el compromiso de agenda y su producción.', err);
       }
     })();
 
-    logActivity(undefined, `creó el evento de agenda "${title}" y su producción correspondiente`);
+    logActivity(undefined, `creó el compromiso de agenda "${title}"`);
   };
 
   const updateEvent = (
     eventId: string,
     title: string,
     description: string,
-    type: CalendarEvent['type'],
+    _type: CalendarEvent['type'],
     start: string,
-    end: string,
+    _end: string,
     location?: string,
     status?: CalendarEvent['status'],
     assigneeId?: string,
     programs?: ProgramType[],
-    formats?: FormatType[]
+    _formats?: FormatType[],
+    observations?: string,
+    multimedia?: MultimediaItem[],
+    assigneeId2?: string
   ) => {
-    const originalEvents = [...events];
-    let originalProd: any = null;
-    let prodToUpdate: any = null;
+    const prodId = eventId.startsWith('event_') ? eventId.substring(6) : eventId;
+    const prod = productions.find(x => x.id === prodId);
+    if (!prod) return;
 
-    setEvents(prev => prev.map(e => {
-      if (e.id === eventId) {
-        // If it is linked to a coverage, also update the production details!
-        if (e.coverageId) {
-          const p = productions.find(x => x.id === e.coverageId);
-          if (p) {
-            originalProd = { ...p };
-            const [prodDate, prodTime] = start ? start.split('T') : [undefined, undefined];
-            let operationalStatus: ProductionStatus = p.status;
-            if (status !== undefined) {
-              if (status === 'confirmed') operationalStatus = 'programada';
-              else if (status === 'published') operationalStatus = 'finalizada';
-              else if (status === 'pending_confirmation') operationalStatus = 'pendiente_planificacion';
-            }
-            prodToUpdate = {
-              ...p,
-              title,
-              description,
-              productionDate: prodDate,
-              productionTime: prodTime,
-              location: location || p.location || '',
-              status: operationalStatus,
-              journalistId: assigneeId || undefined
-            };
-            setProductions(prods => prods.map(x => x.id === e.coverageId ? prodToUpdate! : x));
-          }
-        }
-
-        return {
-          ...e,
-          title,
-          description,
-          type,
-          start,
-          end,
-          location,
-          status: status || 'pending_confirmation',
-          assigneeId,
-          programs: programs || [],
-          formats: formats || []
-        };
-      }
-      return e;
-    }));
-
-    if (prodToUpdate && originalProd) {
-      const targetProd = prodToUpdate;
-      const prevProd = originalProd;
-      (async () => {
-        try {
-          const { error } = await supabase
-            .from('productions')
-            .update(mapAppProductionToDb(targetProd))
-            .eq('id', targetProd.id);
-          if (error) throw error;
-        } catch (err: any) {
-          console.error('Error updating production from event in Supabase:', err.message || err);
-          // Rollback both productions and events
-          setProductions(prods => prods.map(x => x.id === targetProd.id ? prevProd : x));
-          setEvents(originalEvents);
-        }
-      })();
+    const originalProd = { ...prod };
+    const [prodDate, prodTime] = start ? start.split('T') : [undefined, undefined];
+    
+    let operationalStatus: ProductionStatus = prod.status;
+    if (status !== undefined) {
+      if (status === 'confirmed') operationalStatus = 'programada';
+      else if (status === 'published') operationalStatus = 'finalizada';
+      else if (status === 'pending_confirmation') operationalStatus = 'pendiente_planificacion';
     }
+
+    const prodToUpdate: Production = {
+      ...prod,
+      title,
+      description,
+      productionDate: prodDate,
+      productionTime: prodTime,
+      location: location || prod.location || '',
+      status: operationalStatus,
+      journalistId: assigneeId || undefined,
+      photographerId: assigneeId2 || undefined,
+      mediaOutlets: (programs || []) as string[],
+      observations: observations !== undefined ? observations : prod.observations,
+      multimedia: multimedia !== undefined ? multimedia : prod.multimedia
+    };
+
+    setProductions(prods => prods.map(x => x.id === prodId ? prodToUpdate : x));
+
+    (async () => {
+      try {
+        const { error } = await supabase
+          .from('productions')
+          .update(mapAppProductionToDb(prodToUpdate))
+          .eq('id', prodId);
+        if (error) throw error;
+      } catch (err: any) {
+        setProductions(prods => prods.map(x => x.id === prodId ? originalProd : x));
+        reportError('Error al actualizar el compromiso en el servidor.', err);
+      }
+    })();
 
     logActivity(undefined, `actualizó el compromiso de agenda: "${title}"`);
   };
@@ -1750,7 +1674,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           // Convertir automáticamente a producción si no existe una producción vinculada aún
           let newCoverageId = '';
           if (!productions.some(p => p.proposalId === proposalId)) {
-            newCoverageId = convertProposalToCoverage(proposalId);
+            newCoverageId = convertProposalToProduction(proposalId);
           } else {
             newCoverageId = productions.find(p => p.proposalId === proposalId)?.id || '';
           }
@@ -1866,7 +1790,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     })();
   };
 
-  const convertProposalToCoverage = (
+  const convertProposalToProduction = (
     proposalId: string,
     extraDetails?: {
       dateTime: string;
@@ -1874,7 +1798,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       programs: ProgramType[];
       formats: FormatType[];
       assigneeId?: string;
-      status: Coverage['status'];
+      status: ProductionStatus;
     }
   ): string => {
     const prop = proposals.find(p => p.id === proposalId);
@@ -1922,31 +1846,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     })();
 
-    // Expose in calendar
-    if (prodDate) {
-      let eventStatus: CalendarEvent['status'] = 'pending_confirmation';
-      if (newProd.status === 'programada') eventStatus = 'confirmed';
 
-      const newEvent: CalendarEvent = {
-        id: `e_${id}`,
-        title: `[Producción] ${prop.title}`,
-        description: prop.description,
-        type: 'coverage',
-        start: targetDateTime || new Date().toISOString(),
-        end: new Date(new Date(targetDateTime || new Date().toISOString()).getTime() + 4 * 60 * 60 * 1000).toISOString().substring(0, 16),
-        location: targetLocation,
-        status: eventStatus,
-        assigneeId: targetJournalist,
-        coverageId: id,
-        programs: extraDetails?.programs || prop.programs || [],
-        formats: extraDetails?.formats || prop.formats || []
-      };
-
-      setEvents(prev => {
-        const filtered = prev.filter(e => e.id !== `e_prop_${proposalId}`);
-        return [...filtered, newEvent];
-      });
-    }
 
     return id;
   };
@@ -1958,9 +1858,9 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     dateTime: string,
     location: string,
     assignees: string[],
-    programs: ProgramType[],
-    formats: FormatType[],
-    status?: Coverage['status'],
+    _programs: ProgramType[],
+    _formats: FormatType[],
+    _status?: Coverage['status'],
     _logisticsInfo?: string,
     observations?: string,
     _attachments?: string[],
@@ -1981,32 +1881,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       observations: observations || ''
     });
 
-    // Update corresponding calendar event
-    setEvents(prev => prev.map(e => {
-      if (e.coverageId === coverageId) {
-        let eventStatus: CalendarEvent['status'] = e.status;
-        if (status !== undefined) {
-          if (status === 'confirmed') eventStatus = 'confirmed';
-          else if (status === 'in_redaction') eventStatus = 'in_redaction';
-          else if (status === 'published') eventStatus = 'published';
-          else if (status === 'pending_confirmation') eventStatus = 'pending_confirmation';
-        }
 
-        return {
-          ...e,
-          title: `[Cobertura] ${title}`,
-          description,
-          start: dateTime,
-          end: new Date(new Date(dateTime).getTime() + 4 * 60 * 60 * 1000).toISOString().substring(0, 16),
-          location,
-          assigneeId: assignees.length > 0 ? assignees[0] : undefined,
-          programs,
-          formats,
-          status: eventStatus
-        };
-      }
-      return e;
-    }));
 
     logActivity(coverageId, `actualizó los detalles y planificación de la cobertura`);
   };
@@ -2411,7 +2286,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addProposal,
       updateProposalStatus,
       addCommentToProposal,
-      convertProposalToCoverage,
+      convertProposalToProduction,
       recreateCoverageForEvent,
       updateStaffSchedule,
       instagramPosts,

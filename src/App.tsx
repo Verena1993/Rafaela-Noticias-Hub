@@ -133,8 +133,6 @@ const AppContent: React.FC = () => {
         return (
           <Calendar
             setSelectedCoverageId={setSelectedCoverageId}
-            setActiveTab={setActiveTab}
-            setAutoOpenCreateModal={setAutoOpenCreateModal}
           />
         );
       case 'radar':

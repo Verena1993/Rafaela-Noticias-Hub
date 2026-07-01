@@ -47,34 +47,39 @@ const STATUS_COLORS: Record<PubStatus, string> = {
 };
 
 export const Publications: React.FC = () => {
-  const { coverages } = useHub();
+  const { productions } = useHub();
   const [activePlatform, setActivePlatform] = useState<PlatformType | 'all'>('all');
   const [activeStatus, setActiveStatus] = useState<PubStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const deriveStatus = (covStatus: string, pubStatus: string, dateStr: string): PubStatus => {
-    if (pubStatus === 'published') return 'Publicado';
-    if (covStatus === 'pending_confirmation') return 'Idea';
+  const deriveStatus = (prodStatus: string, isPublished: boolean, dateStr?: string): PubStatus => {
+    if (isPublished) return 'Publicado';
+    if (prodStatus === 'pendiente_planificacion') return 'Idea';
     
-    const covDate = new Date(dateStr);
-    const now = new Date();
-    // Simple heuristic for "Programado": not published, confirmed/in_redaction, and date is in future
-    if (covDate > now) return 'Programado';
+    if (dateStr) {
+      const covDate = new Date(dateStr + 'T00:00:00');
+      const now = new Date();
+      if (covDate > now) return 'Programado';
+    }
 
     return 'En Producción';
   };
 
-  const allPubs: PubItem[] = coverages.flatMap(cov => {
+  const allPubs: PubItem[] = productions.flatMap(prod => {
     const platforms: PlatformType[] = ['portal', 'facebook', 'instagram', 'youtube'];
+    const prodDateTime = prod.productionDate 
+      ? `${prod.productionDate}T${prod.productionTime || '00:00'}`
+      : new Date().toISOString();
+
     return platforms.map(plat => {
-      const p = cov.publications[plat];
+      const isPublished = (prod.mediaOutlets || []).includes(plat);
       return {
-        id: `${cov.id}_${plat}`,
-        coverageId: cov.id,
-        coverageTitle: cov.title,
+        id: `${prod.id}_${plat}`,
+        coverageId: prod.id,
+        coverageTitle: prod.title,
         platform: plat,
-        status: deriveStatus(cov.status, p.status, cov.dateTime),
-        date: p.date || cov.dateTime
+        status: deriveStatus(prod.status, isPublished, prod.productionDate),
+        date: prodDateTime
       };
     });
   });

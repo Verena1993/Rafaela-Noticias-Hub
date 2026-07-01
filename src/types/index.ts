@@ -54,8 +54,8 @@ export interface PublicationChecklist {
   youtube: PublicationStatus;
 }
 
-export type ProgramType = 'Bien Despiertos' | 'Noticiero Mañana' | 'Noticiero Tarde' | 'Digital';
-export type FormatType = 'Telefónica' | 'Videollamada' | 'Presencial' | 'Móvil' | 'Grabada' | 'Vivo redes';
+export type ProgramType = 'Bien Despiertos' | 'Noticiero Mañana' | 'Noticiero Tarde' | 'Digital' | 'Comercial';
+export type FormatType = 'Telefónica' | 'Videollamada' | 'Presencial' | 'Móvil' | 'Grabada' | 'Vivo en redes';
 
 // Status: 4 unified editorial states
 export type CoverageStatus = 'pending_confirmation' | 'confirmed' | 'in_redaction' | 'published';
@@ -171,9 +171,12 @@ export interface CalendarEvent {
   location?: string;
   status: EventStatus;
   assigneeId?: string;
+  assigneeId2?: string;
   coverageId?: string;
   programs?: ProgramType[];
   formats?: FormatType[];
+  observations?: string;
+  multimedia?: MultimediaItem[];
 }
 export interface ProposalDecision {
   status: 'pendiente' | 'en_revision' | 'aprobada' | 'rechazada' | 'requiere_cambios';
@@ -213,6 +216,13 @@ export interface StaffSchedule {
   vacationIds: string[];
   absentIds: string[];
   offIds: string[]; // francos
+}
+
+export interface Ephemeris {
+  id: string;
+  date: string; // YYYY-MM-DD
+  title: string;
+  description?: string;
 }
 
 export interface InstagramPost {

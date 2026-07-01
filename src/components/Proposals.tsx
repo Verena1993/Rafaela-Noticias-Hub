@@ -13,7 +13,7 @@ import {
   MessageCircle,
   FolderOpen
 } from 'lucide-react';
-import type { Proposal, ProgramType, FormatType, Coverage } from '../types';
+import type { Proposal, ProgramType, FormatType, ProductionStatus } from '../types';
 import { formatFriendlyDate } from '../utils/dateUtils';
 import { TextAutocompleteModal } from './TextAutocompleteModal';
 
@@ -25,7 +25,7 @@ export const Proposals: React.FC = () => {
     addProposal, 
     updateProposalStatus, 
     addCommentToProposal, 
-    convertProposalToCoverage,
+    convertProposalToProduction,
     searchQuery,
     updateProposalDetails
   } = useHub();
@@ -100,7 +100,7 @@ export const Proposals: React.FC = () => {
   const [convertTime, setConvertTime] = useState('');
   const [convertLocation, setConvertLocation] = useState('');
   const [convertAssigneeId, setConvertAssigneeId] = useState('');
-  const [convertStatus, setConvertStatus] = useState<Coverage['status']>('pending_confirmation');
+  const [convertStatus, setConvertStatus] = useState<ProductionStatus>('pendiente_planificacion');
   const [convertProgram, setConvertProgram] = useState('');
   const [convertFormat, setConvertFormat] = useState('');
 
@@ -155,8 +155,8 @@ export const Proposals: React.FC = () => {
   const [proposalPrograms, setProposalPrograms] = useState<ProgramType[]>([]);
   const [proposalFormats, setProposalFormats] = useState<FormatType[]>([]);
 
-  const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'];
-  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo redes'];
+  const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital', 'Comercial'];
+  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];
 
   const toggleProposalProgram = (prog: ProgramType) => {
     setProposalPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);
@@ -995,72 +995,53 @@ export const Proposals: React.FC = () => {
       {/* CREATE MODAL */}
       {showAddModal && (
         <div className="modal-overlay" style={{ display: 'flex', zIndex: 110 }} onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Nueva Propuesta de Nota</h3>
-              <button onClick={() => setShowAddModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={20} /></button>
+          <div className="modal-content event-modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Nueva Propuesta de Nota</h3>
+              <button className="modal-close" onClick={() => setShowAddModal(false)}>✕</button>
             </div>
 
-            <form onSubmit={handleCreateProposal} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => {
-                  setAutocompleteTarget('proposal');
-                  setShowAutocompleteModal(true);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '6px',
-                  backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                  color: 'var(--primary)',
-                  border: '1px dashed var(--primary)',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.4rem',
-                  cursor: 'pointer',
-                  marginBottom: '0.5rem'
-                }}
-              >
-                ✨ Autocompletar desde texto con IA
-              </button>
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Título de la Propuesta *</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  placeholder="Ej: Reclamo por ruidos molestos en Bº Pizzurno" 
-                  required
-                  value={title}
-                  onChange={e => setTitle(e.target.value)}
-                />
-              </div>
+            <form onSubmit={handleCreateProposal}>
+              <div className="modal-body event-form-grid" style={{ padding: '1.5rem' }}>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => {
+                    setAutocompleteTarget('proposal');
+                    setShowAutocompleteModal(true);
+                  }}
+                  style={{
+                    gridColumn: 'span 3',
+                    padding: '0.5rem',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    color: 'var(--primary)',
+                    border: '1px dashed var(--primary)',
+                    fontWeight: 600,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.4rem',
+                    cursor: 'pointer',
+                    marginBottom: '0.5rem'
+                  }}
+                >
+                  ✨ Autocompletar desde texto con IA
+                </button>
 
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Descripción / Idea de Cobertura</label>
-                <textarea 
-                  className="form-control" 
-                  style={{ minHeight: '100px' }}
-                  placeholder="Detalla de qué trata la noticia, posibles entrevistados, contexto..." 
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Fecha/Hora Tentativa</label>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Título de la Propuesta *</label>
                   <input 
-                    type="datetime-local" 
-                    className="form-control"
-                    value={dateTime}
-                    onChange={e => setDateTime(e.target.value)}
+                    type="text" 
+                    className="form-control" 
+                    placeholder="Ej: Reclamo por ruidos molestos en Bº Pizzurno" 
+                    required
+                    value={title}
+                    onChange={e => setTitle(e.target.value)}
                   />
                 </div>
-                <div className="form-group">
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
                   <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Ubicación</label>
                   <input 
                     type="text" 
@@ -1070,153 +1051,170 @@ export const Proposals: React.FC = () => {
                     onChange={e => setLocation(e.target.value)}
                   />
                 </div>
-              </div>
 
-              {/* Prioridad oculta para limpieza de interfaz */}
-
-              {/* Programs and Formats */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Programas Destino</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                  {PROGRAM_OPTIONS.map(prog => {
-                    const selected = proposalPrograms.includes(prog);
-                    return (
-                      <button
-                        key={prog}
-                        type="button"
-                        className="btn"
-                        onClick={() => toggleProposalProgram(prog)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          fontSize: '0.75rem',
-                          borderRadius: 'var(--radius-full)',
-                          border: '1px solid var(--border-color)',
-                          background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                          color: selected ? 'white' : 'var(--text-secondary)',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {prog}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Formatos de Cobertura</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                  {FORMAT_OPTIONS.map(form => {
-                    const selected = proposalFormats.includes(form);
-                    return (
-                      <button
-                        key={form}
-                        type="button"
-                        className="btn"
-                        onClick={() => toggleProposalFormat(form)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          fontSize: '0.75rem',
-                          borderRadius: 'var(--radius-full)',
-                          border: '1px solid var(--border-color)',
-                          background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                          color: selected ? 'white' : 'var(--text-secondary)',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {form}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Assignees (Visual roles hidden) */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Integrantes de Redacción Sugeridos</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.25rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '0.5rem', borderRadius: 'var(--radius-md)' }}>
-                  {users.map(u => (
-                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={assignees.includes(u.id)}
-                        onChange={() => handleAssigneeToggle(u.id)}
-                      />
-                      <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: u.avatarColor }}></span>
-                      {u.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Multimedia real file selector */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Cargar Flyers / Gacetillas / Fotos</label>
-                <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                  <button 
-                    type="button" 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="btn btn-secondary" 
-                    style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
-                  >
-                    <Paperclip size={14} /> Seleccionar Archivos
-                  </button>
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Fecha/Hora Tentativa</label>
                   <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    multiple 
-                    onChange={handleFileUpload} 
-                    style={{ display: 'none' }} 
+                    type="datetime-local" 
+                    className="form-control"
+                    value={dateTime}
+                    onChange={e => setDateTime(e.target.value)}
                   />
-                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Carga imágenes, audios o documentos reales.</span>
                 </div>
-                {formFiles.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-                    {formFiles.map((file, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-tertiary)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}>
-                        <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
-                        <button type="button" onClick={() => removeFileForm(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={12} /></button>
-                      </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Integrantes de Redacción Sugeridos</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.25rem', maxHeight: '72px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '0.5rem', borderRadius: 'var(--radius-md)' }}>
+                    {users.map(u => (
+                      <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={assignees.includes(u.id)}
+                          onChange={() => handleAssigneeToggle(u.id)}
+                        />
+                        <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: u.avatarColor }}></span>
+                        {u.name}
+                      </label>
                     ))}
                   </div>
-                )}
-              </div>
-
-              {/* External Links Section */}
-              <div className="form-group" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Agregar Enlaces Externos (Drive, WeTransfer, etc.)</label>
-                <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.25rem' }}>
-                  <input 
-                    type="text" 
-                    className="form-control" 
-                    placeholder="Título (Ej: Carpeta Google Drive)" 
-                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.35rem' }}
-                    value={linkTitle}
-                    onChange={e => setLinkTitle(e.target.value)}
-                  />
-                  <input 
-                    type="url" 
-                    className="form-control" 
-                    placeholder="URL (https://...)" 
-                    style={{ flex: 1, fontSize: '0.8rem', padding: '0.35rem' }}
-                    value={linkUrl}
-                    onChange={e => setLinkUrl(e.target.value)}
-                  />
-                  <button type="button" onClick={addLinkToForm} className="btn btn-secondary" style={{ padding: '0.35rem' }}><Plus size={14} /></button>
                 </div>
-                {formLinks.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>
-                    {formLinks.map((link, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-tertiary)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}>
-                        <span>🔗 <b>{link.title}:</b> {link.url}</span>
-                        <button type="button" onClick={() => removeLinkForm(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={12} /></button>
-                      </div>
-                    ))}
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Descripción / Idea de Cobertura</label>
+                  <textarea 
+                    className="form-control" 
+                    style={{ minHeight: '80px' }}
+                    placeholder="Detalla de qué trata la noticia, posibles entrevistados, contexto..." 
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Programas Destino</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                    {PROGRAM_OPTIONS.map(prog => {
+                      const selected = proposalPrograms.includes(prog);
+                      return (
+                        <button
+                          key={prog}
+                          type="button"
+                          className="btn"
+                          onClick={() => toggleProposalProgram(prog)}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            fontSize: '0.75rem',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-color)',
+                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
+                            color: selected ? 'white' : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {prog}
+                        </button>
+                      );
+                    })}
                   </div>
-                )}
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Formatos de Cobertura</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                    {FORMAT_OPTIONS.map(form => {
+                      const selected = proposalFormats.includes(form);
+                      return (
+                        <button
+                          key={form}
+                          type="button"
+                          className="btn"
+                          onClick={() => toggleProposalFormat(form)}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            fontSize: '0.75rem',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-color)',
+                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
+                            color: selected ? 'white' : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {form}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Multimedia real file selector */}
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Cargar Flyers / Gacetillas / Fotos</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="btn btn-secondary" 
+                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                    >
+                      <Paperclip size={14} /> Seleccionar Archivos
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      multiple 
+                      onChange={handleFileUpload} 
+                      style={{ display: 'none' }} 
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Carga imágenes, audios o documentos reales.</span>
+                  </div>
+                  {formFiles.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      {formFiles.map((file, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-tertiary)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}>
+                          <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                          <button type="button" onClick={() => removeFileForm(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* External Links Section */}
+                <div className="form-group" style={{ gridColumn: 'span 3', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Agregar Enlaces Externos (Drive, WeTransfer, etc.)</label>
+                  <div style={{ display: 'flex', gap: '0.25rem', marginBottom: '0.25rem' }}>
+                    <input 
+                      type="text" 
+                      className="form-control" 
+                      placeholder="Título (Ej: Carpeta Google Drive)" 
+                      style={{ flex: 1, fontSize: '0.8rem', padding: '0.35rem' }}
+                      value={linkTitle}
+                      onChange={e => setLinkTitle(e.target.value)}
+                    />
+                    <input 
+                      type="url" 
+                      className="form-control" 
+                      placeholder="URL (https://...)" 
+                      style={{ flex: 1, fontSize: '0.8rem', padding: '0.35rem' }}
+                      value={linkUrl}
+                      onChange={e => setLinkUrl(e.target.value)}
+                    />
+                    <button type="button" onClick={addLinkToForm} className="btn btn-secondary" style={{ padding: '0.35rem' }}><Plus size={14} /></button>
+                  </div>
+                  {formLinks.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.5rem' }}>
+                      {formLinks.map((link, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-tertiary)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}>
+                          <span>🔗 <b>{link.title}:</b> {link.url}</span>
+                          <button type="button" onClick={() => removeLinkForm(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+              <div className="modal-footer" style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>Cancelar</button>
                 <button type="submit" className="btn btn-primary">Crear Propuesta</button>
               </div>
@@ -1244,7 +1242,7 @@ export const Proposals: React.FC = () => {
               const finalTime = convertTime || '12:00';
               const combinedDateTime = `${finalDate}T${finalTime}`;
 
-              const createdId = convertProposalToCoverage(selectedProposal.id, {
+              const createdId = convertProposalToProduction(selectedProposal.id, {
                 dateTime: combinedDateTime,
                 location: convertLocation,
                 assigneeId: convertAssigneeId || undefined,
@@ -1255,7 +1253,7 @@ export const Proposals: React.FC = () => {
               if (createdId) {
                 setShowConvertModal(false);
                 setSelectedProposal(null);
-                alert('¡Propuesta convertida en Cobertura Activa exitosamente!');
+                alert('¡Propuesta convertida en Producción Activa exitosamente!');
               }
             }}>
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -1372,10 +1370,10 @@ export const Proposals: React.FC = () => {
                     value={convertStatus}
                     onChange={e => setConvertStatus(e.target.value as any)}
                   >
-                    <option value="pending_confirmation">Pendiente de confirmación</option>
-                    <option value="confirmed">Confirmada</option>
-                    <option value="in_redaction">En Redacción</option>
-                    <option value="published">Publicada</option>
+                    <option value="pendiente_planificacion">Pendiente de Planificación</option>
+                    <option value="programada">Programada</option>
+                    <option value="finalizada">Finalizada</option>
+                    <option value="suspendida">Suspendida</option>
                   </select>
                 </div>
               </div>
@@ -1449,44 +1447,25 @@ export const Proposals: React.FC = () => {
       {/* Edit Proposal Modal */}
       {showEditProposalModal && selectedProposal && (
         <div className="modal-overlay" style={{ display: 'flex', zIndex: 120 }} onClick={() => setShowEditProposalModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '600px', width: '90%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content event-modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">Editar Detalles de la Propuesta</h3>
               <button className="modal-close" onClick={() => setShowEditProposalModal(false)}>✕</button>
             </div>
-            <form onSubmit={handleSaveProposalDetails} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Título de la Propuesta *</label>
-                <input 
-                  type="text" 
-                  className="form-control" 
-                  required
-                  value={editProposalTitle}
-                  onChange={e => setEditProposalTitle(e.target.value)}
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Descripción / Idea de Cobertura</label>
-                <textarea 
-                  className="form-control" 
-                  style={{ minHeight: '100px' }}
-                  value={editProposalDescription}
-                  onChange={e => setEditProposalDescription(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="form-group">
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Fecha/Hora Tentativa</label>
+            <form onSubmit={handleSaveProposalDetails}>
+              <div className="modal-body event-form-grid" style={{ padding: '1.5rem' }}>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Título de la Propuesta *</label>
                   <input 
-                    type="datetime-local" 
-                    className="form-control"
-                    value={editProposalDateTime}
-                    onChange={e => setEditProposalDateTime(e.target.value)}
+                    type="text" 
+                    className="form-control" 
+                    required
+                    value={editProposalTitle}
+                    onChange={e => setEditProposalTitle(e.target.value)}
                   />
                 </div>
-                <div className="form-group">
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
                   <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Ubicación</label>
                   <input 
                     type="text" 
@@ -1495,84 +1474,103 @@ export const Proposals: React.FC = () => {
                     onChange={e => setEditProposalLocation(e.target.value)}
                   />
                 </div>
-              </div>
 
-              {/* Programs and Formats */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Programas Destino</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                  {PROGRAM_OPTIONS.map(prog => {
-                    const selected = editProposalPrograms.includes(prog);
-                    return (
-                      <button
-                        key={prog}
-                        type="button"
-                        className="btn"
-                        onClick={() => toggleEditProposalProgram(prog)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          fontSize: '0.75rem',
-                          borderRadius: 'var(--radius-full)',
-                          border: '1px solid var(--border-color)',
-                          background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                          color: selected ? 'white' : 'var(--text-secondary)',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {prog}
-                      </button>
-                    );
-                  })}
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Fecha/Hora Tentativa</label>
+                  <input 
+                    type="datetime-local" 
+                    className="form-control"
+                    value={editProposalDateTime}
+                    onChange={e => setEditProposalDateTime(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Integrantes de Redacción Sugeridos</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.25rem', maxHeight: '72px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '0.5rem', borderRadius: 'var(--radius-md)' }}>
+                    {users.map(u => (
+                      <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer' }}>
+                        <input 
+                          type="checkbox" 
+                          checked={editProposalAssignees.includes(u.id)}
+                          onChange={() => handleEditProposalAssigneeToggle(u.id)}
+                        />
+                        <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: u.avatarColor }}></span>
+                        {u.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Descripción / Idea de Cobertura</label>
+                  <textarea 
+                    className="form-control" 
+                    style={{ minHeight: '80px' }}
+                    value={editProposalDescription}
+                    onChange={e => setEditProposalDescription(e.target.value)}
+                  />
+                </div>
+
+                {/* Programs and Formats */}
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Programas Destino</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                    {PROGRAM_OPTIONS.map(prog => {
+                      const selected = editProposalPrograms.includes(prog);
+                      return (
+                        <button
+                          key={prog}
+                          type="button"
+                          className="btn"
+                          onClick={() => toggleEditProposalProgram(prog)}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            fontSize: '0.75rem',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-color)',
+                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
+                            color: selected ? 'white' : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {prog}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Formatos de Cobertura</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                    {FORMAT_OPTIONS.map(form => {
+                      const selected = editProposalFormats.includes(form);
+                      return (
+                        <button
+                          key={form}
+                          type="button"
+                          className="btn"
+                          onClick={() => toggleEditProposalFormat(form)}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            fontSize: '0.75rem',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-color)',
+                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
+                            color: selected ? 'white' : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {form}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Formatos de Cobertura</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
-                  {FORMAT_OPTIONS.map(form => {
-                    const selected = editProposalFormats.includes(form);
-                    return (
-                      <button
-                        key={form}
-                        type="button"
-                        className="btn"
-                        onClick={() => toggleEditProposalFormat(form)}
-                        style={{
-                          padding: '0.25rem 0.5rem',
-                          fontSize: '0.75rem',
-                          borderRadius: 'var(--radius-full)',
-                          border: '1px solid var(--border-color)',
-                          background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
-                          color: selected ? 'white' : 'var(--text-secondary)',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        {form}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Assignees (Visual roles hidden) */}
-              <div className="form-group">
-                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Integrantes de Redacción Sugeridos</label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.25rem', maxHeight: '120px', overflowY: 'auto', border: '1px solid var(--border-color)', padding: '0.5rem', borderRadius: 'var(--radius-md)' }}>
-                  {users.map(u => (
-                    <label key={u.id} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.8rem', cursor: 'pointer' }}>
-                      <input 
-                        type="checkbox" 
-                        checked={editProposalAssignees.includes(u.id)}
-                        onChange={() => handleEditProposalAssigneeToggle(u.id)}
-                      />
-                      <span style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', backgroundColor: u.avatarColor }}></span>
-                      {u.name}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '0.75rem' }}>
+              <div className="modal-footer" style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowEditProposalModal(false)}>Cancelar</button>
                 <button type="submit" className="btn btn-primary">Guardar Cambios</button>
               </div>

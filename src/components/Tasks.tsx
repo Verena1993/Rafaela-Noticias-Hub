@@ -12,7 +12,7 @@ export const Tasks: React.FC<TasksProps> = ({
   setActiveTab,
   setAutoOpenCreateModal
 }) => {
-  const { tasks, users, currentUser, addTask, toggleTaskCompleted, coverages } = useHub();
+  const { tasks, users, currentUser, addTask, toggleTaskCompleted, productions } = useHub();
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'my' | 'all'>('my');
@@ -35,8 +35,8 @@ export const Tasks: React.FC<TasksProps> = ({
   const openModal = () => {
     setShowAddModal(true);
     setNewAssigneeId(currentUser?.id || '');
-    if (coverages.length > 0) {
-      setNewCoverageId(coverages[0].id);
+    if (productions.length > 0) {
+      setNewCoverageId(productions[0].id);
     }
   };
 
@@ -187,7 +187,7 @@ export const Tasks: React.FC<TasksProps> = ({
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {displayTasks.map((task) => {
               const assignee = users.find(u => u.id === task.assigneeId);
-              const coverage = coverages.find(c => c.id === task.coverageId);
+              const coverage = productions.find(c => c.id === task.coverageId);
               const isExpired = new Date(task.dueDate).getTime() < now.getTime() && !task.completed;
 
               return (
@@ -308,14 +308,14 @@ export const Tasks: React.FC<TasksProps> = ({
                 </div>
 
                 <div className="form-group">
-                  <label className="form-label">Vincular a Cobertura (Opcional)</label>
+                  <label className="form-label">Vincular a Producción (Opcional)</label>
                   <select 
                     className="form-select"
                     value={newCoverageId}
                     onChange={(e) => setNewCoverageId(e.target.value)}
                   >
                     <option value="">Ninguna - Tarea General de Redacción</option>
-                    {coverages.map(cov => (
+                    {productions.map(cov => (
                       <option key={cov.id} value={cov.id}>{cov.title.substring(0, 60)}...</option>
                     ))}
                   </select>

@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useHub } from '../context/HubContext';
-import { Plus, List, Kanban } from 'lucide-react';
-import type { Coverage, FormatType } from '../types';
-import { TextAutocompleteModal } from './TextAutocompleteModal';
+import { Plus, List, Kanban, Paperclip, Trash2 } from 'lucide-react';
+import type { ProgramType, FormatType } from '../types';
+import { formatDateDMY } from '../utils/dateUtils';
 
+const PROGRAM_OPTIONS: ProgramType[] = ['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital', 'Comercial'];
+const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];
+import type { ProductionStatus } from '../types';
+import { TextAutocompleteModal } from './TextAutocompleteModal';
 
 interface CoveragesProps {
   setSelectedCoverageId: (id: string | null) => void;
@@ -18,15 +22,15 @@ export const Coverages: React.FC<CoveragesProps> = ({
   autoOpenCreateModal,
   setAutoOpenCreateModal
 }) => {
-  const { coverages, users, addCoverage, searchQuery, categories } = useHub();
+  const { productions, users, addProduction, searchQuery, categories } = useHub();
 
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAutocompleteModal, setShowAutocompleteModal] = useState(false);
 
   // Form states
-  const [newCategory, setNewCategory] = useState('');
   const [newTitle, setNewTitle] = useState('');
+  const [newDesc, setNewDesc] = useState('');
   const [newDate, setNewDate] = useState(() => {
     const d = new Date();
     const pad = (n: number) => String(n).padStart(2, '0');
@@ -38,15 +42,44 @@ export const Coverages: React.FC<CoveragesProps> = ({
     return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
   });
   const [newLocation, setNewLocation] = useState('');
-  const [newStatus, setNewStatus] = useState<Coverage['status']>('pending_confirmation');
-  const [newMainResponsable, setNewMainResponsable] = useState('');
-  const [newSecondaryResponsable, setNewSecondaryResponsable] = useState('');
-  const [newProgram, setNewProgram] = useState('');
-  const [newFormat, setNewFormat] = useState('');
-  const [newObservations, setNewObservations] = useState('');
-  const [newAttachments, setNewAttachments] = useState<string[]>([]);
-  const [attachmentInput, setAttachmentInput] = useState('');
-  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo redes'];
+  const [newStatus, setNewStatus] = useState<ProductionStatus>('pendiente_planificacion');
+  const [newJournalistId, setNewJournalistId] = useState('');
+  const [newJournalistId2, setNewJournalistId2] = useState('');
+  const [newPrograms, setNewPrograms] = useState<ProgramType[]>([]);
+  const [newFormats, setNewFormats] = useState<FormatType[]>([]);
+  const [formFiles, setFormFiles] = useState<any[]>([]);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const filesList = e.target.files;
+    if (!filesList) return;
+    for (let i = 0; i < filesList.length; i++) {
+      const file = filesList[i];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const fileUrl = event.target?.result as string;
+        if (!fileUrl) return;
+        let type: 'photo' | 'video' | 'audio' | 'document' = 'document';
+        if (file.type.startsWith('image/')) type = 'photo';
+        else if (file.type.startsWith('video/')) type = 'video';
+        else if (file.type.startsWith('audio/')) type = 'audio';
+        setFormFiles(prev => [...prev, {
+          id: crypto.randomUUID(),
+          name: file.name,
+          type,
+          url: fileUrl,
+          size: `${(file.size / (1024 * 1024)).toFixed(2)} MB`,
+          uploadDate: new Date().toISOString(),
+          userId: 'system'
+        }]);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeFileForm = (index: number) => {
+    setFormFiles(prev => prev.filter((_, idx) => idx !== index));
+  };
 
   const handleAutocompleteConfirm = (data: {
     title: string;
@@ -69,15 +102,10 @@ export const Coverages: React.FC<CoveragesProps> = ({
     if (data.contactInfo && data.contactInfo !== 'No detectados') {
       obs += `\nContacto: ${data.contactInfo}`;
     }
-    setNewObservations(obs);
+    setNewDesc(obs);
   };
 
-  const addAttachment = () => {
-    if (attachmentInput.trim()) {
-      setNewAttachments(prev => [...prev, attachmentInput.trim()]);
-      setAttachmentInput('');
-    }
-  };
+
 
   useEffect(() => {
     if (autoOpenCreateModal) {
@@ -88,74 +116,65 @@ export const Coverages: React.FC<CoveragesProps> = ({
     }
   }, [autoOpenCreateModal, setAutoOpenCreateModal]);
 
-
-
   // Filter states
   const [filterAssignee, setFilterAssignee] = useState('all');
 
-  const columns: { id: Coverage['status']; name: string; count: number }[] = [
-    { id: 'pending_confirmation', name: 'Pendiente de confirmación', count: 0 },
-    { id: 'confirmed', name: 'Confirmada', count: 0 },
-    { id: 'in_redaction', name: 'En Redacción', count: 0 },
-    { id: 'published', name: 'Publicada', count: 0 }
+  const columns: { id: ProductionStatus; name: string; count: number }[] = [
+    { id: 'pendiente_planificacion', name: 'Pendiente de Planificación', count: 0 },
+    { id: 'programada', name: 'Programada', count: 0 },
+    { id: 'finalizada', name: 'Finalizada', count: 0 },
+    { id: 'suspendida', name: 'Suspendida', count: 0 }
   ];
 
   // Filtering
-  const filteredCoverages = coverages.filter(cov => {
+  const filteredProductions = productions.filter(prod => {
     const matchesSearch = searchQuery
-      ? cov.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        cov.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        cov.location.toLowerCase().includes(searchQuery.toLowerCase())
+      ? prod.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (prod.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (prod.location || '').toLowerCase().includes(searchQuery.toLowerCase())
       : true;
 
-    const matchesAssignee = filterAssignee === 'all' || cov.assignees.includes(filterAssignee);
+    const matchesAssignee = filterAssignee === 'all' || 
+      prod.journalistId === filterAssignee ||
+      prod.photographerId === filterAssignee ||
+      prod.cameramanId === filterAssignee;
 
     return matchesSearch && matchesAssignee;
   });
 
   // Calculate card counts per column
   columns.forEach(col => {
-    col.count = filteredCoverages.filter(c => c.status === col.id).length;
+    col.count = filteredProductions.filter(p => p.status === col.id).length;
   });
 
-  const handleCreateCoverage = (e: React.FormEvent) => {
+  const handleCreateProduction = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const titleToSave = newTitle.trim() || 'Cobertura sin título';
+    const titleToSave = newTitle.trim() || 'Producción sin título';
 
-    const finalDate = newDate || (() => {
-      const d = new Date();
-      const pad = (n: number) => String(n).padStart(2, '0');
-      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    })();
-    const finalTime = newTime || '12:00';
-    const combinedDateTime = `${finalDate}T${finalTime}`;
+    const finalDate = newDate || undefined;
+    const finalTime = newTime || undefined;
 
-    const finalAssignees: string[] = [];
-    if (newMainResponsable) {
-      finalAssignees.push(newMainResponsable);
-    }
-    if (newSecondaryResponsable) {
-      finalAssignees.push(newSecondaryResponsable);
-    }
-
-    const createdId = addCoverage(
+    const createdId = await addProduction(
       titleToSave,
-      newObservations || titleToSave,
-      combinedDateTime,
+      undefined, // proposalId
+      newDesc || titleToSave, // description
+      undefined, // categoryId (removed!)
+      newJournalistId || undefined,
+      newJournalistId2 || undefined, // photographerId mapped to second assignee
+      undefined, // cameramanId (removed!)
+      newPrograms, // mediaOutlets
+      undefined, // formatId
+      'medium', // priority
+      finalDate,
+      finalTime,
       newLocation,
-      finalAssignees,
-      newProgram ? [newProgram as any] : [],
-      newFormat ? [newFormat as any] : [],
-      newStatus,
-      '',
-      newObservations,
-      newAttachments,
-      newCategory || undefined
+      '', // observations (removed!)
+      formFiles
     );
 
-    setNewCategory('');
     setNewTitle('');
+    setNewDesc('');
     setNewDate(() => {
       const d = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
@@ -167,17 +186,15 @@ export const Coverages: React.FC<CoveragesProps> = ({
       return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
     });
     setNewLocation('');
-    setNewStatus('pending_confirmation');
-    setNewMainResponsable('');
-    setNewSecondaryResponsable('');
-    setNewProgram('');
-    setNewFormat('');
-    setNewObservations('');
-    setNewAttachments([]);
-    setAttachmentInput('');
+    setNewStatus('pendiente_planificacion');
+    setNewJournalistId('');
+    setNewJournalistId2('');
+    setNewPrograms([]);
+    setNewFormats([]);
+    setFormFiles([]);
     setShowAddModal(false);
 
-    // Auto open details of new coverage
+    // Auto open details of new production
     setSelectedCoverageId(createdId);
     onViewDetail();
   };
@@ -192,9 +209,9 @@ export const Coverages: React.FC<CoveragesProps> = ({
       {/* Page Header */}
       <div className="page-header">
         <div>
-          <h2 className="page-title">Módulo de Coberturas</h2>
+          <h2 className="page-title">Tablero de Producción</h2>
           <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-            Planifica e instrumenta coberturas en vivo para la mesa editorial.
+            Planifica e instrumenta producciones en vivo para la mesa editorial.
           </p>
         </div>
 
@@ -246,19 +263,19 @@ export const Coverages: React.FC<CoveragesProps> = ({
           </div>
 
           <button className="btn btn-primary" onClick={() => setShowAddModal(true)}>
-            <Plus size={16} /> Nueva Cobertura
+            <Plus size={16} /> Nueva Producción
           </button>
         </div>
       </div>
 
       {/* Advanced Filter Row */}
       <div className="card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.5rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'center' }}>
-        <div style={{ fontSize: '0.8', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
+        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-secondary)', textTransform: 'uppercase' }}>
           Filtrar por:
         </div>
 
         <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Asignado</span>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Asignado (Cualquier Rol)</span>
           <select 
             className="form-select" 
             style={{ padding: '0.25rem 0.5rem', fontSize: '0.8rem' }}
@@ -275,7 +292,7 @@ export const Coverages: React.FC<CoveragesProps> = ({
       {viewMode === 'board' ? (
         <div className="board-container">
           {columns.map(col => {
-            const colCoverages = filteredCoverages.filter(c => c.status === col.id);
+            const colProductions = filteredProductions.filter(c => c.status === col.id);
             return (
               <div key={col.id} className="board-column">
                 <div className="column-header">
@@ -283,65 +300,67 @@ export const Coverages: React.FC<CoveragesProps> = ({
                   <span className="column-count">{col.count}</span>
                 </div>
                 <div className="column-cards">
-                  {colCoverages.map(cov => {
-                    const cat = categories.find(c => c.id === cov.categoryId);
+                  {colProductions.map(prod => {
+                    const cat = categories.find(c => c.id === prod.categoryId);
+                    const activeAssignees = [
+                      { id: prod.journalistId, role: 'Periodista' },
+                      { id: prod.photographerId, role: 'Fotógrafo' },
+                      { id: prod.cameramanId, role: 'Camarógrafo' }
+                    ].filter(x => x.id);
+
                     return (
                       <div 
-                        key={cov.id} 
+                        key={prod.id} 
                         className="board-card" 
-                        onClick={() => handleCardClick(cov.id)}
+                        onClick={() => handleCardClick(prod.id)}
                       >
-                        <h4 className="card-title">{cov.title}</h4>
+                        <h4 className="card-title">{prod.title}</h4>
                         
-                        {/* Program/Format/Category tags on Kanban Card */}
-                        {((cov.programs && cov.programs.length > 0) || (cov.formats && cov.formats.length > 0) || cat) && (
+                        {/* Program/Category tags on Kanban Card */}
+                        {((prod.mediaOutlets && prod.mediaOutlets.length > 0) || cat) && (
                           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginBottom: '0.4rem' }}>
                             {cat && (
                               <span style={{ fontSize: '0.6rem', backgroundColor: `${cat.color}15`, color: cat.color, padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
                                 📁 {cat.name}
                               </span>
                             )}
-                            {cov.programs?.map((prog, idx) => (
-                            <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
-                              📻 {prog}
-                            </span>
-                          ))}
-                          {cov.formats?.map((form, idx) => (
-                            <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#f3e8ff', color: '#6b21a8', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
-                              ⚙️ {form}
-                            </span>
-                          ))}
+                            {prod.mediaOutlets?.map((prog, idx) => (
+                              <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
+                                📺 {prog}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                          <span>📍 {prod.location && prod.location.length > 25 ? `${prod.location.substring(0, 25)}...` : prod.location || 'Sin ubicación'}</span>
+                          <span>🕒 {prod.productionDate ? `${formatDateDMY(prod.productionDate)} ${prod.productionTime || '00:00'}` : 'Sin fecha'}</span>
                         </div>
-                      )}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.1rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                        <span>📍 {cov.location.length > 25 ? `${cov.location.substring(0, 25)}...` : cov.location}</span>
-                        <span>🕒 {new Date(cov.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs</span>
-                      </div>
-                      <div className="card-meta">
-                        <div style={{ display: 'flex', gap: '0.25rem', color: 'var(--text-muted)' }}>
-                          {cov.comments.length > 0 && <span>💬 {cov.comments.length}</span>}
-                          {cov.sharedLinks.length > 0 && <span>🔗 {cov.sharedLinks.length}</span>}
-                        </div>
-                        <div className="card-assignees">
-                          {cov.assignees.map(uid => {
-                            const u = users.find(usr => usr.id === uid);
-                            return (
-                              <div 
-                                key={uid} 
-                                className="avatar-circle" 
-                                style={{ backgroundColor: u?.avatarColor }}
-                                title={u?.name}
-                              >
-                                {u?.name.charAt(0)}
-                              </div>
-                            );
-                          })}
+                        <div className="card-meta">
+                          <div style={{ display: 'flex', gap: '0.25rem', color: 'var(--text-muted)' }}>
+                            {prod.multimedia && prod.multimedia.length > 0 && <span>🖼️ {prod.multimedia.length}</span>}
+                            {prod.sharedLinks && prod.sharedLinks.length > 0 && <span>🔗 {prod.sharedLinks.length}</span>}
+                          </div>
+                          <div className="card-assignees">
+                            {activeAssignees.map(item => {
+                              const u = users.find(usr => usr.id === item.id);
+                              if (!u) return null;
+                              return (
+                                <div 
+                                  key={item.id} 
+                                  className="avatar-circle" 
+                                  style={{ backgroundColor: u.avatarColor }}
+                                  title={`${u.name} (${item.role})`}
+                                >
+                                  {u.name.charAt(0)}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
-                  {colCoverages.length === 0 && (
+                    );
+                  })}
+                  {colProductions.length === 0 && (
                     <div style={{ 
                       padding: '2rem 1rem', 
                       textAlign: 'center', 
@@ -350,7 +369,7 @@ export const Coverages: React.FC<CoveragesProps> = ({
                       border: '1.5px dashed var(--border-color)',
                       borderRadius: 'var(--radius-md)'
                     }}>
-                      Sin coberturas
+                      Sin producciones
                     </div>
                   )}
                 </div>
@@ -371,54 +390,56 @@ export const Coverages: React.FC<CoveragesProps> = ({
               </tr>
             </thead>
             <tbody>
-              {filteredCoverages.map(cov => {
-                const cat = categories.find(c => c.id === cov.categoryId);
+              {filteredProductions.map(prod => {
+                const cat = categories.find(c => c.id === prod.categoryId);
+                const activeAssignees = [
+                  { id: prod.journalistId, role: 'Periodista' },
+                  { id: prod.photographerId, role: 'Fotógrafo' },
+                  { id: prod.cameramanId, role: 'Camarógrafo' }
+                ].filter(x => x.id);
+
                 return (
                   <tr 
-                    key={cov.id} 
+                    key={prod.id} 
                     style={{ borderBottom: '1px solid var(--border-color)', cursor: 'pointer', transition: 'var(--transition)' }}
-                    onClick={() => handleCardClick(cov.id)}
+                    onClick={() => handleCardClick(prod.id)}
                     className="table-row-hover"
                   >
                     <td style={{ padding: '0.75rem 1rem', fontWeight: 600 }}>
-                      <div>{cov.title}</div>
-                      {/* Program/Format/Category tags in table cell */}
-                      {((cov.programs && cov.programs.length > 0) || (cov.formats && cov.formats.length > 0) || cat) && (
+                      <div>{prod.title}</div>
+                      {/* Tags in table cell */}
+                      {((prod.mediaOutlets && prod.mediaOutlets.length > 0) || cat) && (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.2rem', marginTop: '0.25rem' }}>
                           {cat && (
                             <span style={{ fontSize: '0.6rem', backgroundColor: `${cat.color}15`, color: cat.color, padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
                               📁 {cat.name}
                             </span>
                           )}
-                          {cov.programs?.map((prog, idx) => (
+                          {prod.mediaOutlets?.map((prog, idx) => (
                             <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
-                              📻 {prog}
-                            </span>
-                          ))}
-                          {cov.formats?.map((form, idx) => (
-                            <span key={idx} style={{ fontSize: '0.6rem', backgroundColor: '#f3e8ff', color: '#6b21a8', padding: '0.05rem 0.2rem', borderRadius: '4px', fontWeight: 600 }}>
-                              ⚙️ {form}
+                              📺 {prog}
                             </span>
                           ))}
                         </div>
                       )}
                     </td>
                     <td style={{ padding: '0.75rem 1rem' }}>
-                      <span className={`badge status-${cov.status}`}>{cov.status.replace(/_/g, ' ')}</span>
+                      <span className={`badge status-${prod.status}`}>{prod.status.replace(/_/g, ' ')}</span>
                     </td>
-                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>{cov.location}</td>
+                    <td style={{ padding: '0.75rem 1rem', color: 'var(--text-secondary)' }}>{prod.location || '-'}</td>
                     <td style={{ padding: '0.75rem 1rem' }}>
                       <div className="card-assignees">
-                        {cov.assignees.map(uid => {
-                          const u = users.find(usr => usr.id === uid);
+                        {activeAssignees.map(item => {
+                          const u = users.find(usr => usr.id === item.id);
+                          if (!u) return null;
                           return (
                             <div 
-                              key={uid} 
+                              key={item.id} 
                               className="avatar-circle" 
-                              style={{ backgroundColor: u?.avatarColor }}
-                              title={u?.name}
+                              style={{ backgroundColor: u.avatarColor }}
+                              title={`${u.name} (${item.role})`}
                             >
-                              {u?.name.charAt(0)}
+                              {u.name.charAt(0)}
                             </div>
                           );
                         })}
@@ -427,10 +448,10 @@ export const Coverages: React.FC<CoveragesProps> = ({
                   </tr>
                 );
               })}
-              {filteredCoverages.length === 0 && (
+              {filteredProductions.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    No se encontraron coberturas con los filtros seleccionados.
+                  <td colSpan={4} style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    No se encontraron producciones con los filtros seleccionados.
                   </td>
                 </tr>
               )}
@@ -439,23 +460,23 @@ export const Coverages: React.FC<CoveragesProps> = ({
         </div>
       )}
 
-      {/* New Coverage Modal */}
+      {/* New Production Modal */}
       {showAddModal && (
         <div className="modal-overlay" style={{ display: 'flex', zIndex: 110 }} onClick={() => setShowAddModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '950px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
+          <div className="modal-content event-modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">Programar Nueva Cobertura</h3>
+              <h3 className="modal-title">Programar Nueva Producción</h3>
               <button className="modal-close" onClick={() => setShowAddModal(false)}>✕</button>
             </div>
-            <form onSubmit={handleCreateCoverage}>
-              <div className="modal-body" style={{ padding: '1.5rem' }}>
+            <form onSubmit={handleCreateProduction}>
+              <div className="modal-body event-form-grid" style={{ padding: '1.5rem' }}>
                 <button
                   type="button"
                   className="btn"
                   onClick={() => setShowAutocompleteModal(true)}
                   style={{
-                    width: '100%',
-                    padding: '0.6rem',
+                    gridColumn: 'span 3',
+                    padding: '0.5rem',
                     borderRadius: '6px',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
                     color: 'var(--primary)',
@@ -466,246 +487,228 @@ export const Coverages: React.FC<CoveragesProps> = ({
                     justifyContent: 'center',
                     gap: '0.4rem',
                     cursor: 'pointer',
-                    marginBottom: '1.25rem'
+                    marginBottom: '0.5rem'
                   }}
                 >
                   ✨ Autocompletar desde texto con IA
                 </button>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-                  
-                  {/* Left Column - Priority 1-4, 5 */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Cobertura</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Ej. Sesión en el Concejo Deliberante por el presupuesto."
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                      />
-                    </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha</label>
-                        <input
-                          type="date"
-                          className="form-input"
-                          value={newDate}
-                          onChange={(e) => setNewDate(e.target.value)}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora</label>
-                        <input
-                          type="time"
-                          className="form-input"
-                          value={newTime}
-                          onChange={(e) => setNewTime(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Ej. Bv. Santa Fe 300, Rafaela"
-                        value={newLocation}
-                        onChange={(e) => setNewLocation(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Programa Destino</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        {['Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'].map(prog => (
-                          <button
-                            key={prog}
-                            type="button"
-                            onClick={() => setNewProgram(prev => prev === prog ? '' : prog)}
-                            style={{
-                              padding: '0.35rem 0.75rem',
-                              borderRadius: '999px',
-                              border: `1.5px solid ${newProgram === prog ? 'var(--primary)' : 'var(--border-color)'}`,
-                              background: newProgram === prog ? 'var(--primary)' : 'var(--bg-secondary)',
-                              color: newProgram === prog ? '#fff' : 'var(--text-secondary)',
-                              fontWeight: newProgram === prog ? 700 : 500,
-                              fontSize: '0.78rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {prog}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column - Priority 6-8, Status, Attachments */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Formato</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
-                        {FORMAT_OPTIONS.map(fmt => (
-                          <button
-                            key={fmt}
-                            type="button"
-                            onClick={() => setNewFormat(prev => prev === fmt ? '' : fmt)}
-                            style={{
-                              padding: '0.35rem 0.75rem',
-                              borderRadius: '999px',
-                              border: `1.5px solid ${newFormat === fmt ? 'var(--primary)' : 'var(--border-color)'}`,
-                              background: newFormat === fmt ? 'var(--primary)' : 'var(--bg-secondary)',
-                              color: newFormat === fmt ? '#fff' : 'var(--text-secondary)',
-                              fontWeight: newFormat === fmt ? 700 : 500,
-                              fontSize: '0.78rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {fmt}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Categoría</label>
-                      <select
-                        className="form-select"
-                        value={newCategory}
-                        onChange={e => setNewCategory(e.target.value)}
-                      >
-                        <option value="">Seleccionar Categoría...</option>
-                        {categories.filter(c => c.active).map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Principal</label>
-                        <select
-                          className="form-select"
-                          value={newMainResponsable}
-                          onChange={e => setNewMainResponsable(e.target.value)}
-                        >
-                          <option value="">Seleccionar...</option>
-                          {users.map(u => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Secundario</label>
-                        <select
-                          className="form-select"
-                          value={newSecondaryResponsable}
-                          onChange={e => setNewSecondaryResponsable(e.target.value)}
-                        >
-                          <option value="">Seleccionar...</option>
-                          {users.filter(u => u.id !== newMainResponsable).map(u => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem', display: 'block' }}>Estado</label>
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        {([
-                          { value: 'pending_confirmation', label: 'Pendiente de confirmación' },
-                          { value: 'confirmed', label: 'Confirmada' },
-                        ] as { value: Coverage['status']; label: string }[]).map(opt => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setNewStatus(opt.value)}
-                            style={{
-                              padding: '0.35rem 0.75rem',
-                              borderRadius: '999px',
-                              border: `1.5px solid ${newStatus === opt.value ? 'var(--primary)' : 'var(--border-color)'}`,
-                              background: newStatus === opt.value ? 'var(--primary)' : 'var(--bg-secondary)',
-                              color: newStatus === opt.value ? '#fff' : 'var(--text-secondary)',
-                              fontWeight: newStatus === opt.value ? 700 : 500,
-                              fontSize: '0.78rem',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Observaciones</label>
-                      <textarea
-                        className="form-textarea"
-                        rows={2}
-                        placeholder="Comentarios adicionales, enfoques sugeridos..."
-                        value={newObservations}
-                        onChange={(e) => setNewObservations(e.target.value)}
-                        style={{ fontSize: '0.85rem' }}
-                      />
-                    </div>
-                  </div>
-
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Título *</label>
+                  <input
+                    type="text"
+                    required
+                    className="form-input"
+                    placeholder="Ej. Sesión en el Concejo Deliberante..."
+                    value={newTitle}
+                    onChange={(e) => setNewTitle(e.target.value)}
+                  />
                 </div>
 
-                <div className="form-group" style={{ marginTop: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1rem' }}>
-                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjuntos (Enlaces / Archivos)</label>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.4rem' }}>
-                    {newAttachments.map((att, idx) => (
-                      <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', color: 'var(--text-secondary)' }}>📎 {att}</span>
-                        <button 
-                          type="button" 
-                          onClick={() => setNewAttachments(prev => prev.filter((_, i) => i !== idx))} 
-                          style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.8rem' }}
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Ubicación</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ej. Bv. Santa Fe 300..."
+                    value={newLocation}
+                    onChange={(e) => setNewLocation(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Fecha *</label>
+                  <input
+                    type="date"
+                    required
+                    className="form-input"
+                    value={newDate}
+                    onChange={(e) => setNewDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Hora *</label>
+                  <input
+                    type="time"
+                    required
+                    className="form-input"
+                    value={newTime}
+                    onChange={(e) => setNewTime(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Quién lo cubre</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <select 
+                      className="form-select"
+                      value={newJournalistId}
+                      onChange={(e) => setNewJournalistId(e.target.value)}
+                      style={{ padding: '0.35rem', fontSize: '0.8rem' }}
+                    >
+                      <option value="">Seleccionar redactor 1...</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                    <select 
+                      className="form-select"
+                      value={newJournalistId2}
+                      onChange={(e) => setNewJournalistId2(e.target.value)}
+                      style={{ padding: '0.35rem', fontSize: '0.8rem' }}
+                    >
+                      <option value="">Seleccionar redactor 2...</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Descripción</label>
+                  <textarea
+                    className="form-input"
+                    style={{ minHeight: '80px' }}
+                    placeholder="Detalles breves de la cobertura..."
+                    value={newDesc}
+                    onChange={(e) => setNewDesc(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Programa</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                    {PROGRAM_OPTIONS.map(prog => {
+                      const selected = newPrograms.includes(prog);
+                      return (
+                        <button
+                          key={prog}
+                          type="button"
+                          className="btn"
+                          onClick={() => {
+                            setNewPrograms(prev => prev.includes(prog) ? prev.filter(p => p !== prog) : [...prev, prog]);
+                          }}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            fontSize: '0.75rem',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-color)',
+                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
+                            color: selected ? 'white' : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
                         >
-                          🗑️
+                          {prog}
                         </button>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  <div style={{ display: 'flex', gap: '0.25rem' }}>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="Ej: https://drive.google.com/... o gacetilla.pdf" 
-                      style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
-                      value={attachmentInput}
-                      onChange={e => setAttachmentInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          addAttachment();
-                        }
-                      }}
-                    />
-                    <button type="button" onClick={addAttachment} className="btn btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>
-                      Agregar
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Formato</label>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
+                    {FORMAT_OPTIONS.map(form => {
+                      const selected = newFormats.includes(form);
+                      return (
+                        <button
+                          key={form}
+                          type="button"
+                          className="btn"
+                          onClick={() => {
+                            setNewFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
+                          }}
+                          style={{
+                            padding: '0.25rem 0.5rem',
+                            fontSize: '0.75rem',
+                            borderRadius: 'var(--radius-full)',
+                            border: '1px solid var(--border-color)',
+                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
+                            color: selected ? 'white' : 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          {form}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Estado</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    {([
+                      { value: 'pendiente_planificacion', label: 'Pendiente de confirmación' },
+                      { value: 'programada', label: 'Confirmada' }
+                    ] as const).map(opt => {
+                      const selected = newStatus === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          className="btn"
+                          onClick={() => setNewStatus(opt.value)}
+                          style={{
+                            padding: '0.35rem 0.75rem',
+                            borderRadius: '999px',
+                            border: `1.5px solid ${selected ? 'var(--primary)' : 'var(--border-color)'}`,
+                            background: selected ? 'var(--primary)' : 'var(--bg-secondary)',
+                            color: selected ? '#fff' : 'var(--text-secondary)',
+                            fontWeight: selected ? 700 : 500,
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          {opt.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Archivos / Imágenes */}
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>Archivos / Imágenes</label>
+                  <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    <button 
+                      type="button" 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="btn btn-secondary" 
+                      style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}
+                    >
+                      <Paperclip size={14} /> Seleccionar Archivos
                     </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      multiple 
+                      onChange={handleFileUpload} 
+                      style={{ display: 'none' }} 
+                    />
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Carga imágenes, PDFs o documentos.</span>
                   </div>
+                  {formFiles.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      {formFiles.map((file, idx) => (
+                        <div key={file.id || idx} style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', background: 'var(--bg-tertiary)', padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-sm)', fontSize: '0.75rem' }}>
+                          <span style={{ maxWidth: '150px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</span>
+                          <button type="button" onClick={() => removeFileForm(idx)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-              <div className="modal-footer" style={{ padding: '1rem 1.5rem' }}>
+              <div className="modal-footer" style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowAddModal(false)}>
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Crear Cobertura
+                  Crear Producción
                 </button>
               </div>
             </form>

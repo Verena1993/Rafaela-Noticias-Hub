@@ -4,15 +4,14 @@ import {
   UploadCloud, Image as ImageIcon, Video, Music, FileText, 
   Link as LinkIcon, Download, Trash2, ExternalLink, HardDrive
 } from 'lucide-react';
-import type { MultimediaItem, Coverage } from '../types';
-
+import type { MultimediaItem, SharedLink, Production } from '../types';
 
 interface MultimediaManagerProps {
-  coverage: Coverage;
+  production: Production;
 }
 
-export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }) => {
-  const { addMultimediaToCoverage, addSharedLinkToCoverage, users } = useHub();
+export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ production }) => {
+  const { updateProduction, users, currentUser } = useHub();
   
   const [activeTab, setActiveTab] = useState<'files' | 'links' | 'drive'>('files');
   const [dragActive, setDragActive] = useState(false);
@@ -48,27 +47,78 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
     }
   };
 
-  const handleFiles = (files: FileList) => {
-    Array.from(files).forEach(file => {
-      // Simulate file upload
+  const handleFiles = async (files: FileList) => {
+    const newItems = Array.from(files).map(file => {
       let type: MultimediaItem['type'] = 'document';
       if (file.type.startsWith('image/')) type = 'photo';
       if (file.type.startsWith('video/')) type = 'video';
       if (file.type.startsWith('audio/')) type = 'audio';
 
-      const simulatedUrl = URL.createObjectURL(file); // Temporary blob URL for preview
+      const simulatedUrl = URL.createObjectURL(file); // Temporary blob URL
       const sizeMB = (file.size / (1024 * 1024)).toFixed(2) + ' MB';
       
-      addMultimediaToCoverage(coverage.id, file.name, type, simulatedUrl, sizeMB);
+      const item: MultimediaItem = {
+        id: `m_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+        type,
+        name: file.name,
+        url: simulatedUrl,
+        size: sizeMB,
+        uploadDate: new Date().toISOString(),
+        userId: currentUser?.id || ''
+      };
+      return item;
     });
+
+    try {
+      await updateProduction(production.id, {
+        multimedia: [...(production.multimedia || []), ...newItems]
+      });
+    } catch (err) {
+      console.error('Failed to upload files', err);
+    }
   };
 
-  const handleAddLink = (e: React.FormEvent) => {
+  const handleAddLink = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLinkUrl || !newLinkTitle) return;
-    addSharedLinkToCoverage(coverage.id, newLinkTitle, newLinkUrl);
-    setNewLinkUrl('');
-    setNewLinkTitle('');
+
+    const newLink: SharedLink = {
+      id: `sl_${Date.now()}`,
+      title: newLinkTitle,
+      url: newLinkUrl,
+      uploadDate: new Date().toISOString(),
+      userId: currentUser?.id || ''
+    };
+
+    try {
+      await updateProduction(production.id, {
+        sharedLinks: [...(production.sharedLinks || []), newLink]
+      });
+      setNewLinkUrl('');
+      setNewLinkTitle('');
+    } catch (err) {
+      console.error('Failed to add link', err);
+    }
+  };
+
+  const handleDeleteMultimedia = async (itemId: string) => {
+    try {
+      await updateProduction(production.id, {
+        multimedia: (production.multimedia || []).filter(item => item.id !== itemId)
+      });
+    } catch (err) {
+      console.error('Failed to delete file', err);
+    }
+  };
+
+  const handleDeleteLink = async (linkId: string) => {
+    try {
+      await updateProduction(production.id, {
+        sharedLinks: (production.sharedLinks || []).filter(link => link.id !== linkId)
+      });
+    } catch (err) {
+      console.error('Failed to delete link', err);
+    }
   };
 
   const getFileIcon = (type: MultimediaItem['type']) => {
@@ -92,7 +142,7 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
             borderBottom: activeTab === 'files' ? '2px solid var(--primary)' : '2px solid transparent'
           }}
         >
-          Archivos Subidos ({coverage.multimedia.length})
+          Archivos Subidos ({production.multimedia?.length || 0})
         </button>
         <button 
           onClick={() => setActiveTab('links')}
@@ -102,7 +152,7 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
             borderBottom: activeTab === 'links' ? '2px solid var(--primary)' : '2px solid transparent'
           }}
         >
-          Enlaces / Fuentes ({coverage.sharedLinks?.length || 0})
+          Enlaces / Fuentes ({production.sharedLinks?.length || 0})
         </button>
         <button 
           onClick={() => setActiveTab('drive')}
@@ -160,13 +210,13 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
           </div>
 
           {/* Files Grid */}
-          {coverage.multimedia.length === 0 ? (
+          {(production.multimedia || []).length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', padding: '2rem 0' }}>
-              No hay archivos multimedia subidos a esta cobertura.
+              No hay archivos multimedia subidos a esta producción.
             </p>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
-              {[...coverage.multimedia].sort((a,b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()).map(item => (
+              {[...(production.multimedia || [])].sort((a,b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()).map(item => (
                 <div key={item.id} className="card" style={{ padding: '0.75rem', display: 'flex', flexDirection: 'column', gap: '0.5rem', position: 'relative' }}>
                   <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100px', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
                     {item.type === 'photo' ? (
@@ -193,10 +243,10 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
                     </p>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border-color)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
-                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }} title="Descargar">
+                    <a href={item.url} download={item.name} target="_blank" rel="noreferrer" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }} title="Descargar">
                       <Download size={14} />
-                    </button>
-                    <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-text)' }} title="Eliminar">
+                    </a>
+                    <button onClick={() => handleDeleteMultimedia(item.id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--danger-text)' }} title="Eliminar">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -224,10 +274,10 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
           </form>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '1rem' }}>
-            {(coverage.sharedLinks || []).length === 0 ? (
+            {(production.sharedLinks || []).length === 0 ? (
               <p style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.9rem', padding: '1rem 0' }}>No hay enlaces vinculados.</p>
             ) : (
-              (coverage.sharedLinks || []).map(link => (
+              (production.sharedLinks || []).map(link => (
                 <div key={link.id} className="card" style={{ padding: '0.75rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                     <div style={{ backgroundColor: 'var(--bg-secondary)', padding: '0.5rem', borderRadius: '50%' }}>
@@ -240,9 +290,14 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
                       </a>
                     </div>
                   </div>
-                  <button style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}>
-                    <ExternalLink size={16} />
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <a href={link.url} target="_blank" rel="noreferrer" className="btn btn-secondary" style={{ padding: '0.35rem' }}>
+                      <ExternalLink size={14} />
+                    </a>
+                    <button onClick={() => handleDeleteLink(link.id)} className="btn btn-secondary" style={{ padding: '0.35rem', color: 'var(--danger-text)' }}>
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               ))
             )}
@@ -259,7 +314,7 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
           </p>
           <div style={{ backgroundColor: 'var(--bg-primary)', padding: '0.75rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', display: 'inline-block', border: '1px solid var(--border-color)' }}>
             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.25rem' }}>Nombre de carpeta asignado:</span>
-            <strong style={{ fontSize: '0.9rem' }}>{coverage.dateTime.split('T')[0]} - {coverage.title}</strong>
+            <strong style={{ fontSize: '0.9rem' }}>{production.productionDate || 'Sin Fecha'} - {production.title}</strong>
           </div>
           <br />
           <button className="btn btn-secondary" disabled style={{ opacity: 0.7 }}>
@@ -277,7 +332,7 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center', padding: '2rem 1rem' }}>
               <p style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-                Escanea este código QR con la cámara de tu celular para abrir directamente la carpeta de subida de esta cobertura.
+                Escanea este código QR con la cámara de tu celular para abrir directamente la carpeta de subida de esta producción.
               </p>
               <div style={{ width: '180px', height: '180px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', alignItems: 'center', borderRadius: 'var(--radius-md)' }}>
                 {/* Mock QR Code */}
@@ -290,7 +345,7 @@ export const MultimediaManager: React.FC<MultimediaManagerProps> = ({ coverage }
               <div style={{ width: '100%' }}>
                 <p style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '0.25rem', textTransform: 'uppercase' }}>O copia este enlace de subida rápida</p>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input type="text" readOnly className="form-input" value={`https://hub.rafaelanoticias.com/upload/${coverage.id}`} style={{ fontSize: '0.8rem', backgroundColor: 'var(--bg-tertiary)' }} />
+                  <input type="text" readOnly className="form-input" value={`https://hub.rafaelanoticias.com/upload/${production.id}`} style={{ fontSize: '0.8rem', backgroundColor: 'var(--bg-tertiary)' }} />
                   <button className="btn btn-secondary" onClick={() => alert('¡Copiado!')}>Copiar</button>
                 </div>
               </div>

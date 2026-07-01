@@ -1,13 +1,11 @@
 import React, { useState } from 'react';
 import { useHub } from '../context/HubContext';
 import { 
-  ArrowLeft, Calendar, MapPin, Send, ExternalLink, 
-  Image, FileText, Check, Bot, History, Sparkles, MessageSquare, Clipboard,
+  ArrowLeft, Calendar, MapPin, 
+  Image, FileText, Check, Bot, History, MessageSquare, 
   MessageCircle, Edit3
 } from 'lucide-react';
-import type { Coverage, FormatType, PublicationChecklist } from '../types';
-
-import { formatFriendlyDate } from '../utils/dateUtils';
+import type { ProductionStatus, Comment, SharedLink } from '../types';
 import { MultimediaManager } from './MultimediaManager';
 
 interface CoverageDetailProps {
@@ -17,112 +15,100 @@ interface CoverageDetailProps {
 
 export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBack }) => {
   const { 
-    coverages, users, updateCoverageStatus, 
-    addCommentToCoverage, addMultimediaToCoverage, 
-    updatePublicationStatus, currentUser, updateCoverageDetails,
-    events, updateEvent, recreateCoverageForEvent
+    productions, users, updateProduction,
+    currentUser, events, updateEvent, recreateCoverageForEvent
   } = useHub();
 
   const [activeTab, setActiveTab] = useState<'general' | 'multimedia' | 'chat' | 'publications' | 'copilot' | 'history'>('general');
   const [chatMessage, setChatMessage] = useState('');
-  
-  // Modals state
-  const [showFileModal, setShowFileModal] = useState(false);
-  const [fileName, setFileName] = useState('');
-  const [fileType, setFileType] = useState<'photo' | 'video' | 'audio' | 'document'>('photo');
 
   // AI states
   const [aiOutput, setAiOutput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  const coverage = coverages.find(c => c.id === coverageId);
+  const production = productions.find(p => p.id === coverageId);
 
-  // Edit coverage state
+  // Edit production state
   const [showEditModal, setShowEditModal] = useState(false);
-  const [previewItem, setPreviewItem] = useState<{ name: string; url: string; type: 'photo' | 'video' | 'audio' | 'document'; size: string } | null>(null);
 
-  // Redesigned Edit states
+  // Edit states
   const [editTitle, setEditTitle] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editTime, setEditTime] = useState('');
   const [editLocation, setEditLocation] = useState('');
-  const [editStatus, setEditStatus] = useState<Coverage['status']>('pending_confirmation');
-  const [editMainResponsable, setEditMainResponsable] = useState('');
-  const [editAssigneesList, setEditAssigneesList] = useState<string[]>([]);
-  const [editFormats, setEditFormats] = useState<FormatType[]>([]);
-  const [editLogisticsInfo, setEditLogisticsInfo] = useState('');
-  const [editObservations, setEditObservations] = useState('');
-  const [editAttachments, setEditAttachments] = useState<string[]>([]);
-  const [editAttachmentInput, setEditAttachmentInput] = useState('');
+  const [editStatus, setEditStatus] = useState<ProductionStatus>('pendiente_planificacion');
+  const [editJournalistId, setEditJournalistId] = useState('');
+  const [editJournalistId2, setEditJournalistId2] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
-  const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo redes'];
+  // Local state for comments/chat linked to this production
+  const [localComments, setLocalComments] = useState<Comment[]>(() => {
+    const saved = localStorage.getItem(`prod_comments_${coverageId}`);
+    return saved ? JSON.parse(saved) : [];
+  });
 
   const startEditingCoverage = () => {
-    if (coverage) {
-      setEditTitle(coverage.title);
-      const [datePart, timePart] = (coverage.dateTime || '').split('T');
-      setEditDate(datePart || '');
-      setEditTime(timePart?.substring(0, 5) || '');
-      setEditLocation(coverage.location);
-      setEditStatus(coverage.status);
-      setEditMainResponsable(coverage.assignees.length > 0 ? coverage.assignees[0] : '');
-      setEditAssigneesList(coverage.assignees.slice(1));
-      setEditFormats(coverage.formats || []);
-      setEditLogisticsInfo(coverage.logisticsInfo || '');
-      setEditObservations(coverage.observations || '');
-      setEditAttachments(coverage.attachments || []);
-      setEditAttachmentInput('');
+    if (production) {
+      setEditTitle(production.title);
+      setEditDate(production.productionDate || '');
+      setEditTime(production.productionTime || '');
+      setEditLocation(production.location || '');
+      setEditStatus(production.status);
+      setEditJournalistId(production.journalistId || '');
+      setEditJournalistId2(production.photographerId || '');
+      setEditDescription(production.description || '');
       setShowEditModal(true);
     }
   };
 
-  const addEditAttachment = () => {
-    if (editAttachmentInput.trim()) {
-      setEditAttachments(prev => [...prev, editAttachmentInput.trim()]);
-      setEditAttachmentInput('');
-    }
-  };
-
-  const handleSaveCoverageDetails = (e: React.FormEvent) => {
+  const handleSaveCoverageDetails = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!coverage) return;
+    if (!production) return;
 
-    const finalAssignees: string[] = [];
-    if (editMainResponsable) {
-      finalAssignees.push(editMainResponsable);
-    }
-    editAssigneesList.forEach(uid => {
-      if (!finalAssignees.includes(uid)) {
-        finalAssignees.push(uid);
+    try {
+      await updateProduction(production.id, {
+        title: editTitle || production.title,
+        description: editDescription || editTitle || production.title,
+        productionDate: editDate || undefined,
+        productionTime: editTime || undefined,
+        location: editLocation || production.location,
+        status: editStatus,
+        journalistId: editJournalistId || undefined,
+        photographerId: editJournalistId2 || undefined,
+        cameramanId: undefined,
+        observations: ''
+      });
+
+      // Update corresponding calendar event if exists
+      const linkedEvent = events.find(evt => evt.coverageId === production.id);
+      if (linkedEvent) {
+        let eventStatus = linkedEvent.status;
+        if (editStatus === 'programada') eventStatus = 'confirmed';
+        else if (editStatus === 'finalizada') eventStatus = 'published';
+        else if (editStatus === 'pendiente_planificacion') eventStatus = 'pending_confirmation';
+
+        updateEvent(
+          linkedEvent.id,
+          `[Producción] ${editTitle || production.title}`,
+          editDescription || '',
+          linkedEvent.type,
+          editDate && editTime ? `${editDate}T${editTime}` : linkedEvent.start,
+          editDate && editTime ? `${editDate}T${editTime}` : linkedEvent.end,
+          editLocation || production.location,
+          eventStatus,
+          editJournalistId || undefined,
+          linkedEvent.programs,
+          linkedEvent.formats,
+          '',
+          linkedEvent.multimedia,
+          editJournalistId2 || undefined
+        );
       }
-    });
-    // If no assignees were specified, keep the current ones
-    const resolvedAssignees = finalAssignees.length > 0 ? finalAssignees : coverage.assignees;
 
-    // Use existing coverage datetime as fallback if fields were left untouched/empty
-    const existingDate = (coverage.dateTime || '').split('T')[0] || '';
-    const existingTime = (coverage.dateTime || '').split('T')[1]?.substring(0, 5) || '';
-    const resolvedDate = editDate || existingDate;
-    const resolvedTime = editTime || existingTime;
-    const combinedDateTime = resolvedDate && resolvedTime
-      ? `${resolvedDate}T${resolvedTime}`
-      : coverage.dateTime || '';
-
-    updateCoverageDetails(
-      coverage.id,
-      editTitle || coverage.title,
-      editObservations || coverage.description || editTitle || coverage.title,
-      combinedDateTime,
-      editLocation || coverage.location,
-      resolvedAssignees,
-      coverage.programs || [],
-      editFormats,
-      editStatus,
-      editLogisticsInfo,
-      editObservations,
-      editAttachments
-    );
-    setShowEditModal(false);
+      setShowEditModal(false);
+    } catch (err) {
+      console.error('Failed to save production details', err);
+    }
   };
 
   // Diagnostic states
@@ -133,8 +119,8 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   const [eventEditLocation, setEventEditLocation] = useState('');
   const [eventEditAssigneeId, setEventEditAssigneeId] = useState('');
 
-  // New V2 states
-  const [portalUrl, setPortalUrl] = useState(coverage?.publications.portal.link || '');
+  // Publications states
+  const [portalUrl, setPortalUrl] = useState('');
   const [portalInputUrl, setPortalInputUrl] = useState('');
   const [extractedText, setExtractedText] = useState('');
   const [extractedLoading, setExtractedLoading] = useState(false);
@@ -152,7 +138,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     }
   };
 
-  if (!coverage) {
+  if (!production) {
     const handleSaveEvent = (e: React.FormEvent) => {
       e.preventDefault();
       if (linkedEvent) {
@@ -178,10 +164,10 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div>
             <h3 style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0, fontSize: '1.5rem' }}>
-              ⚠️ Cobertura No Encontrada
+              ⚠️ Producción No Encontrada
             </h3>
             <p style={{ marginTop: '0.5rem', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-              No se pudo localizar el registro de la cobertura con ID <code style={{ backgroundColor: 'var(--bg-tertiary)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>{coverageId}</code>.
+              No se pudo localizar el registro de la producción con ID <code style={{ backgroundColor: 'var(--bg-tertiary)', padding: '0.1rem 0.3rem', borderRadius: '4px' }}>{coverageId}</code>.
             </p>
           </div>
 
@@ -212,7 +198,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                       style={{ fontSize: '0.8rem', padding: '0.35rem 0.75rem' }} 
                       onClick={() => recreateCoverageForEvent(linkedEvent.id, coverageId)}
                     >
-                      Recrear Ficha de Cobertura
+                      Recrear Ficha de Producción
                     </button>
                   </div>
                 </div>
@@ -288,7 +274,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             </div>
           ) : (
             <div style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem', backgroundColor: 'var(--bg-secondary)', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-              No se detectaron actividades de agenda vinculadas a este ID de cobertura.
+              No se detectaron actividades de agenda vinculadas a este ID de producción.
             </div>
           )}
 
@@ -303,63 +289,82 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
   }
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    updateCoverageStatus(coverage.id, e.target.value as any);
+    updateProduction(production.id, { status: e.target.value as any });
   };
 
   const handleShareWhatsApp = () => {
-    const text = `*RN Hub - Cobertura Periodística*\n\n` +
-      `*Título:* ${coverage.title}\n` +
-      `*Detalles:* ${coverage.description}\n` +
-      `*Ubicación:* ${coverage.location}\n` +
-      `*Fecha/Hora:* ${new Date(coverage.dateTime).toLocaleString()}\n` +
-      `*Enlaces:* ${coverage.sharedLinks.map(l => `${l.title}: ${l.url}`).join(', ')}`;
+    const text = `*RN Hub - Producción Periodística*\n\n` +
+      `*Título:* ${production.title}\n` +
+      `*Detalles:* ${production.description || ''}\n` +
+      `*Ubicación:* ${production.location || ''}\n` +
+      `*Fecha/Hora:* ${production.productionDate || 'Sin fecha'} ${production.productionTime || ''}\n` +
+      `*Enlaces:* ${(production.sharedLinks || []).map(l => `${l.title}: ${l.url}`).join(', ')}`;
     const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
-  const handleTogglePlatform = (plat: keyof PublicationChecklist) => {
-    const check = coverage.publications[plat];
-    const isPub = check.status === 'published';
-    if (isPub) {
-      updatePublicationStatus(coverage.id, plat, 'pending');
-    } else {
-      updatePublicationStatus(coverage.id, plat, 'published');
-    }
+  const isPublishedOn = (plat: string) => {
+    return (production.mediaOutlets || []).includes(plat);
   };
 
-  const handlePortalPublish = (e: React.FormEvent) => {
+  const handleTogglePlatform = async (plat: string) => {
+    let updatedOutlets = [...(production.mediaOutlets || [])];
+    if (updatedOutlets.includes(plat)) {
+      updatedOutlets = updatedOutlets.filter(x => x !== plat);
+    } else {
+      updatedOutlets.push(plat);
+    }
+    await updateProduction(production.id, { mediaOutlets: updatedOutlets });
+  };
+
+  const handlePortalPublish = async (e: React.FormEvent) => {
     e.preventDefault();
-    updatePublicationStatus(coverage.id, 'portal', 'published', portalInputUrl);
+    if (!portalInputUrl) return;
+
+    let updatedOutlets = [...(production.mediaOutlets || [])];
+    if (!updatedOutlets.includes('portal')) {
+      updatedOutlets.push('portal');
+    }
+
+    const newLink: SharedLink = {
+      id: `sl_portal_${Date.now()}`,
+      title: 'Nota publicada en Portal',
+      url: portalInputUrl,
+      uploadDate: new Date().toISOString(),
+      userId: currentUser?.id || ''
+    };
+
+    await updateProduction(production.id, { 
+      mediaOutlets: updatedOutlets,
+      sharedLinks: [...(production.sharedLinks || []), newLink]
+    });
     setPortalInputUrl('');
   };
 
   const handleSendComment = (e?: React.FormEvent, textOverride?: string) => {
     if (e) e.preventDefault();
     const text = textOverride || chatMessage;
-    if (!text.trim()) return;
+    if (!text.trim() || !currentUser) return;
 
-    addCommentToCoverage(coverage.id, text);
+    const newComment: Comment = {
+      id: `c_${Date.now()}`,
+      userId: currentUser.id,
+      userName: currentUser.name,
+      text,
+      timestamp: new Date().toISOString()
+    };
+
+    const updatedComments = [...localComments, newComment];
+    setLocalComments(updatedComments);
+    localStorage.setItem(`prod_comments_${coverageId}`, JSON.stringify(updatedComments));
+    
     if (!textOverride) setChatMessage('');
   };
 
-  const handleAddFileSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fileName.trim()) return;
-
-    let mockUrl = '#';
-    let size = '1.2 MB';
-    if (fileType === 'photo') {
-      mockUrl = 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80';
-      size = '2.5 MB';
-    } else if (fileType === 'video') {
-      size = '18.4 MB';
-    } else if (fileType === 'audio') {
-      size = '3.6 MB';
-    }
-
-    addMultimediaToCoverage(coverage.id, fileName, fileType, mockUrl, size);
-    setFileName('');
-    setShowFileModal(false);
+  const handleDeleteComment = (commentId: string) => {
+    const updated = localComments.filter(c => c.id !== commentId);
+    setLocalComments(updated);
+    localStorage.setItem(`prod_comments_${coverageId}`, JSON.stringify(updated));
   };
 
   const handleExtract = () => {
@@ -371,9 +376,9 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     setTimeout(() => {
       setExtractedText(
         `NOTICIA EXTRAÍDA DEL PORTAL WEB (${portalUrl}):\n` +
-        `En las últimas horas, se ha desarrollado un suceso de gran relevancia en ${coverage.location}.\n` +
-        `Detalles de la cobertura: ${coverage.description}.\n` +
-        `El equipo de Rafaela Noticias constató los hechos en el lugar de cobertura y continuará ampliando la información en próximas emisiones.`
+        `En las últimas horas, se ha desarrollado un suceso de gran relevancia en ${production.location || 'Rafaela'}.\n` +
+        `Detalles de la producción: ${production.description || ''}.\n` +
+        `El equipo de Rafaela Noticias constató los hechos en el lugar y continuará ampliando la información en próximas emisiones.`
       );
       setExtractedLoading(false);
     }, 1200);
@@ -390,35 +395,35 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     setTimeout(() => {
       let output = '';
       if (type === 'facebook') {
-        output = `🔴 [ÚLTIMO MOMENTO] • ${coverage.title}\n\n` +
-          `📍 Ocurriendo ahora en: ${coverage.location}.\n\n` +
-          `👉 ${coverage.description.substring(0, 160)}...\n\n` +
+        output = `🔴 [ÚLTIMO MOMENTO] • ${production.title}\n\n` +
+          `📍 Ocurriendo ahora en: ${production.location || 'Rafaela'}.\n\n` +
+          `👉 ${(production.description || '').substring(0, 160)}...\n\n` +
           `Seguí la cobertura completa minuto a minuto por Rafaela Noticias 👇\n` +
           `📲 Enlace de la nota: ${portalUrl}\n\n` +
           `#Rafaela #RafaelaNoticias #Ahora #CoberturaPeriodistica`;
       } else if (type === 'instagram') {
-        output = `📸 COBERTURA RN HUB • ${coverage.title}\n\n` +
-          `Te contamos los detalles clave de lo que está sucediendo en Rafaela. ${coverage.description.substring(0, 150)}.\n\n` +
+        output = `📸 COBERTURA RN HUB • ${production.title}\n\n` +
+          `Te contamos los detalles clave de lo que está sucediendo en Rafaela. ${(production.description || '').substring(0, 150)}.\n\n` +
           `Leé la crónica completa y mirá las imágenes exclusivas ingresando al enlace de nuestra biografía 🔗\n\n` +
           `#rafaela #noticias #periodismo #noticiaslocales`;
       } else if (type === 'reel') {
         output = `🎬 [GUION PARA INSTAGRAM REEL / TIKTOK]\n` +
           `Duración estimada: 30 segundos.\n\n` +
-          `[00:00 - 00:05] HOOK VISUAL: Grabación en primer plano de la locación (${coverage.location}).\n` +
+          `[00:00 - 00:05] HOOK VISUAL: Grabación en primer plano de la locación (${production.location || 'Rafaela'}).\n` +
           `🎙️ LOCUTOR: "¡Atención Rafaela! Miren lo que está pasando ahora mismo en la ciudad..."\n\n` +
           `[00:05 - 00:15] DETALLE: Tomas cerradas del hecho, entrevistas rápidas en la calle.\n` +
-          `🎙️ LOCUTOR: "Estamos en vivo informando sobre ${coverage.title}. Según los reportes periodísticos..."\n\n` +
+          `🎙️ LOCUTOR: "Estamos en vivo informando sobre ${production.title}. Según los reportes periodísticos..."\n\n` +
           `[00:15 - 00:30] LLAMADO A LA ACCIÓN: Grabar al periodista con micrófono de Rafaela Noticias.\n` +
           `🎙️ LOCUTOR: "Toda la información y los videos exclusivos los encontrás ya en la web. Entrá al enlace de nuestra biografía."`;
       } else if (type === 'youtube') {
-        output = `🎥 Cobertura especial: ${coverage.title}\n\n` +
-          `Transmisión en vivo y reportaje exclusivo de Rafaela Noticias desde ${coverage.location}.\n\n` +
+        output = `🎥 Cobertura especial: ${production.title}\n\n` +
+          `Transmisión en vivo y reportaje exclusivo de Rafaela Noticias desde ${production.location || 'Rafaela'}.\n\n` +
           `Leé la nota completa en: ${portalUrl}\n\n` +
           `Suscribite a nuestro canal y activá la campanita 🔔`;
       } else if (type === 'titles') {
         output = `💡 Variantes de Títulos Sugeridos para la Nota:\n\n` +
           `1. Choque múltiple y caos de tránsito en Ruta 34: lo que se sabe hasta ahora\n` +
-          `2. Cobertura RN: Fuertes testimonios tras el grave accidente en ${coverage.location}\n` +
+          `2. Cobertura RN: Fuertes testimonios tras el grave accidente en ${production.location || 'Rafaela'}\n` +
           `3. Caos vehicular en Ruta 34 por un triple choque: hay heridos leves\n` +
           `4. Operativo de urgencia en Ruta 34: bomberos y policía trabajan en el lugar\n` +
           `5. CRÓNICA: Los detalles del accidente vial que movilizó a bomberos en Rafaela`;
@@ -434,14 +439,14 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     alert('¡Copiado al portapapeles!');
   };
 
-  const platformNames: Record<keyof PublicationChecklist, string> = {
+  const platformNames: Record<string, string> = {
     portal: 'Portal Web',
     facebook: 'Facebook',
     instagram: 'Instagram',
     youtube: 'YouTube'
   };
 
-  const PUBLICATION_PLATFORMS: (keyof PublicationChecklist)[] = ['portal', 'facebook', 'instagram', 'youtube'];
+  const PUBLICATION_PLATFORMS = ['portal', 'facebook', 'instagram', 'youtube'];
 
   const presetMessages = [
     '⚠️ ¡Estoy en camino al lugar!',
@@ -450,6 +455,12 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
     '📝 Entrevista completada. Volviendo a la redacción.',
     '✅ Nota subida y lista para publicar.'
   ];
+
+  const activeAssignees = [
+    { id: production.journalistId, role: 'Periodista' },
+    { id: production.photographerId, role: 'Fotógrafo' },
+    { id: production.cameramanId, role: 'Camarógrafo' }
+  ].filter(x => x.id);
 
   return (
     <div>
@@ -513,7 +524,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
       >
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem', marginBottom: '1.25rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0', color: 'var(--text-primary)', lineHeight: 1.2 }}>{coverage.title}</h2>
+            <h2 style={{ fontSize: '1.8rem', fontWeight: 800, marginTop: '0', color: 'var(--text-primary)', lineHeight: 1.2 }}>{production.title}</h2>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <button 
@@ -538,10 +549,10 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1.5rem', fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
             <Calendar size={14} /> 
-            {formatFriendlyDate(coverage.dateTime)} - {new Date(coverage.dateTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
+            {production.productionDate ? `${production.productionDate} ${production.productionTime || '00:00'} hs` : 'Sin fecha asignada'}
           </span>
           <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-            <MapPin size={14} /> {coverage.location}
+            <MapPin size={14} /> {production.location || 'Sin ubicación'}
           </span>
         </div>
 
@@ -549,23 +560,24 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
           <select 
             className="form-select" 
             style={{ padding: '0.35rem 0.5rem', fontWeight: 600, width: 'auto' }}
-            value={coverage.status}
+            value={production.status}
             onChange={handleStatusChange}
           >
-            <option value="pending_confirmation">Pendiente de confirmación</option>
-            <option value="confirmed">Confirmada</option>
-            <option value="in_redaction">En Redacción</option>
-            <option value="published">Publicada</option>
+            <option value="pendiente_planificacion">Pendiente de Planificación</option>
+            <option value="programada">Programada</option>
+            <option value="finalizada">Finalizada</option>
+            <option value="suspendida">Suspendida</option>
           </select>
         </div>
 
-        {coverage.assignees.length > 0 && (
+        {activeAssignees.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.75rem' }}>
-            {coverage.assignees.map(uid => {
-              const u = users.find(usr => usr.id === uid);
+            {activeAssignees.map(item => {
+              const u = users.find(usr => usr.id === item.id);
+              if (!u) return null;
               return (
                 <div 
-                  key={uid} 
+                  key={item.id} 
                   style={{ 
                     display: 'flex', 
                     alignItems: 'center', 
@@ -582,7 +594,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                       width: '18px', 
                       height: '18px', 
                       borderRadius: '50%', 
-                      backgroundColor: u?.avatarColor,
+                      backgroundColor: u.avatarColor,
                       color: 'white',
                       display: 'flex',
                       alignItems: 'center',
@@ -591,9 +603,9 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                       fontWeight: 700
                     }}
                   >
-                    {u?.name.charAt(0)}
+                    {u.name.charAt(0)}
                   </div>
-                  <span style={{ fontWeight: 600 }}>{u?.name}</span>
+                  <span style={{ fontWeight: 600 }}>{u.name} <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>({item.role})</span></span>
                 </div>
               );
             })}
@@ -601,14 +613,9 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
         )}
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-          {coverage.programs && coverage.programs.map((prog, idx) => (
-            <span key={idx} style={{ fontSize: '0.73rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.12rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
-              📻 {prog}
-            </span>
-          ))}
-          {coverage.formats && coverage.formats.map((form, idx) => (
-            <span key={idx} style={{ fontSize: '0.73rem', backgroundColor: '#f3e8ff', color: '#6b21a8', padding: '0.12rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
-              ⚙️ {form}
+          {production.mediaOutlets && production.mediaOutlets.map((prog, idx) => (
+            <span key={idx} style={{ fontSize: '0.73rem', backgroundColor: '#e0f2fe', color: '#0369a1', padding: '0.12rem 0.45rem', borderRadius: '4px', fontWeight: 600, textTransform: 'capitalize' }}>
+              📺 {prog}
             </span>
           ))}
         </div>
@@ -619,48 +626,17 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
           {activeTab === 'general' && (
             <div className="card" style={{ padding: '2.5rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div>
-                <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Pauta / Información General</h3>
+                <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Detalles de la Producción</h3>
                 <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-                  {coverage.description}
+                  {production.description || 'Sin descripción redactada.'}
                 </div>
               </div>
 
-              {coverage.logisticsInfo && (
-                <div>
-                  <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Información Logística</h3>
-                  <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-                    {coverage.logisticsInfo}
-                  </div>
-                </div>
-              )}
-
-              {coverage.observations && (
+              {production.observations && (
                 <div>
                   <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Observaciones</h3>
                   <div style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-                    {coverage.observations}
-                  </div>
-                </div>
-              )}
-
-              {coverage.attachments && coverage.attachments.length > 0 && (
-                <div>
-                  <h3 className="detail-section-title" style={{ fontSize: '1.1rem', color: 'var(--text-primary)', border: 'none', margin: 0, paddingBottom: '0.5rem' }}>Adjuntos</h3>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.5rem' }}>
-                    {coverage.attachments.map((att, idx) => {
-                      const isUrl = att.startsWith('http://') || att.startsWith('https://');
-                      return (
-                        <div key={idx} style={{ fontSize: '0.9rem' }}>
-                          {isUrl ? (
-                            <a href={att} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600 }}>
-                              📎 {att} <ExternalLink size={12} />
-                            </a>
-                          ) : (
-                            <span style={{ color: 'var(--text-secondary)' }}>📎 {att}</span>
-                          )}
-                        </div>
-                      );
-                    })}
+                    {production.observations}
                   </div>
                 </div>
               )}
@@ -671,9 +647,9 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
             <div className="card">
               <h3 className="detail-section-title">📦 Gestor Multimedia y Archivos</h3>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                Sube fotos, videos, audios o documentos a esta actividad, o vincula enlaces externos y carpetas de Google Drive.
+                Sube fotos, videos, audios o documentos a esta producción, o vincula enlaces externos y carpetas de Google Drive.
               </p>
-              <MultimediaManager coverage={coverage} />
+              <MultimediaManager production={production} />
             </div>
           )}
 
@@ -683,15 +659,15 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
               
               <div className="chat-container">
                 <div className="chat-messages">
-                  {coverage.comments.length === 0 ? (
+                  {localComments.length === 0 ? (
                     <div style={{ padding: '3rem', textAlign: 'center', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                      Comienza la conversación. Todo el equipo de esta cobertura verá los mensajes.
+                      Comienza la conversación. Todo el equipo de esta producción verá los mensajes.
                     </div>
                   ) : (
-                    coverage.comments.map((comment) => {
+                    localComments.map((comment) => {
                       const user = users.find(u => u.id === comment.userId);
                       return (
-                        <div key={comment.id} className="message-bubble">
+                        <div key={comment.id} className="message-bubble" style={{ position: 'relative' }}>
                           <div 
                             style={{ 
                               width: '32px', 
@@ -709,7 +685,7 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                           >
                             {comment.userName.charAt(0)}
                           </div>
-                          <div>
+                          <div style={{ flex: 1 }}>
                             <div className="message-header">
                               <span className="message-sender">{comment.userName}</span>
                               <span className="message-time">
@@ -718,6 +694,14 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                             </div>
                             <div className="message-text">{comment.text}</div>
                           </div>
+                          {currentUser?.id === comment.userId && (
+                            <button 
+                              onClick={() => handleDeleteComment(comment.id)} 
+                              style={{ border: 'none', background: 'transparent', color: 'var(--danger-text)', cursor: 'pointer', opacity: 0.6, fontSize: '0.8rem', padding: '0.2rem' }}
+                            >
+                              ✕
+                            </button>
+                          )}
                         </div>
                       );
                     })
@@ -748,23 +732,23 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
                         whiteSpace: 'nowrap',
                         transition: 'var(--transition)'
                       }}
-                      className="hover-card-bg"
                     >
                       {msg}
                     </button>
                   ))}
                 </div>
 
-                <form onSubmit={handleSendComment} className="chat-input-wrapper">
+                <form onSubmit={handleSendComment} className="chat-input-area" style={{ display: 'flex', gap: '0.5rem', padding: '0.75rem', borderTop: '1px solid var(--border-color)' }}>
                   <input
                     type="text"
-                    className="chat-input"
-                    placeholder="Escribe un comentario... Usa @ para mencionar."
+                    className="form-input"
+                    placeholder="Escribe un mensaje interno..."
                     value={chatMessage}
                     onChange={(e) => setChatMessage(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem' }}
                   />
-                  <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem' }}>
-                    <Send size={16} />
+                  <button type="submit" className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
+                    Enviar
                   </button>
                 </form>
               </div>
@@ -772,200 +756,152 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
           )}
 
           {activeTab === 'publications' && (
-            <div className="card">
-              <h3 className="detail-section-title">📢 Control de Publicación en Redes y Web</h3>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                Marca las plataformas donde se ha difundido la noticia. El Portal Web permite registrar una URL de la nota publicada.
-              </p>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <h3 className="detail-section-title">📢 Control de Publicación en Redes y Medios</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                  Marca el estado de publicación en las diferentes plataformas y asocia los enlaces correspondientes.
+                </p>
+              </div>
 
-              <div className="platform-checklist">
-                {PUBLICATION_PLATFORMS.map(plat => {
-                  const check = coverage.publications[plat];
-                  if (!check) return null;
-                  const isPub = check.status === 'published';
-                  const pubUser = users.find(u => u.id === check.userId);
-                  
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
+                {PUBLICATION_PLATFORMS.map((platform) => {
+                  const isPub = isPublishedOn(platform);
                   return (
-                    <div key={plat} className="platform-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '0.5rem' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                        <div className="platform-info">
-                          <span className={`badge ${isPub ? 'status-published' : 'status-pending'}`} style={{ fontSize: '0.65rem' }}>
-                            {isPub ? 'Publicada' : 'Pendiente'}
-                          </span>
-                          <span>{platformNames[plat]}</span>
-                        </div>
-
-                        <div className="platform-actions">
-                          {isPub ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                              <span>Por: {pubUser?.name.split(' ')[0]}</span>
-                              <span>{formatFriendlyDate(check.date || '')}</span>
-                              {plat === 'portal' && check.link && (
-                                <a href={check.link} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem', fontWeight: 600 }}>
-                                  Enlace <ExternalLink size={12} />
-                                </a>
-                              )}
-                              <button 
-                                className="btn btn-secondary" 
-                                style={{ padding: '0.15rem 0.35rem', fontSize: '0.65rem' }}
-                                onClick={() => handleTogglePlatform(plat)}
-                              >
-                                Revertir
-                              </button>
-                            </div>
-                          ) : (
-                            plat === 'portal' ? null : (
-                              <button 
-                                className="btn btn-primary" 
-                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }}
-                                onClick={() => handleTogglePlatform(plat)}
-                              >
-                                Marcar Publicada
-                              </button>
-                            )
-                          )}
-                        </div>
+                    <div 
+                      key={platform} 
+                      className="card" 
+                      style={{ 
+                        padding: '1.25rem', 
+                        display: 'flex', 
+                        flexDirection: 'column', 
+                        gap: '0.75rem',
+                        borderLeft: `4px solid ${isPub ? '#10b981' : 'var(--border-color)'}`
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <strong style={{ fontSize: '0.95rem', textTransform: 'capitalize' }}>
+                          {platformNames[platform] || platform}
+                        </strong>
+                        <span className={`badge ${isPub ? 'status-published' : 'status-pending'}`} style={{ fontSize: '0.7rem' }}>
+                          {isPub ? 'Publicado' : 'Pendiente'}
+                        </span>
                       </div>
-
-                      {plat === 'portal' && !isPub && (
-                        <form onSubmit={handlePortalPublish} style={{ display: 'flex', gap: '0.5rem', width: '100%', alignItems: 'center' }}>
-                          <input
-                            type="url"
-                            className="form-input"
-                            placeholder="https://rafaelanoticias.com/nota/..."
-                            value={portalInputUrl}
-                            onChange={e => setPortalInputUrl(e.target.value)}
-                            style={{ flex: 1, padding: '0.3rem 0.5rem', fontSize: '0.8rem' }}
-                          />
-                          <button type="submit" className="btn btn-primary" style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>
-                            Publicar en Portal
-                          </button>
-                        </form>
-                      )}
+                      
+                      <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.25rem' }}>
+                        <button 
+                          className={`btn ${isPub ? 'btn-secondary' : 'btn-primary'}`} 
+                          style={{ flex: 1, fontSize: '0.78rem', padding: '0.4rem' }}
+                          onClick={() => handleTogglePlatform(platform)}
+                        >
+                          {isPub ? 'Desmarcar' : 'Marcar Publicado'}
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
+              </div>
+
+              {/* Portal link insertion */}
+              <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem', marginTop: '0.5rem' }}>
+                <h4 style={{ margin: '0 0 0.5rem 0', fontSize: '0.95rem' }}>🔗 Asociar Enlace del Portal</h4>
+                <form onSubmit={handlePortalPublish} style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="url"
+                    required
+                    className="form-input"
+                    placeholder="Ej. https://www.rafaelanoticias.com/noticia/choque-ruta-34..."
+                    value={portalInputUrl}
+                    onChange={(e) => setPortalInputUrl(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem' }}
+                  />
+                  <button type="submit" className="btn btn-primary" style={{ whiteSpace: 'nowrap' }}>
+                    Asociar Nota
+                  </button>
+                </form>
               </div>
             </div>
           )}
 
           {activeTab === 'copilot' && (
-            <div className="card">
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <Sparkles size={20} color="var(--primary)" />
-                <h3 className="detail-section-title" style={{ margin: 0, padding: 0, border: 'none' }}>
-                  Copiloto IA - Generador de Contenido
-                </h3>
+            <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              <div>
+                <h3 className="detail-section-title">🤖 Copiloto Editorial IA</h3>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                  Extrae el texto de la nota del Portal Web o asocia la gacetilla para que la IA genere copys adaptados para redes sociales.
+                </p>
               </div>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
-                Ingresa la URL de la nota publicada en el portal para simular su lectura y redactar borradores optimizados.
-              </p>
 
-              <div className="form-group" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem', alignItems: 'flex-end' }}>
-                <div style={{ flex: 1 }}>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem', display: 'block' }}>
-                    URL de la Nota (Portal Web) *
-                  </label>
+              <div className="form-group">
+                <label className="form-label" style={{ fontWeight: 600 }}>Enlace de Origen del Portal Web</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input
                     type="url"
                     className="form-input"
-                    placeholder="https://rafaelanoticias.com/policiales/choque-ruta-34..."
-                    style={{ width: '100%' }}
+                    placeholder="Pegar enlace del Portal para analizar..."
                     value={portalUrl}
                     onChange={(e) => setPortalUrl(e.target.value)}
+                    style={{ flex: 1, padding: '0.5rem' }}
                   />
+                  <button 
+                    type="button" 
+                    className="btn btn-primary"
+                    onClick={handleExtract}
+                    disabled={extractedLoading}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {extractedLoading ? 'Extrayendo...' : 'Extraer e Iniciar'}
+                  </button>
                 </div>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  onClick={handleExtract}
-                  disabled={extractedLoading}
-                >
-                  {extractedLoading ? 'Extrayendo...' : 'Extraer e Iniciar'}
-                </button>
               </div>
 
               {extractedText && (
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem', marginBottom: '0.25rem', display: 'block' }}>
-                    Contenido Extraído de la Nota (Simulado)
-                  </label>
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  <label className="form-label" style={{ fontWeight: 600 }}>Texto Base Extraído</label>
                   <textarea
+                    readOnly
                     className="form-textarea"
                     rows={4}
                     value={extractedText}
-                    onChange={(e) => setExtractedText(e.target.value)}
-                    style={{ fontSize: '0.8rem', width: '100%', padding: '0.5rem' }}
+                    style={{ backgroundColor: 'var(--bg-tertiary)', fontSize: '0.82rem', fontFamily: 'monospace' }}
                   />
                 </div>
               )}
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1.25rem' }}>
-                <button className="btn btn-secondary" style={{ fontSize: '0.8rem' }} onClick={() => runAiSimulation('facebook')} disabled={!extractedText}>
-                  Copy Facebook
-                </button>
-                <button className="btn btn-secondary" style={{ fontSize: '0.8rem' }} onClick={() => runAiSimulation('instagram')} disabled={!extractedText}>
-                  Texto Instagram
-                </button>
-                <button className="btn btn-secondary" style={{ fontSize: '0.8rem' }} onClick={() => runAiSimulation('reel')} disabled={!extractedText}>
-                  Guion Reel/TikTok
-                </button>
-                <button className="btn btn-secondary" style={{ fontSize: '0.8rem' }} onClick={() => runAiSimulation('youtube')} disabled={!extractedText}>
-                  Descripción YouTube
-                </button>
-                <button className="btn btn-secondary" style={{ fontSize: '0.8rem' }} onClick={() => runAiSimulation('titles')} disabled={!extractedText}>
-                  5 Variantes Títulos
-                </button>
-              </div>
+              {extractedText && (
+                <div>
+                  <h4 style={{ margin: '0 0 0.75rem 0', fontSize: '0.9rem' }}>Generar Contenido Redes:</h4>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <button className="btn btn-secondary" onClick={() => runAiSimulation('titles')}>💡 Sugerir Títulos</button>
+                    <button className="btn btn-secondary" onClick={() => runAiSimulation('facebook')}>📘 Post Facebook</button>
+                    <button className="btn btn-secondary" onClick={() => runAiSimulation('instagram')}>📸 Post Instagram</button>
+                    <button className="btn btn-secondary" onClick={() => runAiSimulation('reel')}>🎬 Guión Reel/TikTok</button>
+                    <button className="btn btn-secondary" onClick={() => runAiSimulation('youtube')}>🎥 Post YouTube</button>
+                  </div>
+                </div>
+              )}
 
-              {aiLoading ? (
-                <div style={{ padding: '2rem', textAlign: 'center', backgroundColor: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)' }}>
-                  <Bot size={28} className="spin" style={{ color: 'var(--primary)', animation: 'spin 1.5s linear infinite' }} />
-                  <p style={{ fontSize: '0.8rem', marginTop: '0.5rem', fontWeight: 600 }}>Generando copys con Copiloto IA...</p>
+              {aiLoading && (
+                <div style={{ padding: '2rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--primary)', fontWeight: 600 }}>
+                  🪄 Redactando contenido con IA...
                 </div>
-              ) : aiOutput ? (
-                <div style={{ position: 'relative' }}>
-                  <pre style={{
-                    backgroundColor: 'var(--bg-secondary)',
-                    padding: '1rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid var(--border-color)',
-                    fontSize: '0.8rem',
-                    whiteSpace: 'pre-wrap',
-                    fontFamily: 'monospace',
-                    color: 'var(--text-primary)',
-                    maxHeight: '280px',
-                    overflowY: 'auto'
-                  }}>
-                    {aiOutput}
-                  </pre>
-                  <button 
-                    onClick={copyToClipboard}
-                    style={{
-                      position: 'absolute',
-                      top: '8px',
-                      right: '8px',
-                      backgroundColor: 'var(--bg-primary)',
-                      border: '1px solid var(--border-color)',
-                      padding: '0.25rem 0.5rem',
-                      borderRadius: 'var(--radius-sm)',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.25rem',
-                      fontSize: '0.7rem',
-                      fontWeight: 600
-                    }}
-                  >
-                    <Clipboard size={12} /> Copiar
-                  </button>
-                </div>
-              ) : (
-                <div style={{ padding: '2.5rem', textAlign: 'center', border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                  {!extractedText 
-                    ? '1. Ingresa la URL y presiona "Extraer e Iniciar" para simular la lectura de la nota.' 
-                    : '2. Selecciona una plataforma arriba para redactar los copies promocionales.'
-                  }
+              )}
+
+              {aiOutput && (
+                <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.25rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label" style={{ fontWeight: 600, margin: 0 }}>Borrador IA Generado</label>
+                    <button className="btn btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem' }} onClick={copyToClipboard}>
+                      Copiar al Portapapeles
+                    </button>
+                  </div>
+                  <textarea
+                    readOnly
+                    className="form-textarea"
+                    rows={6}
+                    value={aiOutput}
+                    style={{ fontSize: '0.85rem', fontFamily: 'var(--font-primary)' }}
+                  />
                 </div>
               )}
             </div>
@@ -973,420 +909,163 @@ export const CoverageDetail: React.FC<CoverageDetailProps> = ({ coverageId, onBa
 
           {activeTab === 'history' && (
             <div className="card">
-              <h3 className="detail-section-title">📋 Registro de Auditoría y Actividad</h3>
+              <h3 className="detail-section-title">⏳ Historial de Auditoría y Cambios</h3>
+              <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>
+                Registro completo de auditoría y operaciones sobre esta actividad de producción.
+              </p>
               
-              <div className="activity-list" style={{ padding: '0.5rem' }}>
-                {coverage.activities.map((act) => {
-                  return (
-                    <div key={act.id} className="activity-item">
-                      <div className="activity-circle">✓</div>
-                      <div>
-                        <span style={{ fontWeight: 700 }}>{act.userName} </span>
-                        <span>{act.action}</span>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '0.1rem' }}>
-                          {formatFriendlyDate(act.timestamp)} a las {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} hs
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="audit-timeline" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                <div style={{ borderLeft: '2px solid var(--border-color)', paddingLeft: '1.25rem', position: 'relative' }}>
+                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--primary)', position: 'absolute', left: '-5px', top: '5px' }}></div>
+                  <span style={{ fontSize: '0.73rem', color: 'var(--text-muted)', display: 'block' }}>
+                    {production.createdAt ? new Date(production.createdAt).toLocaleString() : 'Recientemente'}
+                  </span>
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>Producción registrada en el sistema</span>
+                </div>
               </div>
             </div>
           )}
-
         </div>
 
+        {/* Sidebar right details panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div className="card">
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-              Resumen de Cobertura
-            </h3>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.8rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>ID:</span>
-                <span style={{ fontFamily: 'monospace' }}>{coverage.id}</span>
+          <div className="card" style={{ padding: '1.5rem' }}>
+            <h4 style={{ margin: '0 0 1rem 0', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', fontSize: '0.95rem' }}>
+              ⚙️ Detalles Técnicos
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', fontSize: '0.8rem' }}>
+              <div>
+                <span style={{ color: 'var(--text-secondary)' }}>ID Único:</span>
+                <code style={{ display: 'block', backgroundColor: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '4px', fontSize: '0.72rem', wordBreak: 'break-all', marginTop: '0.1rem' }}>
+                  {production.id}
+                </code>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Estado:</span>
-                <span className={`badge status-${coverage.status}`} style={{ textTransform: 'capitalize' }}>
-                  {coverage.status.replace(/_/g, ' ')}
+              {production.proposalId && (
+                <div>
+                  <span style={{ color: 'var(--text-secondary)' }}>Propuesta Origen:</span>
+                  <code style={{ display: 'block', backgroundColor: 'var(--bg-secondary)', padding: '0.2rem', borderRadius: '4px', fontSize: '0.72rem', wordBreak: 'break-all', marginTop: '0.1rem' }}>
+                    {production.proposalId}
+                  </code>
+                </div>
+              )}
+              <div>
+                <span style={{ color: 'var(--text-secondary)' }}>Última Actualización:</span>
+                <span style={{ display: 'block', fontWeight: 600 }}>
+                  {new Date().toLocaleDateString()}
                 </span>
               </div>
-              
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Archivos:</span>
-                <span style={{ fontWeight: 600 }}>{coverage.multimedia.length} cargados</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Enlaces:</span>
-                <span style={{ fontWeight: 600 }}>{coverage.sharedLinks.length} compartidos</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="card">
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-              Auditoría de Redes
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
-              {Object.keys(coverage.publications).map(plat => {
-                const isPub = coverage.publications[plat as keyof PublicationChecklist].status === 'published';
-                return (
-                  <div key={plat} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span>{platformNames[plat as keyof PublicationChecklist]}</span>
-                    <span 
-                      style={{ 
-                        fontWeight: 700, 
-                        color: isPub ? 'var(--success)' : 'var(--text-muted)' 
-                      }}
-                    >
-                      {isPub ? '✓ PUBLICADO' : '⚪ Pendiente'}
-                    </span>
-                  </div>
-                );
-              })}
             </div>
           </div>
         </div>
       </div>
 
-      {showFileModal && (
-        <div className="modal-overlay">
-          <div className="modal-content">
+      {/* Edit Coverage Details Modal */}
+      {showEditModal && (
+        <div className="modal-overlay" style={{ display: 'flex', zIndex: 110 }} onClick={() => setShowEditModal(false)}>
+          <div className="modal-content event-modal-content" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3 className="modal-title">Simular Carga de Archivo</h3>
-              <button className="modal-close" onClick={() => setShowFileModal(false)}>✕</button>
+              <h3 className="modal-title">Editar Planificación de Producción</h3>
+              <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
             </div>
-            <form onSubmit={handleAddFileSubmit}>
-              <div className="modal-body">
-                <div className="form-group">
-                  <label className="form-label">Nombre del Archivo</label>
+            <form onSubmit={handleSaveCoverageDetails}>
+              <div className="modal-body event-form-grid" style={{ padding: '1.5rem' }}>
+                <div className="form-group" style={{ gridColumn: 'span 2' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Producción *</label>
                   <input
                     type="text"
                     required
                     className="form-input"
-                    placeholder="Ej. entrevista_intendente.mp3"
-                    value={fileName}
-                    onChange={(e) => setFileName(e.target.value)}
+                    placeholder="Ej. Sesión en el Concejo Deliberante..."
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
                   />
                 </div>
-                <div className="form-group">
-                  <label className="form-label">Tipo de Archivo</label>
-                  <select 
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación</label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Ej. Bv. Santa Fe 300, Rafaela"
+                    value={editLocation}
+                    onChange={(e) => setEditLocation(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora</label>
+                  <input
+                    type="time"
+                    className="form-input"
+                    value={editTime}
+                    onChange={(e) => setEditTime(e.target.value)}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 1' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Quién lo cubre</label>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                    <select
+                      className="form-select"
+                      value={editJournalistId}
+                      onChange={e => setEditJournalistId(e.target.value)}
+                      style={{ padding: '0.35rem', fontSize: '0.8rem' }}
+                    >
+                      <option value="">Sin asignar 1...</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                    <select
+                      className="form-select"
+                      value={editJournalistId2}
+                      onChange={e => setEditJournalistId2(e.target.value)}
+                      style={{ padding: '0.35rem', fontSize: '0.8rem' }}
+                    >
+                      <option value="">Sin asignar 2...</option>
+                      {users.map(u => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Descripción</label>
+                  <textarea
+                    className="form-textarea"
+                    rows={3}
+                    placeholder="Detalles de la cobertura..."
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    style={{ fontSize: '0.85rem' }}
+                  />
+                </div>
+
+                <div className="form-group" style={{ gridColumn: 'span 3' }}>
+                  <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Estado</label>
+                  <select
                     className="form-select"
-                    value={fileType}
-                    onChange={(e) => setFileType(e.target.value as any)}
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as any)}
+                    style={{ padding: '0.5rem', fontWeight: 600 }}
                   >
-                    <option value="photo">Imagen (JPEG/PNG)</option>
-                    <option value="video">Video (MP4/MOV)</option>
-                    <option value="audio">Audio (MP3/WAV)</option>
-                    <option value="document">Documento (PDF/Word)</option>
+                    <option value="pendiente_planificacion">Pendiente de confirmación</option>
+                    <option value="programada">Confirmada</option>
                   </select>
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowFileModal(false)}>
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-primary">
-                  Cargar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Media Preview Modal */}
-      {previewItem && (
-        <div className="modal-overlay" style={{ display: 'flex', zIndex: 120 }} onClick={() => setPreviewItem(null)}>
-          <div className="modal-content" style={{ maxWidth: '800px', width: '95%' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                Previsualización: {previewItem.name}
-              </h3>
-              <button className="modal-close" onClick={() => setPreviewItem(null)}>✕</button>
-            </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundColor: '#111827', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
-              {previewItem.type === 'photo' && (
-                <img 
-                  src={previewItem.url} 
-                  alt={previewItem.name} 
-                  style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain' }} 
-                />
-              )}
-              {previewItem.type === 'video' && (
-                <video 
-                  src={previewItem.url} 
-                  controls 
-                  autoPlay 
-                  style={{ width: '100%', maxHeight: '70vh', backgroundColor: '#000' }} 
-                />
-              )}
-              {previewItem.type === 'audio' && (
-                <div style={{ width: '100%', padding: '2rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', background: '#1f2937', borderRadius: 'var(--radius-md)' }}>
-                  <span style={{ fontSize: '2.5rem' }}>🎵</span>
-                  <span style={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>{previewItem.name}</span>
-                  <audio src={previewItem.url} controls autoPlay style={{ width: '90%' }} />
-                </div>
-              )}
-              {previewItem.type === 'document' && (
-                <div style={{ width: '100%', height: '500px', backgroundColor: '#fff', color: '#333', padding: '2rem', overflowY: 'auto', borderRadius: 'var(--radius-md)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  <div style={{ borderBottom: '2px solid var(--primary)', paddingBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <h4 style={{ fontWeight: 800, color: 'var(--primary)', margin: 0 }}>Rafaela Noticias - Gacetilla de Prensa</h4>
-                    <span style={{ fontSize: '0.75rem', color: '#666' }}>Tamaño: {previewItem.size}</span>
-                  </div>
-                  <p style={{ fontSize: '0.85rem', color: '#555', fontStyle: 'italic' }}>
-                    [Vista previa del documento en pantalla completa]
-                  </p>
-                  <div style={{ fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                    {coverage.description || "Contenido de la gacetilla o reporte adjunto."}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Tamaño del archivo: {previewItem.size}</span>
-              <button className="btn btn-secondary" onClick={() => setPreviewItem(null)}>
-                Cerrar Visor
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Coverage Details Modal */}
-      {showEditModal && coverage && (
-        <div className="modal-overlay" style={{ display: 'flex', zIndex: 110 }} onClick={() => setShowEditModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '950px', width: '95%', maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3 className="modal-title">Editar Planificación de Cobertura</h3>
-              <button className="modal-close" onClick={() => setShowEditModal(false)}>✕</button>
-            </div>
-            <form onSubmit={handleSaveCoverageDetails}>
-              <div className="modal-body" style={{ padding: '1.5rem' }}>
-                <div className="coverage-create-grid">
-                  
-                  {/* Left Column - Core Data */}
-                  <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Título de la Cobertura</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Ej. Sesión en el Concejo Deliberante por el presupuesto."
-                        value={editTitle}
-                        onChange={(e) => setEditTitle(e.target.value)}
-                      />
-                    </div>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Fecha</label>
-                        <input
-                          type="date"
-                          className="form-input"
-                          value={editDate}
-                          onChange={(e) => setEditDate(e.target.value)}
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Hora</label>
-                        <input
-                          type="time"
-                          className="form-input"
-                          value={editTime}
-                          onChange={(e) => setEditTime(e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Ubicación</label>
-                      <input
-                        type="text"
-                        className="form-input"
-                        placeholder="Ej. Bv. Santa Fe 300, Rafaela"
-                        value={editLocation}
-                        onChange={(e) => setEditLocation(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Estado</label>
-                      <select
-                        className="form-select"
-                        value={editStatus}
-                        onChange={(e) => setEditStatus(e.target.value as any)}
-                        style={{ padding: '0.5rem', fontWeight: 600 }}
-                      >
-                        <option value="pending_confirmation">Pendiente de confirmación</option>
-                        <option value="confirmed">Confirmada</option>
-                        <option value="in_redaction">En Redacción</option>
-                        <option value="published">Publicada</option>
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Formato</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.2rem' }}>
-                        {FORMAT_OPTIONS.map(form => {
-                          const isSelected = editFormats.includes(form);
-                          return (
-                            <button
-                              key={form}
-                              type="button"
-                              className="btn"
-                              onClick={() => {
-                                setEditFormats(prev => prev.includes(form) ? prev.filter(f => f !== form) : [...prev, form]);
-                              }}
-                              style={{
-                                padding: '0.35rem 0.75rem',
-                                fontSize: '0.75rem',
-                                borderRadius: 'var(--radius-md)',
-                                border: '1px solid var(--border-color)',
-                                background: isSelected ? 'var(--primary)' : 'var(--bg-secondary)',
-                                color: isSelected ? 'white' : 'var(--text-secondary)',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                transition: 'var(--transition)'
-                              }}
-                            >
-                              {form}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column - Team & Logistics */}
-                  <div className="coverage-create-col" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Responsable Principal</label>
-                      <select
-                        className="form-select"
-                        value={editMainResponsable}
-                        onChange={e => setEditMainResponsable(e.target.value)}
-                      >
-                        <option value="">Sin responsable principal</option>
-                        {users.map(u => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Equipo Asignado</label>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                        {editAssigneesList.length === 0 ? (
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>Ningún integrante asignado al equipo</span>
-                        ) : (
-                          editAssigneesList.map(uid => {
-                            const u = users.find(usr => usr.id === uid);
-                            if (!u) return null;
-                            return (
-                              <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', padding: '0.2rem 0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-full)', fontSize: '0.75rem' }}>
-                                <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: u.avatarColor }} />
-                                <span>{u.name.split(' ')[0]}</span>
-                                <button 
-                                  type="button" 
-                                  onClick={() => setEditAssigneesList(prev => prev.filter(id => id !== uid))} 
-                                  style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontWeight: 'bold', fontSize: '0.8rem', padding: '0 0.1rem' }}
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            );
-                          })
-                        )}
-                      </div>
-                      <select
-                        className="form-select"
-                        value=""
-                        onChange={e => {
-                          const uid = e.target.value;
-                          if (uid && !editAssigneesList.includes(uid)) {
-                            setEditAssigneesList(prev => [...prev, uid]);
-                          }
-                        }}
-                        style={{ fontSize: '0.8rem', padding: '0.4rem' }}
-                      >
-                        <option value="">+ Agregar integrante...</option>
-                        {users
-                          .filter(u => u.id !== editMainResponsable && !editAssigneesList.includes(u.id))
-                          .map(u => (
-                            <option key={u.id} value={u.id}>{u.name}</option>
-                          ))}
-                      </select>
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Información Logística</label>
-                      <textarea
-                        className="form-textarea"
-                        rows={2}
-                        placeholder="Direcciones secundarias, accesos, teléfonos de contacto, transporte..."
-                        value={editLogisticsInfo}
-                        onChange={(e) => setEditLogisticsInfo(e.target.value)}
-                        style={{ fontSize: '0.85rem' }}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Observaciones</label>
-                      <textarea
-                        className="form-textarea"
-                        rows={2}
-                        placeholder="Comentarios adicionales, enfoques sugeridos..."
-                        value={editObservations}
-                        onChange={(e) => setEditObservations(e.target.value)}
-                        style={{ fontSize: '0.85rem' }}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label" style={{ fontWeight: 700, fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Adjuntos (Enlaces / Archivos)</label>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', marginBottom: '0.4rem' }}>
-                        {editAttachments.map((att, idx) => (
-                          <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-md)', fontSize: '0.78rem' }}>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%', color: 'var(--text-secondary)' }}>📎 {att}</span>
-                            <button 
-                              type="button" 
-                              onClick={() => setEditAttachments(prev => prev.filter((_, i) => i !== idx))} 
-                              style={{ border: 'none', background: 'none', cursor: 'pointer', color: 'var(--danger)', fontSize: '0.8rem' }}
-                            >
-                              🗑️
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                      <div style={{ display: 'flex', gap: '0.25rem' }}>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          placeholder="Ej: https://drive.google.com/... o gacetilla.pdf" 
-                          style={{ flex: 1, padding: '0.35rem 0.5rem', fontSize: '0.8rem' }}
-                          value={editAttachmentInput}
-                          onChange={e => setEditAttachmentInput(e.target.value)}
-                          onKeyDown={e => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addEditAttachment();
-                            }
-                          }}
-                        />
-                        <button type="button" onClick={addEditAttachment} className="btn btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }}>
-                          Agregar
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-              </div>
-              <div className="modal-footer" style={{ padding: '1rem 1.5rem' }}>
+              <div className="modal-footer" style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                 <button type="button" className="btn btn-secondary" onClick={() => setShowEditModal(false)}>
                   Cancelar
                 </button>

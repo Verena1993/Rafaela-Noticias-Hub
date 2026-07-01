@@ -19,7 +19,7 @@ export const ProductionTable: React.FC<ProductionTableProps> = ({
   setActiveTab,
   setAutoOpenCreateModal
 }) => {
-  const { events, users, coverages } = useHub();
+  const { events, users, productions } = useHub();
 
   const [selectedDate, setSelectedDate] = useState(() => {
     const d = new Date();
@@ -50,7 +50,10 @@ export const ProductionTable: React.FC<ProductionTableProps> = ({
       data.status,
       data.assigneeId || undefined,
       data.programs,
-      data.formats
+      data.formats,
+      data.observations,
+      data.multimedia,
+      data.assigneeId2 || undefined
     );
     setEditingEvent(null);
   };
@@ -197,8 +200,12 @@ export const ProductionTable: React.FC<ProductionTableProps> = ({
                   // Get assignees list
                   let assigneesList: string[] = [];
                   if (evt.coverageId) {
-                     const cov = coverages.find(c => c.id === evt.coverageId);
-                     if (cov) assigneesList = cov.assignees;
+                     const prod = productions.find(p => p.id === evt.coverageId);
+                     if (prod) {
+                       if (prod.journalistId) assigneesList.push(prod.journalistId);
+                       if (prod.photographerId) assigneesList.push(prod.photographerId);
+                       if (prod.cameramanId) assigneesList.push(prod.cameramanId);
+                     }
                   } else if (evt.assigneeId) {
                      assigneesList = [evt.assigneeId];
                   }
@@ -279,8 +286,11 @@ export const ProductionTable: React.FC<ProductionTableProps> = ({
             location: editingEvent.location || '',
             status: editingEvent.status,
             assigneeId: editingEvent.assigneeId || '',
+            assigneeId2: editingEvent.assigneeId2 || '',
             programs: editingEvent.programs || [],
-            formats: editingEvent.formats || []
+            formats: editingEvent.formats || [],
+            observations: editingEvent.observations || '',
+            multimedia: editingEvent.multimedia || []
           }}
           onSave={handleSaveEdit}
           onClose={() => setEditingEvent(null)}

@@ -220,10 +220,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
             justifyContent: isCollapsed ? 'center' : 'flex-start',
             padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
           }}
-          title={isCollapsed ? "Coberturas" : undefined}
+          title={isCollapsed ? "Tablero de Producción" : undefined}
         >
           <Kanban size={18} />
-          {!isCollapsed && <span>Coberturas</span>}
+          {!isCollapsed && <span>Tablero de Producción</span>}
         </button>
 
         <button
