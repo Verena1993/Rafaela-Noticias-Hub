@@ -32,7 +32,7 @@ export const Calendar: React.FC<CalendarProps> = ({
   const FORMAT_OPTIONS: FormatType[] = ['Telefónica', 'Videollamada', 'Presencial', 'Móvil', 'Grabada', 'Vivo en redes'];
 
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
-  const [calendarTab, setCalendarTab] = useState<'producciones' | 'efemerides' | 'guardias' | 'libre'>('producciones');
+  const [calendarTab] = useState<'producciones' | 'efemerides' | 'guardias' | 'libre'>('producciones');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAutocompleteModal, setShowAutocompleteModal] = useState(false);
 
@@ -360,8 +360,77 @@ export const Calendar: React.FC<CalendarProps> = ({
       setSelectedCoverageId(coverageId);
     }
   };
+    const viewDateStr = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, '0')}-${String(viewDate.getDate()).padStart(2, '0')}`;
 
+    // Week days calculation for weekly summary
+    const getMondayOfDate = (d: Date) => {
+      const date = new Date(d);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      return new Date(date.setDate(diff));
+    };
+    const weekStart = getMondayOfDate(viewDate);
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      return d;
+    });
 
+    const formatDayLabel = (d: Date) => {
+      const days = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+      return `${days[d.getDay()]} ${d.getDate()}`;
+    };
+
+    const ephemerisList: { dateStr: string; text: string; id: string }[] = [];
+    const guardsList: { dateStr: string; text: string }[] = [];
+    const offsList: { dateStr: string; text: string }[] = [];
+
+    weekDays.forEach(dayDate => {
+      const dayStr = `${dayDate.getFullYear()}-${String(dayDate.getMonth() + 1).padStart(2, '0')}-${String(dayDate.getDate()).padStart(2, '0')}`;
+      
+      // Ephemeris
+      const ephemeris = getEphemerisByMonthDay(dayStr);
+      ephemeris.forEach(ep => {
+        ephemerisList.push({
+          dateStr: dayStr,
+          text: `${formatDayLabel(dayDate)} • ${ep.title}`,
+          id: ep.id
+        });
+      });
+
+      // Guardias
+      const sched = getDaySchedule(dayStr);
+      sched.guardIds.forEach(uid => {
+        const name = users.find(u => u.id === uid)?.name || 'Desconocido';
+        guardsList.push({
+          dateStr: dayStr,
+          text: `${formatDayLabel(dayDate)} • ${name}`
+        });
+      });
+
+      // Libres
+      sched.offIds.forEach(uid => {
+        const name = users.find(u => u.id === uid)?.name || 'Desconocido';
+        offsList.push({
+          dateStr: dayStr,
+          text: `${formatDayLabel(dayDate)} • ${name} (Franco)`
+        });
+      });
+      sched.vacationIds.forEach(uid => {
+        const name = users.find(u => u.id === uid)?.name || 'Desconocido';
+        offsList.push({
+          dateStr: dayStr,
+          text: `${formatDayLabel(dayDate)} • ${name} (Vacaciones)`
+        });
+      });
+      sched.absentIds.forEach(uid => {
+        const name = users.find(u => u.id === uid)?.name || 'Desconocido';
+        offsList.push({
+          dateStr: dayStr,
+          text: `${formatDayLabel(dayDate)} • ${name} (Ausente)`
+        });
+      });
+    });
 
   return (
     <div className="calendar-module">
@@ -416,82 +485,41 @@ export const Calendar: React.FC<CalendarProps> = ({
 
       {/* Main Calendar Card */}
       <div className="card" style={{ padding: '1rem' }}>
-        {/* Calendar Sub-View Tabs */}
+        {/* Program Filter */}
         <div style={{
           display: 'flex',
-          borderBottom: '2px solid var(--border-color)',
+          borderBottom: '1px solid var(--border-color)',
           marginBottom: '1rem',
-          gap: '0.1rem'
+          overflowX: 'auto',
+          gap: '0.25rem',
+          paddingBottom: '0.25rem'
         }}>
-          {([
-            { key: 'producciones', label: '📅 Producciones' },
-            { key: 'efemerides',   label: '🏛️ Efemérides' },
-            { key: 'guardias',     label: '🛡️ Guardias' },
-            { key: 'libre',        label: '🏖️ Libre' }
-          ] as const).map(tab => {
-            const isActive = calendarTab === tab.key;
+          {['Todos', 'Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'].map((prog) => {
+            const isActive = selectedProgramFilter === prog;
             return (
               <button
-                key={tab.key}
+                key={prog}
+                onClick={() => setSelectedProgramFilter(prog as any)}
                 type="button"
-                onClick={() => setCalendarTab(tab.key)}
                 style={{
-                  padding: '0.5rem 1rem',
+                  padding: '0.4rem 0.8rem',
                   border: 'none',
-                  background: 'transparent',
+                  background: isActive ? 'var(--primary-light)' : 'transparent',
                   borderBottom: isActive ? '2px solid var(--primary)' : '2px solid transparent',
                   color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
                   fontWeight: isActive ? 700 : 500,
                   fontSize: '0.85rem',
                   cursor: 'pointer',
-                  marginBottom: '-2px',
+                  borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
                   transition: 'var(--transition)',
                   whiteSpace: 'nowrap'
                 }}
               >
-                {tab.label}
+                {prog === 'Todos' ? '🌐 Todos' : `📻 ${prog}`}
               </button>
             );
           })}
         </div>
-
-        {/* Program Filter — only for Producciones */}
-        {calendarTab === 'producciones' && (
-          <div style={{
-            display: 'flex',
-            borderBottom: '1px solid var(--border-color)',
-            marginBottom: '1rem',
-            overflowX: 'auto',
-            gap: '0.25rem',
-            paddingBottom: '0.25rem'
-          }}>
-            {['Todos', 'Bien Despiertos', 'Noticiero Mañana', 'Noticiero Tarde', 'Digital'].map((prog) => {
-              const isActive = selectedProgramFilter === prog;
-              return (
-                <button
-                  key={prog}
-                  onClick={() => setSelectedProgramFilter(prog as any)}
-                  type="button"
-                  style={{
-                    padding: '0.4rem 0.8rem',
-                    border: 'none',
-                    background: isActive ? 'var(--primary-light)' : 'transparent',
-                    borderBottom: isActive ? '2px solid var(--primary)' : '2px solid transparent',
-                    color: isActive ? 'var(--primary)' : 'var(--text-secondary)',
-                    fontWeight: isActive ? 700 : 500,
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    borderRadius: 'var(--radius-sm) var(--radius-sm) 0 0',
-                    transition: 'var(--transition)',
-                    whiteSpace: 'nowrap'
-                  }}
-                >
-                  {prog === 'Todos' ? '🌐 Todos' : `📻 ${prog}`}
-                </button>
-              );
-            })}
-          </div>
-        )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button 
@@ -752,11 +780,10 @@ export const Calendar: React.FC<CalendarProps> = ({
               const timeB = b.start.split('T')[1] || '';
               return timeA.localeCompare(timeB);
             });
-          const sched = getDaySchedule(dayStr);
           
           return (
-            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem' }}>
-              <div>
+            <div>
+              <div style={{ width: '100%' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)', marginBottom: '0.75rem' }}>
                   <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>
                     Compromisos del {formatFriendlyDate(viewDate)}
@@ -890,52 +917,100 @@ export const Calendar: React.FC<CalendarProps> = ({
                   </div>
                 )}
               </div>
-
-              {/* Side staff card for Day View */}
-              <div className="card" style={{ backgroundColor: 'var(--bg-secondary)', height: 'fit-content' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
-                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700 }}>Guardias del Día</h4>
-                  <button className="btn btn-secondary" style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }} onClick={() => handleOpenStaffModal(dayStr)}>
-                    Configurar
-                  </button>
-                </div>
-
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
-                  <div>
-                    <span style={{ fontWeight: 'bold', color: '#065f46' }}>🟢 En Guardia:</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem' }}>
-                      {sched.guardIds.length === 0 ? (
-                        <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Nadie asignado</span>
-                      ) : (
-                        sched.guardIds.map(uid => (
-                          <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                            <span style={{ width: '6px', height: '6px', backgroundColor: '#10b981', borderRadius: '50%' }}></span>
-                            {users.find(u => u.id === uid)?.name}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div style={{ marginTop: '0.5rem' }}>
-                    <span style={{ fontWeight: 'bold', color: '#991b1b' }}>🏖️ Licencias / Francos:</span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', marginTop: '0.25rem', color: 'var(--text-secondary)' }}>
-                      {sched.vacationIds.map(uid => (
-                        <div key={uid}>✈️ {users.find(u => u.id === uid)?.name} (Vacaciones)</div>
-                      ))}
-                      {sched.absentIds.map(uid => (
-                        <div key={uid}>⚠️ {users.find(u => u.id === uid)?.name} (Ausente)</div>
-                      ))}
-                      {sched.offIds.map(uid => (
-                        <div key={uid}>☕ {users.find(u => u.id === uid)?.name} (Franco)</div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           );
         })()}
+
+        {/* Style for the weekly summary cards */}
+        <style>{`
+          .weekly-summary-cards-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-top: 1.5rem;
+          }
+          @media (min-width: 768px) {
+            .weekly-summary-cards-grid {
+              grid-template-columns: repeat(3, 1fr);
+            }
+          }
+        `}</style>
+
+        {/* Weekly Summary Cards Panel */}
+        <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+          <h3 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span>Resumen semanal</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)' }}>
+              {formatDateDMY(weekDays[0].toISOString().split('T')[0])} al {formatDateDMY(weekDays[6].toISOString().split('T')[0])}
+            </span>
+          </h3>
+
+          <div className="weekly-summary-cards-grid">
+            {/* Card 1: Efemérides */}
+            <div className="card" style={{ backgroundColor: 'var(--bg-secondary)', height: 'fit-content' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 700 }}>🏛️ Efemérides</h4>
+                <button className="btn btn-secondary" style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }} onClick={() => handleOpenEphemerisModal(viewDateStr)}>
+                  Configurar
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
+                {ephemerisList.length === 0 ? (
+                  <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No hay efemérides esta semana</span>
+                ) : (
+                  ephemerisList.map((ep, idx) => (
+                    <div key={idx} style={{ padding: '0.35rem 0.5rem', backgroundColor: '#fef9c3', color: '#713f12', borderRadius: 'var(--radius-sm)', border: '1px solid #fef08a' }}>
+                      <span style={{ fontWeight: 600 }}>{ep.text}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Card 2: Guardias */}
+            <div className="card" style={{ backgroundColor: 'var(--bg-secondary)', height: 'fit-content' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 700 }}>🛡️ Guardias</h4>
+                <button className="btn btn-secondary" style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }} onClick={() => handleOpenStaffModal(viewDateStr)}>
+                  Configurar
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.8rem' }}>
+                {guardsList.length === 0 ? (
+                  <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Nadie asignado</span>
+                ) : (
+                  guardsList.map((guard, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span style={{ width: '6px', height: '6px', backgroundColor: '#10b981', borderRadius: '50%' }}></span>
+                      {guard.text}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Card 3: Libres */}
+            <div className="card" style={{ backgroundColor: 'var(--bg-secondary)', height: 'fit-content' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '0.75rem' }}>
+                <h4 style={{ fontSize: '0.85rem', fontWeight: 700 }}>🏖️ Libres</h4>
+                <button className="btn btn-secondary" style={{ padding: '0.2rem 0.4rem', fontSize: '0.7rem' }} onClick={() => handleOpenStaffModal(viewDateStr)}>
+                  Configurar
+                </button>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                {offsList.length === 0 ? (
+                  <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>Nadie asignado</span>
+                ) : (
+                  offsList.map((off, idx) => (
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      <span style={{ color: 'red' }}>●</span> {off.text}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* STAFF SCHEDULING CONFIGURATION MODAL */}
