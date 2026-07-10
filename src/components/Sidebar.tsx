@@ -7,7 +7,6 @@ import {
   Activity, 
   LogOut,
   Table,
-  Kanban,
   User,
   Settings as SettingsIcon,
   Megaphone,
@@ -210,23 +209,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '0.50rem 0' }} />
 
         {/* Block 2: Herramientas */}
-        <button
-          className={`menu-item ${activeTab === 'coverages' ? 'active' : ''}`}
-          onClick={() => handleNavClick('coverages')}
-          style={{ 
-            background: 'transparent', 
-            border: 'none', 
-            width: '100%', 
-            textAlign: isCollapsed ? 'center' : 'left',
-            justifyContent: isCollapsed ? 'center' : 'flex-start',
-            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
-          }}
-          title={isCollapsed ? "Tablero de Producción" : undefined}
-        >
-          <Kanban size={18} />
-          {!isCollapsed && <span>Tablero de Producción</span>}
-        </button>
-
         <button
           className={`menu-item ${activeTab === 'calendar' ? 'active' : ''}`}
           onClick={() => handleNavClick('calendar')}
