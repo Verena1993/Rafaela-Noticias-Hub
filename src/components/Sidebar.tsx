@@ -14,7 +14,8 @@ import {
   Lightbulb,
   Users,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Radio
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -292,6 +293,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         >
           <Lightbulb size={18} />
           {!isCollapsed && <span>Propuestas</span>}
+        </button>
+
+        <button
+          className={`menu-item ${activeTab === 'radar' ? 'active' : ''}`}
+          onClick={() => handleNavClick('radar')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Radar de Noticias" : undefined}
+        >
+          <Radio size={18} />
+          {!isCollapsed && <span>Radar de Noticias</span>}
         </button>
 
         {/* Block 3 & 4: Administración y Configuración (Admin only) */}
