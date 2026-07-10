@@ -1016,13 +1016,13 @@ export const Calendar: React.FC<CalendarProps> = ({
       {/* STAFF SCHEDULING CONFIGURATION MODAL */}
       {showStaffModal && (
         <div className="modal-overlay" style={{ display: 'flex', zIndex: 110 }} onClick={() => setShowStaffModal(false)}>
-          <div className="modal-content" style={{ maxWidth: '580px', width: '90%', maxHeight: '85vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', paddingBottom: '0.5rem', borderBottom: '1px solid var(--border-color)' }}>
+          <div className="modal-content" style={{ maxWidth: '580px', width: '90%', maxHeight: '85vh', overflowY: 'auto', padding: '28px', boxSizing: 'border-box' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border-color)' }}>
               <h3 style={{ fontSize: '1.1rem', fontWeight: 700 }}>Agenda Operativa: {formatDateDMY(selectedStaffDate)}</h3>
               <button onClick={() => setShowStaffModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>✕</button>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', marginBottom: '2rem' }}>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
                 Asigna el rol de disponibilidad para cada miembro de la redacción periodística en esta fecha.
               </p>
@@ -1031,8 +1031,8 @@ export const Calendar: React.FC<CalendarProps> = ({
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
                   <thead>
                     <tr style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-color)', textAlign: 'left' }}>
-                      <th style={{ padding: '0.5rem 0.75rem' }}>Miembro</th>
-                      <th style={{ padding: '0.5rem 0.75rem' }}>Disponibilidad</th>
+                      <th style={{ padding: '0.75rem' }}>Miembro</th>
+                      <th style={{ padding: '0.75rem' }}>Disponibilidad</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1045,11 +1045,11 @@ export const Calendar: React.FC<CalendarProps> = ({
 
                       return (
                         <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '0.5rem 0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                          <td style={{ padding: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                             <span style={{ width: '8px', height: '8px', backgroundColor: u.avatarColor, borderRadius: '50%' }}></span>
                             {u.name}
                           </td>
-                          <td style={{ padding: '0.5rem 0.75rem' }}>
+                          <td style={{ padding: '0.75rem' }}>
                             <select 
                               value={currentVal} 
                               onChange={(e) => handleStaffUserStatusChange(u.id, e.target.value as any)}
