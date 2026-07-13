@@ -12,6 +12,7 @@ import { InstagramPlanner } from './components/InstagramPlanner';
 import { NewsRadar } from './components/NewsRadar';
 import { ProductionTable } from './components/ProductionTable';
 import { Publications } from './components/Publications';
+import { Publicidad } from './components/Publicidad';
 // import { Coverages } from './components/Coverages';
 import { UserManagement } from './components/UserManagement';
 import { ResetPassword } from './components/ResetPassword';
@@ -113,6 +114,8 @@ const AppContent: React.FC = () => {
         return <InstagramPlanner />;
       case 'publications':
         return <Publications />;
+      case 'publicity':
+        return <Publicidad />;
       case 'tasks':
         return (
           <Tasks 

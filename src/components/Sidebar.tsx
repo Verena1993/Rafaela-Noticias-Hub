@@ -14,7 +14,8 @@ import {
   Users,
   ChevronLeft,
   ChevronRight,
-  Radio
+  Radio,
+  Target
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -258,6 +259,23 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab, isOpe
         >
           <Megaphone size={18} />
           {!isCollapsed && <span>Publicaciones</span>}
+        </button>
+
+        <button
+          className={`menu-item ${activeTab === 'publicity' ? 'active' : ''}`}
+          onClick={() => handleNavClick('publicity')}
+          style={{ 
+            background: 'transparent', 
+            border: 'none', 
+            width: '100%', 
+            textAlign: isCollapsed ? 'center' : 'left',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            padding: isCollapsed ? '0.6rem 0' : '0.6rem 0.75rem'
+          }}
+          title={isCollapsed ? "Publicidad" : undefined}
+        >
+          <Target size={18} />
+          {!isCollapsed && <span>Publicidad</span>}
         </button>
 
         <button
