@@ -151,6 +151,13 @@ export const Publicidad: React.FC = () => {
   // Flag to avoid auto-generation during modal initialization or user load
   const [isInitializing, setIsInitializing] = useState(false);
   const [originalConfig, setOriginalConfig] = useState<any>(null);
+  
+  // Custom confirmation modal state for deletions
+  const [confirmDelete, setConfirmDelete] = useState<{
+    show: boolean;
+    title: string;
+    onConfirm: () => void;
+  }>({ show: false, title: '', onConfirm: () => {} });
 
   // Attachment states (for inline addition inside Bloque 1 / Bloque 2 cards)
   const [addingAttachmentToPubId, setAddingAttachmentToPubId] = useState<string | null>(null); // if null, adding to Bloque 1 (Producción)
@@ -454,7 +461,14 @@ export const Publicidad: React.FC = () => {
 
   // Delete a publication card
   const handleRemovePublicationCard = (id: string) => {
-    setPublications(prev => prev.filter(p => p.id !== id));
+    setConfirmDelete({
+      show: true,
+      title: '¿Deseás eliminar este registro?',
+      onConfirm: () => {
+        setPublications(prev => prev.filter(p => p.id !== id));
+        setConfirmDelete(prev => ({ ...prev, show: false }));
+      }
+    });
   };
 
   // Update field of a specific publication card
@@ -581,10 +595,15 @@ export const Publicidad: React.FC = () => {
 
   // Delete campaign
   const handleDeleteCampaign = (id: string) => {
-    if (window.confirm('¿Estás seguro de que deseas eliminar esta publicidad y todas sus publicaciones programadas?')) {
-      const updated = campaigns.filter(c => c.id !== id);
-      saveCampaigns(updated);
-    }
+    setConfirmDelete({
+      show: true,
+      title: '¿Deseás eliminar este registro?',
+      onConfirm: () => {
+        const updated = campaigns.filter(c => c.id !== id);
+        saveCampaigns(updated);
+        setConfirmDelete(prev => ({ ...prev, show: false }));
+      }
+    });
   };
 
   // Toggle pieces to produce
@@ -1276,8 +1295,8 @@ export const Publicidad: React.FC = () => {
                             <Edit3 size={12} />
                           </button>
                           <button 
-                            className="btn btn-secondary" 
-                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', color: 'var(--danger)' }} 
+                            className="btn" 
+                            style={{ padding: '0.25rem 0.5rem', fontSize: '0.72rem', backgroundColor: 'var(--danger-light)', color: 'var(--danger-text)', border: 'none' }} 
                             onClick={() => handleDeleteCampaign(camp.id)}
                             title="Eliminar publicidad"
                           >
@@ -1650,10 +1669,21 @@ export const Publicidad: React.FC = () => {
                                 <button
                                   type="button"
                                   onClick={() => handleRemovePublicationCard(pub.id)}
-                                  style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: '0.95rem' }}
+                                  style={{ 
+                                    background: 'var(--danger-light)', 
+                                    border: 'none', 
+                                    color: 'var(--danger-text)', 
+                                    cursor: 'pointer', 
+                                    padding: '0.35rem', 
+                                    borderRadius: '4px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: 'all 0.2s'
+                                  }}
                                   title="Eliminar publicación"
                                 >
-                                  ✕
+                                  <Trash2 size={14} />
                                 </button>
                               </div>
 
@@ -1918,6 +1948,40 @@ export const Publicidad: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* CONFIRM DELETE MODAL */}
+      {confirmDelete.show && (
+        <div className="modal-overlay" style={{ display: 'flex', zIndex: 130, position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' }} onClick={() => setConfirmDelete(prev => ({ ...prev, show: false }))}>
+          <div className="modal-content" style={{ maxWidth: '400px', width: '90%', padding: '1.5rem', textAlign: 'center', backgroundColor: 'var(--bg-primary)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-lg)' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', backgroundColor: 'var(--danger-light)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--danger-text)' }}>
+                <Trash2 size={24} />
+              </div>
+              <h4 style={{ fontSize: '1.05rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Confirmar Eliminación</h4>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', margin: 0 }}>
+                {confirmDelete.title}
+              </p>
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%', marginTop: '0.5rem' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ flex: 1 }} 
+                  onClick={() => setConfirmDelete(prev => ({ ...prev, show: false }))}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-danger" 
+                  style={{ flex: 1 }} 
+                  onClick={confirmDelete.onConfirm}
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
