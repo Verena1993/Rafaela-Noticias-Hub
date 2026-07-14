@@ -20,7 +20,7 @@ export interface PublicityPublication {
   date: string;       // YYYY-MM-DD
   time?: string;      // HH:mm (optional)
   medium: PublicityMedium;
-  pieces: PublicityFormat[]; // ¿Qué publicar? (sub-selection of production formats)
+  pieces: (PublicityFormat | PublicityMedium)[]; // ¿Qué publicar? (sub-selection of production formats / media)
   attachments: PublicityAttachment[]; // Materiales propios para esta publicación
   observations?: string;
   status: PublicityStatus;
@@ -320,19 +320,18 @@ export const Publicidad: React.FC = () => {
           date: productionDate || new Date().toISOString().split('T')[0],
           time: productionTime || '10:00',
           medium: 'Portal Web',
-          pieces: selectedPieces,
+          pieces: [],
           attachments: [],
           observations: '',
           status: 'Pendiente'
         }]);
       } else {
-        // Keep only the first publication but update its date/time and filter pieces
+        // Keep only the first publication but update its date/time
         setPublications(prev => [
           {
             ...prev[0],
             date: productionDate || prev[0].date,
-            time: productionTime || prev[0].time,
-            pieces: prev[0].pieces.length > 0 ? prev[0].pieces.filter(p => selectedPieces.includes(p)) : selectedPieces
+            time: productionTime || prev[0].time
           }
         ]);
       }
@@ -349,15 +348,15 @@ export const Publicidad: React.FC = () => {
   }, [frequency, intervalDays, pubCount, selectedMonth, selectedYear, productionDate, productionTime]);
 
   // Sync content checkboxes inside cards when selection of pieces to produce changes
-  useEffect(() => {
-    if (!showModal || isInitializing) return;
-    setPublications(prev =>
-      prev.map(pub => ({
-        ...pub,
-        pieces: pub.pieces.filter(p => selectedPieces.includes(p))
-      }))
-    );
-  }, [selectedPieces]);
+  // useEffect(() => {
+  //   if (!showModal || isInitializing) return;
+  //   setPublications(prev =>
+  //     prev.map(pub => ({
+  //       ...pub,
+  //       pieces: pub.pieces.filter(p => selectedPieces.includes(p))
+  //     }))
+  //   );
+  // }, [selectedPieces]);
 
   // Generation Logic
   const calculateGeneratedPublications = (): PublicityPublication[] => {
@@ -466,15 +465,21 @@ export const Publicidad: React.FC = () => {
   };
 
   // Toggle piece inside card "Contenido a publicar"
-  const handleTogglePieceInCard = (pubId: string, format: PublicityFormat) => {
+  const handleTogglePieceInCard = (pubId: string, item: any) => {
     setPublications(prev =>
       prev.map(p => {
         if (p.id !== pubId) return p;
         const pieces = p.pieces || [];
-        const newPieces = pieces.includes(format)
-          ? pieces.filter(f => f !== format)
-          : [...pieces, format];
-        return { ...p, pieces: newPieces };
+        const newPieces = pieces.includes(item)
+          ? pieces.filter(f => f !== item)
+          : [...pieces, item];
+        // Keep medium in sync with the first selected option (or default to 'Portal Web')
+        const firstMedium = (newPieces.find(x => ALL_MEDIA.includes(x as any)) as PublicityMedium) || 'Portal Web';
+        return { 
+          ...p, 
+          pieces: newPieces,
+          medium: firstMedium
+        };
       })
     );
   };
@@ -1635,7 +1640,6 @@ export const Publicidad: React.FC = () => {
                         </p>
                       ) : (
                         publications.map((pub, idx) => {
-                          const piecesToShow = selectedPieces.length > 0 ? selectedPieces : ALL_PIECES;
                           return (
                             <div key={pub.id} className="pub-editor-card">
                               {/* Header Card */}
@@ -1654,7 +1658,7 @@ export const Publicidad: React.FC = () => {
                               </div>
 
                               {/* Card Fields */}
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
                                 <div className="form-group">
                                   <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Fecha *</label>
                                   <input
@@ -1674,29 +1678,17 @@ export const Publicidad: React.FC = () => {
                                     style={{ width: '100%', padding: '0.3rem', fontSize: '0.78rem', border: '1px solid var(--border-color)', borderRadius: '4px' }}
                                   />
                                 </div>
-                                <div className="form-group">
-                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.2' }}>Medio de publicación *</label>
-                                  <select
-                                    value={pub.medium}
-                                    onChange={e => handleUpdatePublicationField(pub.id, 'medium', e.target.value as PublicityMedium)}
-                                    style={{ width: '100%', padding: '0.3rem', fontSize: '0.78rem', border: '1px solid var(--border-color)', borderRadius: '4px', backgroundColor: 'var(--bg-primary)' }}
-                                  >
-                                    {ALL_MEDIA.map(m => (
-                                      <option key={m} value={m}>{getMediumColorDot(m)} {m}</option>
-                                    ))}
-                                  </select>
-                                </div>
                               </div>
 
-                              {/* ¿Qué publicar? (Content Selection of Selected Pieces) */}
+                              {/* ¿Qué publicar? (Content Selection of Media) */}
                               <div className="form-group">
                                 <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>¿Qué publicar?</label>
                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                                  {piecesToShow.map(format => {
-                                    const isChecked = (pub.pieces || []).includes(format);
+                                  {ALL_MEDIA.map(mediaOpt => {
+                                    const isChecked = (pub.pieces || []).includes(mediaOpt as any);
                                     return (
                                       <label
-                                        key={format}
+                                        key={mediaOpt}
                                         style={{
                                           display: 'inline-flex',
                                           alignItems: 'center',
@@ -1713,11 +1705,11 @@ export const Publicidad: React.FC = () => {
                                         <input
                                           type="checkbox"
                                           checked={isChecked}
-                                          onChange={() => handleTogglePieceInCard(pub.id, format)}
+                                          onChange={() => handleTogglePieceInCard(pub.id, mediaOpt as any)}
                                           style={{ display: 'none' }}
                                         />
                                         <span>{isChecked ? '☑' : '☐'}</span>
-                                        <span>{format}</span>
+                                        <span>{mediaOpt}</span>
                                       </label>
                                     );
                                   })}

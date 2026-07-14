@@ -1,0 +1,154 @@
+warning: in the working copy of 'src/components/Publicidad.tsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/src/components/Publicidad.tsx b/src/components/Publicidad.tsx[m
+[1mindex 9facbc7..5f730fc 100644[m
+[1m--- a/src/components/Publicidad.tsx[m
+[1m+++ b/src/components/Publicidad.tsx[m
+[36m@@ -20,7 +20,7 @@[m [mexport interface PublicityPublication {[m
+   date: string;       // YYYY-MM-DD[m
+   time?: string;      // HH:mm (optional)[m
+   medium: PublicityMedium;[m
+[31m-  pieces: PublicityFormat[]; // ¿Qué publicar? (sub-selection of production formats)[m
+[32m+[m[32m  pieces: (PublicityFormat | PublicityMedium)[]; // ¿Qué publicar? (sub-selection of production formats / media)[m
+   attachments: PublicityAttachment[]; // Materiales propios para esta publicación[m
+   observations?: string;[m
+   status: PublicityStatus;[m
+[36m@@ -320,19 +320,18 @@[m [mexport const Publicidad: React.FC = () => {[m
+           date: productionDate || new Date().toISOString().split('T')[0],[m
+           time: productionTime || '10:00',[m
+           medium: 'Portal Web',[m
+[31m-          pieces: selectedPieces,[m
+[32m+[m[32m          pieces: [],[m
+           attachments: [],[m
+           observations: '',[m
+           status: 'Pendiente'[m
+         }]);[m
+       } else {[m
+[31m-        // Keep only the first publication but update its date/time and filter pieces[m
+[32m+[m[32m        // Keep only the first publication but update its date/time[m
+         setPublications(prev => [[m
+           {[m
+             ...prev[0],[m
+             date: productionDate || prev[0].date,[m
+[31m-            time: productionTime || prev[0].time,[m
+[31m-            pieces: prev[0].pieces.length > 0 ? prev[0].pieces.filter(p => selectedPieces.includes(p)) : selectedPieces[m
+[32m+[m[32m            time: productionTime || prev[0].time[m
+           }[m
+         ]);[m
+       }[m
+[36m@@ -349,15 +348,15 @@[m [mexport const Publicidad: React.FC = () => {[m
+   }, [frequency, intervalDays, pubCount, selectedMonth, selectedYear, productionDate, productionTime]);[m
+ [m
+   // Sync content checkboxes inside cards when selection of pieces to produce changes[m
+[31m-  useEffect(() => {[m
+[31m-    if (!showModal || isInitializing) return;[m
+[31m-    setPublications(prev =>[m
+[31m-      prev.map(pub => ({[m
+[31m-        ...pub,[m
+[31m-        pieces: pub.pieces.filter(p => selectedPieces.includes(p))[m
+[31m-      }))[m
+[31m-    );[m
+[31m-  }, [selectedPieces]);[m
+[32m+[m[32m  // useEffect(() => {[m
+[32m+[m[32m  //   if (!showModal || isInitializing) return;[m
+[32m+[m[32m  //   setPublications(prev =>[m
+[32m+[m[32m  //     prev.map(pub => ({[m
+[32m+[m[32m  //       ...pub,[m
+[32m+[m[32m  //       pieces: pub.pieces.filter(p => selectedPieces.includes(p))[m
+[32m+[m[32m  //     }))[m
+[32m+[m[32m  //   );[m
+[32m+[m[32m  // }, [selectedPieces]);[m
+ [m
+   // Generation Logic[m
+   const calculateGeneratedPublications = (): PublicityPublication[] => {[m
+[36m@@ -466,15 +465,21 @@[m [mexport const Publicidad: React.FC = () => {[m
+   };[m
+ [m
+   // Toggle piece inside card "Contenido a publicar"[m
+[31m-  const handleTogglePieceInCard = (pubId: string, format: PublicityFormat) => {[m
+[32m+[m[32m  const handleTogglePieceInCard = (pubId: string, item: any) => {[m
+     setPublications(prev =>[m
+       prev.map(p => {[m
+         if (p.id !== pubId) return p;[m
+         const pieces = p.pieces || [];[m
+[31m-        const newPieces = pieces.includes(format)[m
+[31m-          ? pieces.filter(f => f !== format)[m
+[31m-          : [...pieces, format];[m
+[31m-        return { ...p, pieces: newPieces };[m
+[32m+[m[32m        const newPieces = pieces.includes(item)[m
+[32m+[m[32m          ? pieces.filter(f => f !== item)[m
+[32m+[m[32m          : [...pieces, item];[m
+[32m+[m[32m        // Keep medium in sync with the first selected option (or default to 'Portal Web')[m
+[32m+[m[32m        const firstMedium = (newPieces.find(x => ALL_MEDIA.includes(x as any)) as PublicityMedium) || 'Portal Web';[m
+[32m+[m[32m        return {[m[41m [m
+[32m+[m[32m          ...p,[m[41m [m
+[32m+[m[32m          pieces: newPieces,[m
+[32m+[m[32m          medium: firstMedium[m
+[32m+[m[32m        };[m
+       })[m
+     );[m
+   };[m
+[36m@@ -1635,7 +1640,6 @@[m [mexport const Publicidad: React.FC = () => {[m
+                         </p>[m
+                       ) : ([m
+                         publications.map((pub, idx) => {[m
+[31m-                          const piecesToShow = selectedPieces.length > 0 ? selectedPieces : ALL_PIECES;[m
+                           return ([m
+                             <div key={pub.id} className="pub-editor-card">[m
+                               {/* Header Card */}[m
+[36m@@ -1654,7 +1658,7 @@[m [mexport const Publicidad: React.FC = () => {[m
+                               </div>[m
+ [m
+                               {/* Card Fields */}[m
+[31m-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>[m
+[32m+[m[32m                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>[m
+                                 <div className="form-group">[m
+                                   <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>Fecha *</label>[m
+                                   <input[m
+[36m@@ -1674,29 +1678,17 @@[m [mexport const Publicidad: React.FC = () => {[m
+                                     style={{ width: '100%', padding: '0.3rem', fontSize: '0.78rem', border: '1px solid var(--border-color)', borderRadius: '4px' }}[m
+                                   />[m
+                                 </div>[m
+[31m-                                <div className="form-group">[m
+[31m-                                  <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.2' }}>Medio de publicación *</label>[m
+[31m-                                  <select[m
+[31m-                                    value={pub.medium}[m
+[31m-                                    onChange={e => handleUpdatePublicationField(pub.id, 'medium', e.target.value as PublicityMedium)}[m
+[31m-                                    style={{ width: '100%', padding: '0.3rem', fontSize: '0.78rem', border: '1px solid var(--border-color)', borderRadius: '4px', backgroundColor: 'var(--bg-primary)' }}[m
+[31m-                                  >[m
+[31m-                                    {ALL_MEDIA.map(m => ([m
+[31m-                                      <option key={m} value={m}>{getMediumColorDot(m)} {m}</option>[m
+[31m-                                    ))}[m
+[31m-                                  </select>[m
+[31m-                                </div>[m
+                               </div>[m
+ [m
+[31m-                              {/* ¿Qué publicar? (Content Selection of Selected Pieces) */}[m
+[32m+[m[32m                              {/* ¿Qué publicar? (Content Selection of Media) */}[m
+                               <div className="form-group">[m
+                                 <label style={{ fontSize: '0.75rem', fontWeight: 600, display: 'block', marginBottom: '0.2rem' }}>¿Qué publicar?</label>[m
+                                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>[m
+[31m-                                  {piecesToShow.map(format => {[m
+[31m-                                    const isChecked = (pub.pieces || []).includes(format);[m
+[32m+[m[32m                                  {ALL_MEDIA.map(mediaOpt => {[m
+[32m+[m[32m                                    const isChecked = (pub.pieces || []).includes(mediaOpt as any);[m
+                                     return ([m
+                                       <label[m
+[31m-                                        key={format}[m
+[32m+[m[32m                                        key={mediaOpt}[m
+                                         style={{[m
+                                           display: 'inline-flex',[m
+                                           alignItems: 'center',[m
+[36m@@ -1713,11 +1705,11 @@[m [mexport const Publicidad: React.FC = () => {[m
+                                         <input[m
+                                           type="checkbox"[m
+                                           checked={isChecked}[m
+[31m-                                          onChange={() => handleTogglePieceInCard(pub.id, format)}[m
+[32m+[m[32m                                          onChange={() => handleTogglePieceInCard(pub.id, mediaOpt as any)}[m
+                                           style={{ display: 'none' }}[m
+                                         />[m
+                                         <span>{isChecked ? '☑' : '☐'}</span>[m
+[31m-                                        <span>{format}</span>[m
+[32m+[m[32m                                        <span>{mediaOpt}</span>[m
+                                       </label>[m
+                                     );[m
+                                   })}[m
