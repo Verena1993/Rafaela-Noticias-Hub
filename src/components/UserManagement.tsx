@@ -47,7 +47,7 @@ export const UserManagement: React.FC = () => {
   // Creation Form State
   const [createName, setCreateName] = useState('');
   const [createEmail, setCreateEmail] = useState('');
-  const [createPassword, setCreatePassword] = useState('password123');
+  const [createPassword, setCreatePassword] = useState('');
   const [createRole, setCreateRole] = useState<'admin' | 'editor'>('editor');
   const [createError, setCreateError] = useState('');
   const [creating, setCreating] = useState(false);
@@ -68,7 +68,7 @@ export const UserManagement: React.FC = () => {
       // Reset form
       setCreateName('');
       setCreateEmail('');
-      setCreatePassword('password123');
+      setCreatePassword('');
       setCreateRole('editor');
     } catch (err: any) {
       setCreateError(err.message || 'Error al crear el usuario. Inténtalo de nuevo.');

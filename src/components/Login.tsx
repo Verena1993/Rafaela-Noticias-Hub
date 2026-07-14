@@ -5,7 +5,7 @@ import { Radio, Key } from 'lucide-react';
 export const Login: React.FC = () => {
   const { login, resetPassword, users } = useHub();
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('password123'); // Default password
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');

@@ -868,7 +868,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password: password || 'password123',
+        password: password || '',
       });
       if (error) {
         throw error;
@@ -935,7 +935,7 @@ export const HubProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data, error } = await supabaseAdminClient.auth.signUp({
         email,
-        password: password || 'password123',
+        password: password || '',
         options: {
           data: {
             nombre,
